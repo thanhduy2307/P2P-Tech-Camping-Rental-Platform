@@ -1,0 +1,1306 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "P2P Rental Platform API (Hệ thống API Cho Thuê P2P)",
+    "version": "1.0.0",
+    "description": "Tài liệu API chi tiết hệ thống Sàn giao dịch cho thuê thiết bị công nghệ & đồ dã ngoại ngang hàng (P2P Tech & Camping Rental Platform)."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000",
+      "description": "Server nội bộ thử nghiệm (Local server)"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "User": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "name": { "type": "string" },
+          "email": { "type": "string" },
+          "role": { "type": "string", "enum": ["renter", "lender", "inspector", "admin"] },
+          "authProvider": { "type": "string", "enum": ["local", "google"] },
+          "balance": { "type": "number" },
+          "phoneNumber": { "type": "string" },
+          "address": {
+            "type": "object",
+            "properties": {
+              "province": { "type": "string" },
+              "district": { "type": "string" },
+              "ward": { "type": "string" },
+              "street": { "type": "string" },
+              "coordinates": {
+                "type": "object",
+                "properties": {
+                  "lat": { "type": "number", "example": 10.776223 },
+                  "lng": { "type": "number", "example": 106.667501 }
+                }
+              }
+            }
+          },
+          "isProfileCompleted": { "type": "boolean" },
+          "lenderStatus": { "type": "string", "enum": ["none", "pending", "approved", "rejected"] },
+          "lenderOnboarding": {
+            "type": "object",
+            "properties": {
+              "cccdFront": { "type": "string" },
+              "cccdBack": { "type": "string" },
+              "cccdSelfie": { "type": "string" },
+              "bankAccount": {
+                "type": "object",
+                "properties": {
+                  "accountNumber": { "type": "string" },
+                  "bankName": { "type": "string" },
+                  "accountHolder": { "type": "string" }
+                }
+              },
+              "rejectReason": { "type": "string" }
+            }
+          },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Asset": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "lender": { "type": "string", "description": "Lender User ID" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "category": { "type": "string" },
+          "condition": { "type": "string" },
+          "pricePerDay": { "type": "number" },
+          "depositAmount": { "type": "number" },
+          "status": { "type": "string", "enum": ["draft", "pending_approval", "verified", "rented", "rejected", "unavailable"] },
+          "images": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "videos": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "location": {
+            "type": "object",
+            "properties": {
+              "lat": { "type": "number", "example": 10.776889 },
+              "lng": { "type": "number", "example": 106.700806 }
+            }
+          },
+          "verifiedBy": { "type": "string", "description": "Inspector User ID" },
+          "verificationNotes": { "type": "string" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      },
+      "Order": {
+        "type": "object",
+        "properties": {
+          "_id": { "type": "string" },
+          "asset": { "type": "string", "description": "Asset ID" },
+          "renter": { "type": "string", "description": "Renter User ID" },
+          "startDate": { "type": "string", "format": "date" },
+          "endDate": { "type": "string", "format": "date" },
+          "rentalDays": { "type": "integer" },
+          "totalRent": { "type": "number" },
+          "deposit": { "type": "number" },
+          "platformFee": { "type": "number" },
+          "status": { "type": "string", "enum": ["pending_payment", "reserved", "active", "returned", "completed", "disputed"] },
+          "vnpayTxnRef": { "type": "string" },
+          "handoverOTP": { "type": "string" },
+          "returnOTP": { "type": "string" },
+          "disputeNotes": { "type": "string" },
+          "inspector": { "type": "string", "description": "Inspector User ID" },
+          "createdAt": { "type": "string", "format": "date-time" },
+          "updatedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/api/auth/register": {
+      "post": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Đăng ký tài khoản người dùng mới",
+        "description": "Đăng ký một tài khoản mới trên hệ thống với vai trò mặc định là renter (người đi thuê) hoặc lender (chủ cho thuê).",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "email", "password"],
+                "properties": {
+                  "name": { "type": "string", "example": "Nguyễn Văn Renter" },
+                  "email": { "type": "string", "example": "newrenter@example.com" },
+                  "password": { "type": "string", "example": "password123" },
+                  "role": { "type": "string", "enum": ["renter", "lender"], "default": "renter" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Đăng ký tài khoản mới thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "_id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "email": { "type": "string" },
+                        "role": { "type": "string" },
+                        "isProfileCompleted": { "type": "boolean" },
+                        "token": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Email đã tồn tại trên hệ thống hoặc định dạng dữ liệu không hợp lệ" }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Đăng nhập bằng Email và Mật khẩu",
+        "description": "Đăng nhập tài khoản nội bộ để lấy mã JWT Access Token sử dụng cho các yêu cầu bảo mật sau này.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "password"],
+                "properties": {
+                  "email": { "type": "string", "example": "renter@example.com" },
+                  "password": { "type": "string", "example": "password123" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đăng nhập thành công, trả về Access Token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "_id": { "type": "string" },
+                        "name": { "type": "string" },
+                        "email": { "type": "string" },
+                        "role": { "type": "string" },
+                        "isProfileCompleted": { "type": "boolean" },
+                        "token": { "type": "string" }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Thông tin đăng nhập không chính xác" }
+        }
+      }
+    },
+    "/api/auth/google/callback": {
+      "get": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Callback tiếp nhận đăng nhập bằng Google OAuth",
+        "description": "Endpoint tiếp nhận mã xác thực từ Google gửi về sau khi người dùng đăng nhập Google thành công, hệ thống tự động khởi tạo/đăng nhập tài khoản liên kết.",
+        "parameters": [
+          {
+            "name": "code",
+            "in": "query",
+            "required": true,
+            "description": "Mã Authorization Code được trả về từ phía Google",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Liên kết và Đăng nhập Google thành công" },
+          "401": { "description": "Lỗi xác thực thông tin tài khoản Google từ phía bên thứ ba" }
+        }
+      }
+    },
+    "/api/auth/complete-profile": {
+      "put": {
+        "tags": ["Common User APIs (Chung)"],
+        "summary": "Cập nhật và hoàn thiện hồ sơ cơ bản",
+        "description": "Yêu cầu bắt buộc người dùng điền thêm Số điện thoại và Địa chỉ chi tiết (kèm theo tọa độ GPS vĩ độ/kinh độ) trước khi được quyền đi thuê hoặc cho thuê đồ.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["phoneNumber", "address"],
+                "properties": {
+                  "phoneNumber": { "type": "string", "example": "0987654321" },
+                  "address": {
+                    "type": "object",
+                    "required": ["province", "district", "ward", "street"],
+                    "properties": {
+                      "province": { "type": "string", "example": "Hồ Chí Minh" },
+                      "district": { "type": "string", "example": "Quận 10" },
+                      "ward": { "type": "string", "example": "Phường 12" },
+                      "street": { "type": "string", "example": "Đường 3 tháng 2" },
+                      "coordinates": {
+                        "type": "object",
+                        "required": ["lat", "lng"],
+                        "properties": {
+                          "lat": { "type": "number", "example": 10.776223 },
+                          "lng": { "type": "number", "example": 106.667501 }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Hoàn thiện hồ sơ cá nhân thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Thiếu các thông tin bắt buộc như số điện thoại hoặc các trường địa chỉ chi tiết" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập (Token thiếu hoặc không hợp lệ)" }
+        }
+      }
+    },
+    "/api/auth/switch-role": {
+      "put": {
+        "tags": ["Common User APIs (Chung)"],
+        "summary": "Chuyển đổi giao diện vai trò (Renter <=> Lender)",
+        "description": "Hỗ trợ thay đổi chế độ xem và tác vụ giữa Renter và Lender. Lưu ý: Chỉ được phép đổi vai trò sang Lender nếu trạng thái eKYC Lender đã được Admin xét duyệt APPROVED.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Chuyển đổi vai trò người dùng thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối chuyển vai trò do hồ sơ eKYC Lender chưa được đăng ký, đang chờ duyệt hoặc đã bị từ chối." }
+        }
+      }
+    },
+    "/api/auth/balance": {
+      "get": {
+        "tags": ["Common User APIs (Chung)"],
+        "summary": "Xem số dư ví hiện tại",
+        "description": "Lấy thông tin số dư ví hiện tại của tài khoản người dùng đang đăng nhập (áp dụng cho cả Renter và Lender).",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Lấy số dư thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "balance": { "type": "number", "example": 1500000 }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" }
+        }
+      }
+    },
+    "/api/auth/lender-onboarding": {
+      "post": {
+        "tags": ["Renter APIs (Người thuê)"],
+        "summary": "Gửi hồ sơ đăng ký làm đối tác cho thuê (eKYC Lender)",
+        "description": "Người dùng đăng ký làm chủ cho thuê đồ bằng cách nộp ảnh CCCD hai mặt, ảnh selfie cầm CCCD và thông tin số tài khoản ngân hàng nhận tiền giải ngân dòng tiền thuê sau này.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["cccdFront", "cccdBack", "cccdSelfie", "bankAccount"],
+                "properties": {
+                  "cccdFront": { "type": "string", "example": "http://example.com/cccd-front.jpg" },
+                  "cccdBack": { "type": "string", "example": "http://example.com/cccd-back.jpg" },
+                  "cccdSelfie": { "type": "string", "example": "http://example.com/cccd-selfie.jpg" },
+                  "bankAccount": {
+                    "type": "object",
+                    "required": ["accountNumber", "bankName", "accountHolder"],
+                    "properties": {
+                      "accountNumber": { "type": "string", "example": "1903456789012" },
+                      "bankName": { "type": "string", "example": "Techcombank" },
+                      "accountHolder": { "type": "string", "example": "NGUYEN VAN A" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Nộp đơn đăng ký eKYC Lender thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Thiếu hồ sơ ảnh eKYC, tài khoản ngân hàng hoặc tài khoản gốc chưa hoàn thành hồ sơ cá nhân" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" }
+        }
+      }
+    },
+    "/api/auth/lender-applications": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Lấy danh sách các đơn eKYC đang chờ duyệt (Chỉ Admin)",
+        "description": "Hệ thống truy xuất toàn bộ danh sách hồ sơ ứng viên đăng ký Lender có trạng thái 'pending' để quản trị viên thẩm định.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Tải danh sách đơn đăng ký eKYC chờ duyệt thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/User" }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - API chỉ dành riêng cho tài khoản quản trị Admin" }
+        }
+      }
+    },
+    "/api/auth/lender-applications/{id}/verify": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Phê duyệt hoặc Từ chối hồ sơ đăng ký eKYC Lender (Chỉ Admin)",
+        "description": "Admin kiểm duyệt hồ sơ ứng viên: duyệt 'approved' (hệ thống tự nâng cấp vai trò người dùng thành Lender) hoặc từ chối 'rejected' kèm lý do cụ thể gửi về cho người dùng.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID người dùng ứng tuyển",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["approved", "rejected"], "example": "approved" },
+                  "rejectReason": { "type": "string", "example": "Ảnh chân dung tự sướng cầm CCCD bị mờ, không rõ mặt." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Xử lý hồ sơ eKYC Lender thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "message": { "type": "string" },
+                    "data": { "$ref": "#/components/schemas/User" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Trạng thái duyệt không hợp lệ hoặc thiếu lý do khi từ chối đơn" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Quyền hạn Admin yêu cầu" },
+          "404": { "description": "Không tìm thấy thông tin tài khoản ứng viên" }
+        }
+      }
+    },
+    "/api/auth/withdraw": {
+      "post": {
+        "tags": ["Common User APIs (Chung)"],
+        "summary": "Gửi yêu cầu rút tiền từ số dư ví",
+        "description": "Người dùng (Renter hoặc Lender) gửi yêu cầu rút số tiền khả dụng từ số dư ví về tài khoản ngân hàng. Hệ thống sẽ tự động đóng băng (khấu trừ) số dư tương ứng ngay lập tức. Nếu tài khoản chưa kích hoạt eKYC Lender, vui lòng cung cấp thêm trường bankAccount trong requestBody.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["amount"],
+                "properties": {
+                  "amount": { "type": "number", "example": 500000, "description": "Số tiền muốn rút (VND)" },
+                  "bankAccount": {
+                    "type": "object",
+                    "properties": {
+                      "accountNumber": { "type": "string", "example": "1903456789012" },
+                      "bankName": { "type": "string", "example": "Techcombank" },
+                      "accountHolder": { "type": "string", "example": "NGUYEN VAN A" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tạo yêu cầu rút tiền thành công, số tiền đã được đóng băng chờ phê duyệt"
+          },
+          "400": { "description": "Số tiền không hợp lệ, không cung cấp đủ thông tin ngân hàng hoặc số dư ví không đủ" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập do vai trò không hợp lệ" }
+        }
+      }
+    },
+    "/api/auth/withdrawals": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Lấy danh sách các đơn yêu cầu rút tiền (Chỉ Admin)",
+        "description": "Admin truy xuất danh sách tất cả các đơn yêu cầu rút tiền của Lender để kiểm duyệt.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Lấy danh sách thành công"
+          },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" }
+        }
+      }
+    },
+    "/api/auth/withdrawals/{id}/verify": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Phê duyệt hoặc Từ chối yêu cầu rút tiền (Chỉ Admin)",
+        "description": "Admin duyệt (chuyển khoản thực tế thành công) hoặc từ chối đơn rút tiền. Từ chối yêu cầu rút tiền sẽ tự động hoàn trả số tiền đóng băng về ví số dư của Lender.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID yêu cầu rút tiền",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["approved", "rejected"], "example": "approved" },
+                  "rejectReason": { "type": "string", "example": "Sai thông tin chi nhánh ngân hàng hoặc tài khoản không tồn tại." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Xử lý yêu cầu rút tiền thành công"
+          },
+          "400": { "description": "Trạng thái không hợp lệ hoặc thiếu lý do từ chối" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Yêu cầu vai trò Admin" },
+          "404": { "description": "Không tìm thấy yêu cầu rút tiền" }
+        }
+      }
+    },
+    "/api/admin/stats": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Lấy thống kê số liệu tổng quan hệ thống (Chỉ Admin)",
+        "description": "Admin lấy số liệu thống kê toàn bộ hệ thống bao gồm người dùng, thiết bị, đơn hàng, tổng doanh thu và số lượng yêu cầu chờ duyệt.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Lấy thống kê thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" }
+        }
+      }
+    },
+    "/api/admin/users": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Danh sách người dùng trên nền tảng (Chỉ Admin)",
+        "description": "Admin tìm kiếm, lọc danh sách tất cả thành viên trong hệ thống.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "role",
+            "in": "query",
+            "required": false,
+            "description": "Lọc theo vai trò (renter, lender, inspector, admin)",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "search",
+            "in": "query",
+            "required": false,
+            "description": "Tìm kiếm theo tên hoặc email",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Lấy danh sách người dùng thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" }
+        }
+      }
+    },
+    "/api/admin/users/{id}/role": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Cập nhật vai trò thành viên (Chỉ Admin)",
+        "description": "Admin thay đổi phân quyền tài khoản người dùng thành renter, lender, inspector, hoặc admin.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID người dùng",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["role"],
+                "properties": {
+                  "role": { "type": "string", "enum": ["renter", "lender", "inspector", "admin"], "example": "inspector" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cập nhật vai trò thành công" },
+          "400": { "description": "Vai trò không hợp lệ" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" },
+          "404": { "description": "Không tìm thấy người dùng" }
+        }
+      }
+    },
+    "/api/admin/users/{id}/ban": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Khóa / Mở khóa tài khoản thành viên (Chỉ Admin)",
+        "description": "Admin cấm (ban) hoặc bỏ cấm (unban) người dùng vi phạm chính sách nền tảng.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID người dùng",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Đổi trạng thái khóa tài khoản thành công" },
+          "400": { "description": "Không thể khóa tài khoản Admin" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" },
+          "404": { "description": "Không tìm thấy người dùng" }
+        }
+      }
+    },
+    "/api/admin/assets": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Lấy toàn bộ danh sách thiết bị cho thuê (Chỉ Admin)",
+        "description": "Admin quản lý và lọc danh sách toàn bộ thiết bị đang cho thuê trên sàn.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Lọc trạng thái thiết bị",
+            "schema": { "type": "string", "enum": ["draft", "pending_approval", "verified", "rented", "rejected", "unavailable"] }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Lấy danh sách thiết bị thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" }
+        }
+      }
+    },
+    "/api/admin/orders": {
+      "get": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Lấy toàn bộ danh sách đơn thuê đồ (Chỉ Admin)",
+        "description": "Admin xem và quản lý tất cả lịch sử/trạng thái đơn thuê đồ trên toàn sàn.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Lọc trạng thái đơn hàng",
+            "schema": { "type": "string", "enum": ["pending_payment", "reserved", "active", "returned", "completed", "disputed"] }
+          }
+        ],
+        "responses": {
+          "200": { "description": "Lấy danh sách đơn thuê đồ thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Admin" }
+        }
+      }
+    },
+    "/api/assets": {
+      "get": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Xem danh sách thiết bị/tài sản đã được phê duyệt công khai",
+        "description": "Trả về danh sách tất cả các thiết bị đang sẵn sàng cho thuê trên sàn, cho phép Renter tự do duyệt và lựa chọn sản phẩm phù hợp. Nếu truyền thêm tọa độ lat/lng, danh sách sẽ tự động sắp xếp theo khoảng cách từ gần đến xa.",
+        "parameters": [
+          {
+            "name": "lat",
+            "in": "query",
+            "required": false,
+            "description": "Vĩ độ vị trí hiện tại của Renter để tính khoảng cách.",
+            "schema": { "type": "number", "example": 10.776223 }
+          },
+          {
+            "name": "lng",
+            "in": "query",
+            "required": false,
+            "description": "Kinh độ vị trí hiện tại của Renter để tính khoảng cách.",
+            "schema": { "type": "number", "example": 106.667501 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Tải danh sách thiết bị cho thuê thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/Asset" }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Lender APIs (Người cho thuê)"],
+        "summary": "Đăng tải tài sản/thiết bị cho thuê mới",
+        "description": "Lender đăng thông tin thiết bị cho thuê kèm ảnh chụp và tọa độ GPS vị trí thực tế của món đồ. Hệ thống tự động so khớp định vị địa lý (Geolocation) để gán đơn kiểm định chất lượng cho Inspector gần nhất xử lý.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "description", "category", "pricePerDay", "depositAmount", "location"],
+                "properties": {
+                  "name": { "type": "string", "example": "Bộ máy chơi game PS5 kèm 2 tay cầm" },
+                  "description": { "type": "string", "example": "Máy game Playstation 5 phiên bản ổ đĩa hoạt động tốt, kèm 2 tay chơi game DualSense." },
+                  "category": { "type": "string", "example": "Tech" },
+                  "condition": { "type": "string", "example": "Excellent" },
+                  "pricePerDay": { "type": "120000", "example": 120000 },
+                  "depositAmount": { "type": "2000000", "example": 2000000 },
+                  "images": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["http://example.com/ps5_1.jpg", "http://example.com/ps5_2.jpg"]
+                  },
+                  "videos": {
+                    "type": "array",
+                    "items": { "type": "string" },
+                    "example": ["http://example.com/ps5_video.mp4"]
+                  },
+                  "location": {
+                    "type": "object",
+                    "required": ["lat", "lng"],
+                    "properties": {
+                      "lat": { "type": "number", "example": 10.776889 },
+                      "lng": { "type": "number", "example": 106.700806 }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Đăng tải tài sản thành công, đơn duyệt đã được gán cho Inspector gần nhất" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Tài khoản chưa được nâng cấp/xác thực quyền Lender (LENDER_NOT_APPROVED)" }
+        }
+      }
+    },
+    "/api/assets/pending": {
+      "get": {
+        "tags": ["Inspector APIs (Kiểm dịch viên)"],
+        "summary": "Lấy danh sách thiết bị đang chờ kiểm duyệt thực tế (Chỉ Inspector)",
+        "description": "Nhân viên kiểm định (Inspector) truy xuất danh sách tất cả các thiết bị mới đăng ký có trạng thái 'pending_approval' để chuẩn bị đi thẩm định chất lượng tận nơi.",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": { "description": "Tải danh sách thiết bị chờ duyệt thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Inspector" }
+        }
+      }
+    },
+    "/api/assets/{id}/verify": {
+      "put": {
+        "tags": ["Inspector APIs (Kiểm dịch viên)"],
+        "summary": "Duyệt hoặc Từ chối hồ sơ thiết bị đăng tải (Chỉ Inspector)",
+        "description": "Inspector cập nhật trạng thái kiểm định sản phẩm: Duyệt công khai ('verified') để Renter thấy đồ trên sàn, từ chối ('rejected') hoặc tạm khóa ('unavailable'), đồng thời tự động đánh dấu nhiệm vụ InspectorTask liên quan thành hoàn thành.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID thiết bị cần kiểm duyệt",
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["status"],
+                "properties": {
+                  "status": { "type": "string", "enum": ["verified", "rejected", "unavailable"] },
+                  "verificationNotes": { "type": "string", "example": "Mọi chức năng hoạt động hoàn hảo, tay cầm nguyên bản." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cập nhật trạng thái kiểm định và hoàn thành nhiệm vụ thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu vai trò Inspector" },
+          "404": { "description": "Không tìm thấy thiết bị cần kiểm định" }
+        }
+      }
+    },
+    "/api/orders": {
+      "post": {
+        "tags": ["Renter APIs (Người thuê)"],
+        "summary": "Tạo đơn đặt thuê mới & Lấy đường dẫn thanh toán cổng VNPay",
+        "description": "Renter lựa chọn món đồ và đặt thời gian thuê. Hệ thống xác thực tính sẵn sàng của sản phẩm, tính toán giá thuê + tiền cọc và phản hồi liên kết thanh toán VNPay Sandbox trực tiếp.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["assetId", "startDate", "endDate"],
+                "properties": {
+                  "assetId": { "type": "string", "example": "664c39fbbdca6b412ea351b2" },
+                  "startDate": { "type": "string", "format": "date", "example": "2026-06-01" },
+                  "endDate": { "type": "string", "format": "date", "example": "2026-06-05" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Khởi tạo đơn đặt thuê thành công, sẵn sàng thanh toán",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": { "type": "boolean" },
+                    "data": { "$ref": "#/components/schemas/Order" },
+                    "paymentUrl": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "Thiết bị không sẵn sàng cho thuê hoặc ngày thuê không hợp lệ/đã bị trùng lịch" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Từ chối truy cập - Yêu cầu tài khoản hoàn thiện thông tin cá nhân trước (PROFILE_INCOMPLETE)" }
+        }
+      }
+    },
+    "/api/orders/vnpay_return": {
+      "get": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Xác nhận kết quả thanh toán từ cổng VNPay",
+        "description": "Đường dẫn phản hồi tự động tiếp nhận dữ liệu checksum kết quả thanh toán từ VNPay để tự động cập nhật trạng thái đơn đặt thuê sang 'reserved' (Đã đặt cọc thành công).",
+        "parameters": [
+          { "name": "vnp_TxnRef", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "vnp_ResponseCode", "in": "query", "required": true, "schema": { "type": "string" } },
+          { "name": "vnp_SecureHash", "in": "query", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Giao dịch thanh toán cọc và tiền thuê được hệ thống xác thực thành công" },
+          "400": { "description": "Lỗi chữ ký bảo mật hoặc giao dịch thanh toán thất bại/đã bị hủy" }
+        }
+      }
+    },
+    "/api/orders/{id}/handover": {
+      "put": {
+        "tags": ["Renter APIs (Người thuê)", "Lender APIs (Người cho thuê)"],
+        "summary": "Xác nhận bàn giao thiết bị thực tế bằng OTP",
+        "description": "Lender nhận mã OTP từ Renter (người đi thuê) bàn giao và nhập vào hệ thống để xác nhận hai bên giao nhận thiết bị thành công. Đơn hàng chuyển sang 'active'.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["otp"],
+                "properties": {
+                  "otp": { "type": "string", "example": "123456", "description": "Mã xác thực bàn giao OTP gồm 6 chữ số từ Renter" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Xác nhận bàn giao đồ thành công" },
+          "400": { "description": "Mã OTP sai hoặc trạng thái đơn hàng không hợp lệ" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Chỉ Lender sở hữu tài sản mới có quyền bàn giao đồ" }
+        }
+      }
+    },
+    "/api/orders/{id}/return": {
+      "put": {
+        "tags": ["Renter APIs (Người thuê)", "Lender APIs (Người cho thuê)"],
+        "summary": "Lender xác nhận nhận lại thiết bị an toàn bằng OTP",
+        "description": "Lender kiểm tra chất lượng đồ nhận lại, sau đó nhập mã OTP trả đồ từ Renter cung cấp. Hệ thống sẽ tự động đối soát tài chính hoàn trả cọc (100% deposit) cho Renter và quyết toán tiền thuê (sau khi khấu trừ 10% phí) cho Lender.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["otp"],
+                "properties": {
+                  "otp": { "type": "string", "example": "654321", "description": "Mã xác thực trả đồ OTP gồm 6 chữ số từ Renter" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Trả đồ và quyết toán tài chính thành công, hoàn cọc Renter và trả tiền thuê cho Lender." },
+          "400": { "description": "Mã OTP sai hoặc trạng thái đơn hàng không hợp lệ" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" },
+          "403": { "description": "Chỉ Lender mới có quyền xác nhận nhận lại đồ" }
+        }
+      }
+    },
+    "/api/orders/{id}/settle": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Quyết toán tài chính đơn hàng hoàn cọc và trả tiền thuê (Chỉ Admin)",
+        "description": "Admin thực hiện tất toán đơn đặt thuê sau khi đồ đã trả xong: tự động giải ngân tiền thuê (trừ đi 10% phí vận hành sàn) vào ví số dư của Lender, đồng thời hoàn trả 100% tiền đặt cọc cược đồ vào ví cho Renter.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Quyết toán và giải ngân dòng tiền đơn hàng thành công" },
+          "401": { "description": "Yêu cầu xác thực tài khoản đăng nhập" }
+        }
+      }
+    },
+    "/api/orders/{id}/dispute": {
+      "put": {
+        "tags": ["Renter APIs (Người thuê)", "Lender APIs (Người cho thuê)"],
+        "summary": "Khởi tạo khiếu nại phát sinh khi xảy ra tranh chấp",
+        "description": "Khi xảy ra sự cố không mong muốn (hỏng thiết bị, trả đồ trễ hẹn, xích mích...), Lender hoặc Renter có thể gọi API này để gửi biên bản khiếu nại. Sàn sẽ đóng băng tạm thời dòng tiền cọc và đợi quản trị viên hòa giải.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["disputeNotes"],
+                "properties": {
+                  "disputeNotes": { "type": "string", "example": "Thiết bị bị vỡ màn hình góc phải khi khách trả lều, yêu cầu đền bù." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Tạo biên bản khiếu nại và đóng băng dòng tiền đơn hàng thành công" }
+        }
+      }
+    },
+    "/api/orders/{id}/resolve-dispute": {
+      "put": {
+        "tags": ["Admin APIs (Quản trị viên)"],
+        "summary": "Xử lý hòa giải khiếu nại và phân bổ đền bù (Chỉ Admin)",
+        "description": "Admin/Inspector đưa ra kết luận giải quyết khiếu nại bằng cách chỉ định rõ số tiền Lender nhận bồi thường và số tiền hoàn trả lại cho Renter từ khoản cọc đóng băng.",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["lenderCompensation", "renterRefund"],
+                "properties": {
+                  "lenderCompensation": { "type": "number", "example": 500000 },
+                  "renterRefund": { "type": "number", "example": 1500000 }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Đóng biên bản khiếu nại và phân chia tài chính thành công" }
+        }
+      }
+    },
+    "/api/auth/users/{id}/profile": {
+      "get": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "Xem thông tin trang cá nhân công khai",
+        "description": "Lấy thông tin tóm tắt hồ sơ công khai của người dùng (Renter/Lender) bao gồm điểm uy tín, ngày đăng ký, vai trò, số lần được đánh giá.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "ID người dùng cần xem",
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lấy hồ sơ thành công"
+          },
+          "404": { "description": "Không tìm thấy người dùng" }
+        }
+      }
+    },
+    "/api/assets/recommend": {
+      "post": {
+        "tags": ["Public APIs (Khách)"],
+        "summary": "AI tư vấn đồ cắm trại theo nhu cầu dã ngoại",
+        "description": "Người dùng nhập nhu cầu dã ngoại bằng ngôn ngữ tự nhiên (ví dụ: cắm trại 3 người đi bộ trekking 2 ngày), AI sẽ phân tích và gợi ý các loại đồ cần mang kèm so khớp với các thiết bị thực tế đang có trên sàn.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                  "query": { "type": "string", "example": "Cắm trại 3 người đi bộ leo núi trong 2 ngày ở Đà Lạt." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gợi ý cắm trại từ AI thành công"
+          }
+        }
+      }
+    },
+    "/api/assets/ai-estimate-deposit": {
+      "post": {
+        "tags": ["Lender APIs (Người cho thuê)"],
+        "summary": "AI tư vấn định giá cọc & giá thuê",
+        "description": "Lender gửi thông tin gốc của sản phẩm, AI sẽ tự động tính toán giá trị hiện tại (đã khấu hao) và đưa ra mức cọc + phí thuê ngày đề xuất.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["name", "originalPrice", "purchaseYear", "itemConditionRate"],
+                "properties": {
+                  "name": { "type": "string", "example": "Lều cắm trại 4 người Eureka" },
+                  "description": { "type": "string", "example": "Lều cắm trại chống mưa tốt, mua từ năm 2024" },
+                  "originalPrice": { "type": "number", "example": 3000000 },
+                  "purchaseYear": { "type": "number", "example": 2024 },
+                  "itemConditionRate": { "type": "number", "example": 90, "description": "Độ mới tính theo % (0-100)" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Định giá thành công"
+          }
+        }
+      }
+    },
+    "/api/posts": {
+      "post": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Tạo bài viết PR mới",
+        "description": "Tạo bài viết review/PR dã ngoại trên trang cá nhân của Renter, có thể tag các sản phẩm đã sử dụng của Lender.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["title", "content"],
+                "properties": {
+                  "title": { "type": "string", "example": "Review lều Eureka cắm trại cực ấm áp" },
+                  "content": { "type": "string", "example": "Lều Eureka này mình thuê của anh Lender rất xịn sò, chống nước tốt..." },
+                  "images": { "type": "array", "items": { "type": "string" }, "example": ["http://example.com/leu1.jpg"] },
+                  "taggedAssets": { "type": "array", "items": { "type": "string" }, "example": ["65c3b9f3e4b0d1a2b3c4d010"] }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Tạo bài viết PR thành công" }
+        }
+      },
+      "get": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Lấy dòng thời gian bài viết PR",
+        "description": "Lấy tất cả bài viết PR của cộng đồng trên VeloX xếp từ mới đến cũ.",
+        "responses": {
+          "200": { "description": "Lấy dòng thời gian thành công" }
+        }
+      }
+    },
+    "/api/posts/{id}": {
+      "get": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Xem chi tiết bài viết PR",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Lấy chi tiết bài viết thành công" }
+        }
+      },
+      "put": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Chỉnh sửa bài viết PR",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": { "type": "string" },
+                  "content": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Cập nhật bài viết thành công" }
+        }
+      },
+      "delete": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Xóa bài viết PR",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Xóa bài viết thành công" }
+        }
+      }
+    },
+    "/api/posts/user/{userId}": {
+      "get": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Lấy các bài viết PR của một người dùng cụ thể",
+        "description": "Truy xuất danh sách bài viết review/PR của Renter cụ thể để hiển thị trên Trang cá nhân của họ.",
+        "parameters": [
+          { "name": "userId", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Lấy danh sách bài viết thành công" }
+        }
+      }
+    },
+    "/api/posts/{id}/like": {
+      "post": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Thích hoặc Bỏ thích bài viết PR",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Thích hoặc bỏ thích thành công" }
+        }
+      }
+    },
+    "/api/posts/{id}/comment": {
+      "post": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "Bình luận vào bài viết PR",
+        "security": [{ "bearerAuth": [] }],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["content"],
+                "properties": {
+                  "content": { "type": "string", "example": "Đồ dùng rất tốt nhé mọi người!" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Bình luận thành công" }
+        }
+      }
+    },
+    "/api/posts/generate-ai-content": {
+      "post": {
+        "tags": ["PR Posts & Social APIs (Trang cá nhân & PR)"],
+        "summary": "AI tự động soạn thảo bài viết PR",
+        "description": "Renter cung cấp ID thiết bị đã thuê, AI sẽ tự động sinh tiêu đề, nội dung review và đề xuất hashtag phù hợp.",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["assetId"],
+                "properties": {
+                  "assetId": { "type": "string", "example": "664c39fbbdca6b412ea351b2" },
+                  "userRequest": { "type": "string", "example": "Nhấn mạnh vào khả năng chống lạnh giữ ấm của lều." }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Sinh bài viết PR thành công" }
+        }
+      }
+    }
+  }
+}
