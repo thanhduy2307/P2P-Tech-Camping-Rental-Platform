@@ -1,139 +1,139 @@
 # ⛺ P2P Tech & Camping Rental Platform 📱
 
-Chào mừng bạn đến với **P2P Tech & Camping Rental Platform**, nền tảng kinh tế chia sẻ (Sharing Economy) chuyên kết nối những người sở hữu thiết bị công nghệ và đồ cắm trại (Lender) với những người có nhu cầu thuê (Renter). Nền tảng được thiết kế với mục tiêu mang lại sự tiện lợi, an toàn, minh bạch và tối đa hóa giá trị vòng đời của các thiết bị.
+Welcome to the **P2P Tech & Camping Rental Platform**, a comprehensive Sharing Economy ecosystem designed to seamlessly connect owners of technology gadgets and camping equipment (Lenders) with individuals looking to rent (Renters). The platform is built from the ground up to ensure convenience, safety, transparency, and to maximize the lifecycle value of premium assets.
 
 ---
 
-## 📖 Tổng quan Dự án (Project Overview)
+## 📖 Project Overview
 
-Trong thời đại kinh tế chia sẻ, nhu cầu sử dụng các thiết bị công nghệ đắt tiền (như máy ảnh kỹ thuật số, flycam, máy chiếu) hoặc đồ dã ngoại (lều trại, phụ kiện sinh tồn) chỉ diễn ra trong các khoảng thời gian ngắn hạn (đi du lịch, dự án sự kiện). Thay vì phải bỏ ra một số tiền lớn để mua đứt, người dùng có thể dễ dàng thuê lại từ những người không có nhu cầu sử dụng thường xuyên.
+In the era of the sharing economy, the need for expensive technology devices (like DSLR cameras, drones, projectors) or outdoor gear (tents, survival kits) often occurs only for short-term periods (e.g., a weekend trip, a specific event). Instead of spending a massive amount of money to purchase these items outright, users can easily and securely rent them from peers who aren't using them frequently.
 
-Dự án này giải quyết các "nỗi đau" (Pain points) lớn nhất của thị trường cho thuê P2P hiện nay:
-1. **Nỗi sợ mất đồ / tráo đồ:** Giải quyết thông qua hệ thống eKYC định danh nghiêm ngặt và quy trình bàn giao có OTP 2 lớp.
-2. **Tranh chấp hỏng hóc:** Giải quyết qua hệ thống phân xử Dispute dựa trên bằng chứng và Check-list bàn giao chéo giữa 2 bên.
-3. **Thẩm định chất lượng:** Giải quyết bằng công nghệ AI tự động duyệt đồ dân dụng và đội ngũ Inspector chuyên nghiệp thẩm định tận nơi cho các tài sản giá trị cao (trên 20 triệu VNĐ).
-4. **Quản lý Dòng tiền cọc:** Hệ thống ví điện tử tích hợp, hỗ trợ cả hai hình thức: Cọc trực tuyến (Escrow) được nền tảng bảo vệ 100%, hoặc Cọc trực tiếp bằng tiền mặt (Offline Cash).
-
----
-
-## 🎯 Phân quyền & Vai trò (Roles)
-
-Hệ thống xoay quanh 4 vai trò chính, mỗi vai trò có một bảng điều khiển (Dashboard) và luồng nghiệp vụ riêng biệt:
-
-- **1. Người thuê (Renter)**: Tìm kiếm, lọc và đặt thuê các thiết bị phù hợp. Renter bắt buộc phải hoàn thành eKYC nếu muốn thuê các thiết bị đắt tiền. Renter được cấp quyền gia hạn thời gian thuê, đánh giá chất lượng thiết bị và gửi yêu cầu khiếu nại nếu đồ không đúng mô tả.
-- **2. Chủ đồ (Lender)**: Đăng tải thiết bị lên nền tảng, quản lý kho đồ, duyệt/từ chối các yêu cầu gia hạn và theo dõi doanh thu thông qua Ví điện tử (E-wallet). Lender cũng phải ký cam kết bảo mật và trải qua bước định danh eKYC.
-- **3. Người thẩm định (Inspector)**: Đây là đội ngũ cộng tác viên hiện trường của nền tảng. Khi Lender đăng một tài sản có giá trị $\ge$ 20 triệu VNĐ, AI sẽ tự động phân công một Inspector ở gần khu vực đó đến tận nhà Lender để kiểm tra thực tế, chống lừa đảo (Fraud) trước khi cho phép tài sản xuất hiện trên chợ.
-- **4. Quản trị viên (Admin)**: Quản lý tối cao của hệ thống. Chịu trách nhiệm duyệt hồ sơ eKYC (nếu hệ thống tự động nghi ngờ), xử lý yêu cầu rút tiền của user, khóa/mở khóa tài khoản, và đặc biệt là **Phân xử Tranh chấp (Dispute Resolution)** dựa trên bằng chứng của Lender và Renter.
+This project directly addresses the biggest pain points in the current P2P rental market:
+1. **Fear of Theft / Item Switching:** Solved through a strict eKYC identity verification system and a dual-layer OTP physical handover process.
+2. **Damage Disputes:** Solved via a built-in Dispute Resolution system based on transparent evidence and mutual handover checklists.
+3. **Quality Assurance:** Solved by utilizing AI auto-approval for low-value consumer items, and deploying a fleet of professional Inspectors to physically verify high-value assets (>= 20M VND) on-site.
+4. **Deposit & Cash Flow Management:** An integrated e-wallet system supporting two deposit methods: Online Escrow (100% protected by the platform) and Offline Cash (handled directly between users but strictly monitored).
 
 ---
 
-## ⚙️ Các Module Cốt lõi & Luồng Xử lý (Core Modules)
+## 🎯 Roles & Permissions
 
-### 🤖 1. Luồng Kiểm duyệt Tài sản Đa tầng (Multi-tier Verification)
-- **Tài sản phổ thông (< 20.000.000đ)**: Sử dụng AI để tự động phát hiện hình ảnh trùng lặp hoặc hình ảnh tải từ Internet. Nếu hình hợp lệ, tự động chuyển sang trạng thái `Verified`.
-- **Tài sản cao cấp (>= 20.000.000đ)**: Bắt buộc chuyển sang trạng thái `Pending Inspector`. Quá trình duyệt phải có chữ ký điện tử và ảnh chụp tận nơi từ Inspector.
+The system operates around 4 primary roles, each equipped with a dedicated dashboard and specialized workflows:
 
-### 🔐 2. Quy trình Giao nhận An toàn (Secure Handover Workflow)
-Để đảm bảo không có tranh chấp về sau, quy trình bàn giao được thiết kế chặt chẽ:
-- **Bước Nhận đồ (Handover)**: Renter đến gặp Lender. Renter bắt buộc phải kiểm tra 3 điều kiện (Mô tả, Ngoại quan, Phụ kiện đi kèm) thông qua checklist trên app. Sau khi tick đủ, app mới cấp mã **OTP**. Renter đọc mã này cho Lender nhập vào hệ thống kèm 3 tấm ảnh thực tế để mở khóa đơn hàng.
-- **Bước Trả đồ (Return)**: Lender nhận lại đồ. Nếu thiết bị bình thường, Lender chọn "Thu hồi bình thường", nhập mã OTP từ Renter và hoàn cọc. Nếu có hư hỏng, Lender chọn **"Báo cáo hư hỏng"**.
-
-### ⚖️ 3. Quản lý Khiếu nại (Dispute Resolution - SLA 48h)
-- **Khiếu nại từ Renter**: Ngay lúc nhận đồ, nếu đồ hỏng, Renter có thể nhấn nút "Từ chối nhận & Khiếu nại", đơn hàng bị hủy và Admin sẽ xem xét hoàn cọc.
-- **Khiếu nại từ Lender**: Lúc trả đồ, Lender báo cáo hư hỏng và nhập số tiền yêu cầu đền bù. Đơn hàng chuyển sang `Disputed`.
-- **Quyền Bào chữa (Defense)**: Renter nhận được thông báo khiếu nại và có thể gửi lời bào chữa (text/hình ảnh).
-- **Phân xử**: Admin đọc lời khai hai bên và nhập số tiền bồi thường cuối cùng cho Lender. Hệ thống tự động chia số tiền cọc khả dụng cho cả 2 bên.
-
-### 🕒 4. Phạt Trả Muộn & Gia Hạn
-- **Gia hạn (Extension)**: Renter có thể request gia hạn thêm ngày. Tiền thuê phát sinh sẽ tự động trừ vào ví.
-- **Trả đồ muộn (Late Return)**: Hệ thống cho phép "ân hạn" 4 tiếng. Nếu Renter trả trễ hơn 4 tiếng so với giờ kết thúc hợp đồng, hệ thống sẽ phạt tự động **150% giá thuê một ngày** cho mỗi ngày trễ.
+- **1. Renter**: Can search, filter, and book available equipment. Renters are required to complete eKYC verification to rent premium items. They have the ability to request rental extensions, rate the item quality, and raise disputes if the received item does not match the description.
+- **2. Lender**: Can list assets on the marketplace, manage inventory, approve or reject extension requests, and track revenue via the built-in E-wallet. Lenders must also sign a digital security commitment and pass eKYC verification.
+- **3. Inspector**: Field agents working for the platform. When a Lender lists a high-value asset ($\ge$ 20M VND), the AI system automatically assigns the nearest Inspector to conduct an on-site physical inspection to prevent fraud before the asset goes live on the marketplace.
+- **4. Admin**: The supreme manager of the system. Admins are responsible for manually reviewing flagged eKYC applications, processing withdrawal requests, managing user bans, and—most importantly—acting as the judge in **Dispute Resolutions** based on the evidence provided by both Lenders and Renters.
 
 ---
 
-## 🛠 Ngăn xếp Công nghệ (Technology Stack)
+## ⚙️ Core Modules & Workflows
 
-Hệ thống được phát triển hoàn toàn bằng Javascript/Typescript từ Frontend đến Backend:
+### 🤖 1. Multi-tier Asset Verification Workflow
+- **Standard Assets (< 20,000,000 VND)**: Utilizes AI heuristics to automatically detect duplicate or internet-sourced images. If the images are deemed valid, the asset is instantly approved (`Verified`).
+- **Premium Assets (>= 20,000,000 VND)**: Automatically routed to a `Pending Inspector` status. Approval requires a digital signature and on-site physical proof submitted by a verified Inspector.
+
+### 🔐 2. Secure Handover Protocol
+To guarantee there are no post-rental disputes, the physical handover is tightly controlled:
+- **Handover (Start)**: When the Renter meets the Lender, the Renter must physically inspect the item and complete a mandatory 3-point checklist in the app (Description Match, Physical Condition, Included Accessories). Only after checking all boxes does the app generate an **OTP**. The Renter gives this OTP to the Lender, who inputs it into the system alongside 3 real-time photos to officially start the rental.
+- **Return (End)**: When the Lender receives the item back, they can choose "Normal Return" (inputting an OTP from the Renter to release the deposit) or **"Report Damage"** if the item is broken.
+
+### ⚖️ 3. Dispute Management (48h SLA)
+- **Renter Dispute**: At handover, if the item is defective, the Renter can hit "Refuse & Dispute". The order is frozen and sent to Admin for a full refund review.
+- **Lender Dispute**: At return, the Lender reports damage and inputs a requested compensation amount. The order shifts to the `Disputed` status.
+- **Renter Defense**: The Renter is immediately notified and granted a "Defense Right" to submit their side of the story and photographic evidence.
+- **Resolution Verdict**: The Admin reviews all handover logs, photos, and testimonies, then determines the final compensation amount for the Lender. The system automatically splits and distributes the remaining deposit to both parties accordingly.
+
+### 🕒 4. Late Return Penalties & Extensions
+- **Extensions**: Renters can request additional rental days. The extra cost is automatically deducted from their wallet upon Lender approval.
+- **Late Returns**: The system grants a 4-hour grace period. If an item is returned more than 4 hours late, the system automatically imposes a penalty of **150% of the daily rental rate** for each day late, deducted directly from the Renter's deposit.
+
+---
+
+## 🛠 Technology Stack
+
+The platform is built end-to-end using Javascript/Typescript:
 
 - **Frontend**: 
   - React.js (Vite)
-  - TailwindCSS (Utility-first styling, Responsive)
+  - TailwindCSS (Utility-first styling, highly responsive)
   - SweetAlert2 (Popups/Notifications)
   - React Router (Routing)
 - **Backend**: 
-  - Node.js với Express.js Framework
-  - Kiến trúc MVC (Models - Views - Controllers)
-- **Cơ sở dữ liệu**: 
-  - MongoDB (Mongoose ORM) với thiết kế NoSQL linh hoạt, phù hợp lưu trữ dữ liệu JSON phức tạp của đơn hàng và người dùng.
-- **Tính năng nâng cao**:
-  - JWT (JSON Web Tokens) cho phân quyền và bảo mật Session.
-  - Tích hợp module xử lý AI cơ bản trong tương lai.
+  - Node.js with Express.js Framework
+  - Robust MVC (Model-View-Controller) Architecture
+- **Database**: 
+  - MongoDB (Mongoose ORM) with a flexible NoSQL design, perfect for handling complex JSON document structures like dynamic orders and user profiles.
+- **Advanced Features**:
+  - JWT (JSON Web Tokens) for RBAC (Role-Based Access Control) and secure session management.
+  - Base architecture ready for advanced AI module integrations.
 
 ---
 
-## 🚀 Hướng dẫn Cài đặt & Chạy dự án (Getting Started)
+## 🚀 Getting Started
 
-### Yêu cầu hệ thống (Prerequisites)
-- Node.js (phiên bản v16 trở lên)
-- MongoDB Server đang chạy (Localhost hoặc MongoDB Atlas)
+### Prerequisites
+- Node.js (v16 or higher)
+- MongoDB Server running (Localhost or MongoDB Atlas)
 - Git
 
-### Các bước Cài đặt (Installation)
+### Installation Guide
 
-**1. Clone dự án về máy:**
+**1. Clone the repository:**
 ```bash
 git clone https://github.com/thanhduy2307/P2P-Tech-Camping-Rental-Platform.git
 cd P2P-Tech-Camping-Rental-Platform
 ```
 
-**2. Khởi chạy Backend:**
+**2. Start the Backend Server:**
 ```bash
-# Cài đặt thư viện backend
+# Install backend dependencies
 npm install
 
-# Sao chép file cấu hình môi trường
+# Copy the environment example file
 cp .env.example .env
 
-# Mở file .env và cấu hình các thông số (VD: PORT=5000, MONGODB_URI=...)
-# Chạy Server Backend (Mặc định ở cổng 5000)
+# Configure your environment variables in the .env file (e.g., PORT=5000, MONGODB_URI=...)
+# Start the backend server (Defaults to port 5000)
 npm start
 ```
 
-**3. Khởi chạy Frontend:**
-Mở thêm một terminal mới:
+**3. Start the Frontend App:**
+Open a new terminal window:
 ```bash
 cd frontend
 
-# Cài đặt thư viện frontend
+# Install frontend dependencies
 npm install
 
-# Chạy ứng dụng React (Vite - Mặc định ở cổng 5173)
+# Run the React Vite app (Defaults to port 5173)
 npm run dev
 ```
 
-Sau khi cả 2 server đều chạy, bạn truy cập vào `http://localhost:5173` để trải nghiệm nền tảng.
+Once both servers are running, navigate to `http://localhost:5173` in your browser to experience the platform.
 
 ---
 
-## 📁 Cấu trúc Thư mục Chính (Directory Structure)
+## 📁 Main Directory Structure
 
 ```text
 📦 P2P-Tech-Camping-Rental-Platform
- ┣ 📂 frontend/               # Mã nguồn Giao diện (React)
+ ┣ 📂 frontend/               # React Frontend Source Code
  ┃ ┣ 📂 src/
- ┃ ┃ ┣ 📂 components/         # Các UI component dùng chung (Navbar, Footer, Modal)
- ┃ ┃ ┣ 📂 configs/            # Cấu hình API Axios
- ┃ ┃ ┣ 📂 Page/               # Các trang chính (Dashboard Admin, Lender, Renter, Orders, v.v.)
- ┃ ┃ ┗ 📜 App.jsx             # Cấu hình Routing chính
- ┣ 📂 src/                    # Mã nguồn Máy chủ (Node.js)
- ┃ ┣ 📂 controllers/          # Xử lý logic nghiệp vụ (Auth, Orders, Assets, Admin)
- ┃ ┣ 📂 middleware/           # Trình trung gian bảo mật & phân quyền (verifyToken, isAdmin)
- ┃ ┣ 📂 models/               # Cấu trúc CSDL MongoDB (Mongoose Schema)
- ┃ ┣ 📂 routes/               # Cấu hình đường dẫn API (Endpoints)
- ┃ ┗ 📜 index.js              # File chạy server chính
- ┣ 📜 TEST_PLAN.md            # Tài liệu kịch bản kiểm thử dự án
- ┣ 📜 ROLES_AND_FEATURES.md   # Đặc tả yêu cầu chi tiết
- ┗ 📜 README.md               # Tài liệu tổng quan (Bạn đang đọc file này)
+ ┃ ┃ ┣ 📂 components/         # Shared UI components (Navbars, Modals, etc.)
+ ┃ ┃ ┣ 📂 configs/            # Axios API configurations
+ ┃ ┃ ┣ 📂 Page/               # Main Views (Admin Dashboard, Renter/Lender flows, etc.)
+ ┃ ┃ ┗ 📜 App.jsx             # Main Routing Configuration
+ ┣ 📂 src/                    # Node.js Backend Source Code
+ ┃ ┣ 📂 controllers/          # Business logic controllers (Auth, Orders, Assets)
+ ┃ ┣ 📂 middleware/           # Security & RBAC middlewares (verifyToken, isAdmin)
+ ┃ ┣ 📂 models/               # MongoDB Database Schemas (Mongoose)
+ ┃ ┣ 📂 routes/               # API Endpoints
+ ┃ ┗ 📜 index.js              # Server entry point
+ ┣ 📜 TEST_PLAN.md            # Quality Assurance and testing guidelines
+ ┣ 📜 ROLES_AND_FEATURES.md   # Detailed system requirements
+ ┗ 📜 README.md               # Project overview (You are reading this)
 ```
 
 ---
-*Phát triển với ❤️ bởi đội ngũ P2P Platform.*
+*Developed with ❤️ by the P2P Platform Team.*
