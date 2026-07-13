@@ -71,4 +71,23 @@ const checkLenderPermission = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, authorize, checkProfileCompleted, checkLenderPermission };
+const checkRenterVerified = (req, res, next) => {
+  if (req.user.renterStatus !== 'approved') {
+    let errorMsg = 'Vui lòng xác thực hình ảnh CCCD (eKYC Renter) trước khi thực hiện đặt thuê thiết bị.';
+    if (req.user.renterStatus === 'pending') {
+      errorMsg = 'Hồ sơ eKYC xác thực Renter của bạn đang được Admin kiểm duyệt. Kết quả sẽ có trong vòng 24h.';
+    } else if (req.user.renterStatus === 'rejected') {
+      errorMsg = `Hồ sơ eKYC xác thực Renter của bạn bị từ chối. Lý do: "${req.user.renterOnboarding?.rejectReason}". Vui lòng cập nhật và nộp lại hồ sơ.`;
+    }
+
+    return res.status(403).json({
+      success: false,
+      code: 'RENTER_NOT_VERIFIED',
+      renterStatus: req.user.renterStatus,
+      message: errorMsg
+    });
+  }
+  next();
+};
+
+module.exports = { protect, authorize, checkProfileCompleted, checkLenderPermission, checkRenterVerified };

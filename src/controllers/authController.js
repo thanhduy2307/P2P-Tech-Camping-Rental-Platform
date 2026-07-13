@@ -44,6 +44,141 @@ exports.register = async (req, res) => {
         role: user.role,
         avatar: user.avatar,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
+        lenderStatus: user.lenderStatus,
+        lenderOnboarding: user.lenderOnboarding,
+        token: generateToken(user._id)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.registerPhone = async (req, res) => {
+  try {
+    const { name, phoneNumber, password, role } = req.body;
+
+    if (!name || !phoneNumber || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ Họ tên, Số điện thoại và Mật khẩu.' });
+    }
+
+    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
+    if (cleanPhone.length < 9 || cleanPhone.length > 11 || !/^\d+$/.test(cleanPhone)) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại không đúng định dạng.' });
+    }
+
+    // Generate unique virtual email to satisfy unique index constraint on email
+    const virtualEmail = `${cleanPhone}@sdt.equippeer.vn`;
+
+    // Check if phone number already registered or virtual email exists
+    const userExists = await User.findOne({
+      $or: [
+        { phoneNumber: cleanPhone },
+        { email: virtualEmail }
+      ]
+    });
+    if (userExists) {
+      if (userExists.isPhoneVerified) {
+        return res.status(400).json({ success: false, message: 'Số điện thoại này đã được đăng ký và xác thực.' });
+      } else {
+        // If not verified, remove any duplicate registration so they can re-register
+        await User.deleteMany({
+          $or: [
+            { phoneNumber: cleanPhone },
+            { email: virtualEmail }
+          ],
+          isPhoneVerified: false
+        });
+      }
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    // Generate 6-digit random OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const user = await User.create({
+      name,
+      email: virtualEmail,
+      phoneNumber: cleanPhone,
+      password: hashedPassword,
+      role: role || 'renter',
+      isPhoneVerified: false,
+      phoneVerificationOtp: otp,
+      phoneVerificationOtpExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    // Send real SMS OTP via SMS Service
+    const smsService = require('../services/smsService');
+    const smsResult = await smsService.sendSMS(cleanPhone, otp);
+
+    const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
+    const showOtp = isMock || !smsResult.success;
+
+    res.status(201).json({
+      success: true,
+      message: smsResult.success 
+        ? 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.'
+        : 'Cổng Twilio bị lỗi gửi (chưa bật Geo-permissions hoặc giới hạn Trial). Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
+      data: {
+        userId: user._id,
+        phoneNumber: user.phoneNumber,
+        otp: showOtp ? otp : undefined,
+        smsSent: smsResult.success
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    if (!userId || !otp) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã OTP.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng.' });
+    }
+
+    if (user.isPhoneVerified) {
+      return res.status(400).json({ success: false, message: 'Số điện thoại đã được xác minh.' });
+    }
+
+    if (!user.phoneVerificationOtp || user.phoneVerificationOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
+    }
+
+    if (new Date() > user.phoneVerificationOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
+    }
+
+    // Activate account
+    user.isPhoneVerified = true;
+    user.phoneVerificationOtp = undefined;
+    user.phoneVerificationOtpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Xác thực số điện thoại thành công!',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phoneNumber: user.phoneNumber,
+        role: user.role,
+        avatar: user.avatar,
+        isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
@@ -59,10 +194,17 @@ exports.login = async (req, res) => {
     const { email, password } = req.body;
 
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+      return res.status(400).json({ success: false, message: 'Please provide email/phone and password' });
     }
 
-    const user = await User.findOne({ email });
+    const cleanInput = email.trim();
+    const user = await User.findOne({
+      $or: [
+        { email: cleanInput.toLowerCase() },
+        { phoneNumber: cleanInput }
+      ]
+    });
+
     if (!user) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
@@ -70,6 +212,8 @@ exports.login = async (req, res) => {
     if (user.isBanned) {
       return res.status(403).json({ success: false, message: 'Tài khoản của bạn đã bị khóa. Vui lòng liên hệ Admin.' });
     }
+
+
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
@@ -82,9 +226,12 @@ exports.login = async (req, res) => {
         _id: user._id,
         name: user.name,
         email: user.email,
+        phoneNumber: user.phoneNumber,
         role: user.role,
         avatar: user.avatar,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
@@ -150,6 +297,8 @@ exports.googleCallback = async (req, res) => {
         role: user.role,
         avatar: user.avatar,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
@@ -202,6 +351,8 @@ exports.switchRole = async (req, res) => {
         role: user.role,
         avatar: user.avatar,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
@@ -214,7 +365,7 @@ exports.switchRole = async (req, res) => {
 
 exports.completeProfile = async (req, res) => {
   try {
-    const { phoneNumber, address, bankAccount } = req.body;
+    const { email, phoneNumber, address, bankAccount } = req.body;
 
     if (!phoneNumber) {
       return res.status(400).json({ success: false, message: 'Please provide phone number' });
@@ -227,6 +378,17 @@ exports.completeProfile = async (req, res) => {
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (email) {
+      const emailLower = email.trim().toLowerCase();
+      if (emailLower !== user.email) {
+        const existingEmail = await User.findOne({ email: emailLower });
+        if (existingEmail) {
+          return res.status(400).json({ success: false, message: 'Email đã được sử dụng bởi tài khoản khác' });
+        }
+        user.email = emailLower;
+      }
     }
 
     user.phoneNumber = phoneNumber;
@@ -266,6 +428,8 @@ exports.completeProfile = async (req, res) => {
         address: user.address,
         bankAccount: user.bankAccount,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
@@ -279,10 +443,6 @@ exports.completeProfile = async (req, res) => {
 exports.applyLender = async (req, res) => {
   try {
     const { cccdFront, cccdBack, cccdSelfie, bankAccount } = req.body;
-
-    if (!cccdFront || !cccdBack || !cccdSelfie) {
-      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ ảnh CCCD (Mặt trước, mặt sau và ảnh Selfie)' });
-    }
 
     if (!bankAccount || !bankAccount.accountNumber || !bankAccount.bankName || !bankAccount.accountHolder) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin tài khoản ngân hàng nhận tiền' });
@@ -304,11 +464,25 @@ exports.applyLender = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Hồ sơ của bạn đang trong quá trình xét duyệt. Không thể nộp đơn mới.' });
     }
 
+    let finalCccdFront = cccdFront;
+    let finalCccdBack = cccdBack;
+    let finalCccdSelfie = cccdSelfie;
+
+    if (user.renterStatus === 'approved') {
+      finalCccdFront = finalCccdFront || user.renterOnboarding.cccdFront;
+      finalCccdBack = finalCccdBack || user.renterOnboarding.cccdBack;
+      finalCccdSelfie = finalCccdSelfie || user.renterOnboarding.cccdSelfie;
+    }
+
+    if (!finalCccdFront || !finalCccdBack || !finalCccdSelfie) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ ảnh CCCD (Mặt trước, mặt sau và ảnh Selfie)' });
+    }
+
     user.lenderStatus = 'pending';
     user.lenderOnboarding = {
-      cccdFront,
-      cccdBack,
-      cccdSelfie,
+      cccdFront: finalCccdFront,
+      cccdBack: finalCccdBack,
+      cccdSelfie: finalCccdSelfie,
       bankAccount: {
         accountNumber: bankAccount.accountNumber,
         bankName: bankAccount.bankName,
@@ -328,6 +502,8 @@ exports.applyLender = async (req, res) => {
         email: user.email,
         role: user.role,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding
       }
@@ -386,6 +562,8 @@ exports.verifyLenderApplication = async (req, res) => {
         name: applicant.name,
         email: applicant.email,
         role: applicant.role,
+        renterStatus: applicant.renterStatus,
+        renterOnboarding: applicant.renterOnboarding,
         lenderStatus: applicant.lenderStatus,
         lenderOnboarding: applicant.lenderOnboarding
       }
@@ -618,8 +796,111 @@ exports.updateAvatar = async (req, res) => {
         role: user.role,
         avatar: user.avatar,
         isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
         lenderOnboarding: user.lenderOnboarding
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.applyRenterEkyc = async (req, res) => {
+  try {
+    const { cccdFront, cccdBack, cccdSelfie } = req.body;
+    if (!cccdFront || !cccdBack || !cccdSelfie) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ ảnh CCCD (Mặt trước, mặt sau và ảnh Selfie)' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (user.renterStatus === 'pending') {
+      return res.status(400).json({ success: false, message: 'Hồ sơ của bạn đang trong quá trình xét duyệt. Không thể nộp đơn mới.' });
+    }
+
+    user.renterStatus = 'pending';
+    user.renterOnboarding = {
+      cccdFront,
+      cccdBack,
+      cccdSelfie,
+      rejectReason: ''
+    };
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Nộp hồ sơ eKYC xác thực Renter thành công. Vui lòng chờ Admin xét duyệt.',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
+        isProfileCompleted: user.isProfileCompleted
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.getRenterApplications = async (req, res) => {
+  try {
+    const applications = await User.find({ renterStatus: 'pending' })
+      .select('name email phoneNumber address renterStatus renterOnboarding createdAt');
+    res.status(200).json({ success: true, data: applications });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.verifyRenterApplication = async (req, res) => {
+  try {
+    const { status, rejectReason } = req.body;
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Trạng thái phê duyệt không hợp lệ. Phải là "approved" hoặc "rejected".' });
+    }
+
+    if (status === 'rejected' && !rejectReason) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp lý do từ chối hồ sơ.' });
+    }
+
+    const applicant = await User.findById(req.params.id);
+    if (!applicant) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy hồ sơ người dùng.' });
+    }
+
+    if (applicant.renterStatus !== 'pending') {
+      return res.status(400).json({ success: false, message: 'Hồ sơ này không ở trạng thái chờ duyệt.' });
+    }
+
+    if (status === 'approved') {
+      applicant.renterStatus = 'approved';
+    } else {
+      applicant.renterStatus = 'rejected';
+      applicant.renterOnboarding.rejectReason = rejectReason;
+    }
+
+    await applicant.save();
+
+    res.status(200).json({
+      success: true,
+      message: status === 'approved' ? 'Phê duyệt hồ sơ Renter eKYC thành công.' : 'Đã từ chối hồ sơ Renter eKYC.',
+      data: {
+        _id: applicant._id,
+        name: applicant.name,
+        email: applicant.email,
+        role: applicant.role,
+        renterStatus: applicant.renterStatus,
+        renterOnboarding: applicant.renterOnboarding
       }
     });
   } catch (error) {

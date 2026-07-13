@@ -114,46 +114,46 @@ const BrowseAssets = () => {
         const response = await api.get(url, { params });
         if (response.data && response.data.success) {
           const mappedAssets = response.data.data.map(item => {
-            let category = item.category || '';
-            let subCategory = item.subCategory || '';
+            const nameLower = (item.name || '').toLowerCase();
+            const catLower = (item.category || '').toLowerCase();
             
-            const catLower = category.toLowerCase();
-            if (['tents', 'lều'].includes(catLower)) {
+            let category = 'Tech';
+            if (catLower === 'camping' || ['lều', 'tent', 'bếp', 'dã ngoại', 'cắm trại', 'balo', 'túi ngủ', 'bàn', 'ghế'].some(kw => nameLower.includes(kw))) {
               category = 'Camping';
-              subCategory = 'Tents';
-            } else if (['cookware', 'cooking', 'cook', 'bếp'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Cooking';
-            } else if (['furniture', 'bàn ghế', 'bàn', 'ghế'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Furniture';
-            } else if (['lighting', 'ánh sáng', 'đèn'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Lighting';
-            } else if (['backpacks', 'balo', 'túi'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Backpacks';
-            } else if (['cameras', 'máy ảnh', 'camera'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Máy ảnh';
-            } else if (['flycam', 'drone'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Flycam';
-            } else if (['audio', 'âm thanh', 'loa'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Máy ảnh';
-            } else if (['lights', 'ánh sáng'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Ánh sáng';
-            } else if (['laptop', 'máy tính'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Laptop';
-            } else if (catLower === 'camping') {
-              category = 'Camping';
-            } else if (catLower === 'tech') {
-              category = 'Tech';
             }
-            
+
+            // Determine subcategory
+            let subCategory = 'Khác';
+            if (category === 'Camping') {
+              if (['lều', 'tent', 'tăng', 'bạt', 'thảm', 'footprint', 'túi ngủ', 'đệm'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Lều & Thảm dã ngoại';
+              } else if (['bếp', 'nồi', 'chảo', 'stove', 'cook', 'gas', 'ấm', 'ly', 'chén', 'đĩa', 'vỉ nướng'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Bếp & Dụng cụ nấu ăn';
+              } else if (['bàn', 'ghế', 'table', 'chair', 'giường xếp'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Bàn ghế dã ngoại';
+              } else if (['đèn', 'pin', 'light', 'flashlight', 'đuốc'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Đèn & Thiết bị chiếu sáng';
+              } else if (['balo', 'backpack', 'túi', 'bag', 'rìu', 'dao', 'sinh tồn', 'hộp y tế'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Balo & Đồ sinh tồn';
+              } else {
+                subCategory = 'Lều & Thảm dã ngoại';
+              }
+            } else {
+              if (['máy ảnh', 'camera', 'lens', 'ống kính', 'gimbal', 'tripod', 'sony', 'canon', 'fuji', 'nikon'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Máy ảnh & Ống kính';
+              } else if (['flycam', 'drone', 'mavic', 'phantom', 'dji'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Flycam & Drone';
+              } else if (['loa', 'sound', 'speaker', 'tai nghe', 'headphone', 'micro', 'amp'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Loa & Thiết bị âm thanh';
+              } else if (['laptop', 'macbook', 'máy tính', 'pc', 'ram', 'ổ cứng', 'ssd'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Laptop & Phụ kiện';
+              } else if (['đèn', 'light', 'aputure', 'studio', 'softbox'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Đèn Studio & Ánh sáng';
+              } else {
+                subCategory = 'Máy ảnh & Ống kính';
+              }
+            }
+
             return {
               ...item,
               category,
@@ -173,7 +173,7 @@ const BrowseAssets = () => {
             pricePerDay: 1200000,
             depositAmount: 15000000,
             category: 'Tech',
-            subCategory: 'Máy ảnh',
+            subCategory: 'Máy ảnh & Ống kính',
             condition: 'New',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida/AP1WRLuITSCUq6N1VKUQNFKt0Lombzat2g9IMSWyJWaETVvgCJOGz981iyDFvon8eYhfjCRKX7-Biwv-9MB726Gj2di4ZZbl7NCyXPZc7Z5cquYXfgQ_72C8lPkxawPn_sAi2nW5zbaKLUkbVm6vKXYZuTk62fdlxH4RRL97Ass0aoHovzEmbX3p2spfJKqN3-RC9cnDUX0ycco1Mk7PuORIrSLKbuzX5h7PoSw_zlVF3RByNSfXYe9oG8Rhw5Y'],
@@ -188,7 +188,7 @@ const BrowseAssets = () => {
             pricePerDay: 1500000,
             depositAmount: 20000000,
             category: 'Tech',
-            subCategory: 'Flycam',
+            subCategory: 'Flycam & Drone',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuAuiA9qit7Eifbk2zYgqKFwGPG5rQpXmtPxKbVoOX4Hl2u4W6f0zYmBjnpXbodsagdIlGinEWcgopK8iAnbCkGcpf5iOBJyWDTN315NwpiFIe_6vhub9n3eXlHWfVBiwwK0Ze1AxTaLPxmKdZ305bYsl7n6uKInJ_bTLrtQ-MpZCk7Odcgq0vfCGzCYXISWTfpTZ-5yLmzFrDwVTA-EUR_RQfeNEw6hz6fx9Aybq6lQVdmad2bSK2SUIYa1Nw8ckb8MexoSiaWSyyic'],
@@ -203,7 +203,7 @@ const BrowseAssets = () => {
             pricePerDay: 800000,
             depositAmount: 8000000,
             category: 'Tech',
-            subCategory: 'Ánh sáng',
+            subCategory: 'Đèn Studio & Ánh sáng',
             condition: 'Excellent',
             status: 'rented',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuBIQtDDhGw3gwTz--81gIAsBcRE6oW3J-gMClroqe74424KLoRgKpNhSpSzpB6FvQFCix4m6E2pLEhGiBtnY1JNk9DnwTrEE34ZCO0g9Ggnsa9wrtq_hcD69IUmTYcGq3fWsXdI9B1In8S5Hj7FseFMqb3vCU0NFtKm0JihLQFkkilqVL4K7kQR9u_5jgX6igjhaLDuh7jxEhHNRjCQwC4Voux2Ono-cOPb3AKUBhf4FKXauTV_Kiorlc_4s6vNEfd9zk3NgUWetWS3'],
@@ -218,7 +218,7 @@ const BrowseAssets = () => {
             pricePerDay: 1800000,
             depositAmount: 30000000,
             category: 'Tech',
-            subCategory: 'Laptop',
+            subCategory: 'Laptop & Phụ kiện',
             condition: 'New',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuCLKS2m-1T0yT7_jYQQ5Cn7Dz-ELxO28WKy4iEy9olekyTiRnwbQ8Qwli6xk8AwfeN6E-JhsrsmfSFlACywZeA8iXuterSvdRxRlMGFgEYI8WhvUWjMhXJZbVRuHjSZohcG3efzgDtMcwj8lJgF2qncMx8Kv6c8uNhGxJTbXRTyr6BztloO60wy-BDykrl1Ek07rS86ZfjN6vY-6nB9ZaPoKWr_vtRLXStE_pJgM1fGwRSN5X32tQzjAAeXfyNEyG9DxdbuppA18l1O'],
@@ -233,7 +233,7 @@ const BrowseAssets = () => {
             pricePerDay: 900000,
             depositAmount: 10000000,
             category: 'Tech',
-            subCategory: 'Máy ảnh',
+            subCategory: 'Máy ảnh & Ống kính',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuCIxc7P42P3MDVYhkcjce6KgGa3rAJc1iFhTumiuIfbhAE6ONs8S0YFY95-JHzenxjzVJFszWSgm2UIN3_F7NQACRTTjS7N2T2taxf1iTq54CBPjs-t7iUk7SYStPtnXN581cJfHpkQTynEqZiTsYqoD32V9RgI0vy3pzxMH68EH48i5w8D2xjCF5F7qCmfxjzaF3uv0Xd31WVFy66iLxaW_QO_ap1PzbBchn8V7_-IzCYyotXPgOzK1MCXWWJaBMXaXb3KOTpWBdrE'],
@@ -249,7 +249,7 @@ const BrowseAssets = () => {
             pricePerDay: 120000,
             depositAmount: 1500000,
             category: 'Camping',
-            subCategory: 'Tents',
+            subCategory: 'Lều & Thảm dã ngoại',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida/AP1WRLttSf7-B5XqE0wfVz566F_Ay0bXnEKE1Aryb6uRJkEQShT7TjBPz666fOu6YkYGdUk_ytO3G59UsDG9x91d2fwDWO-Da4-moisiS3EACYWM-T8KoYW3NW0bDE4GGc7y_wtba3bw5X5rIQB0MdmmGyYla3rpAKFnHhVWWYw4ShwxTQ5r31v-TVlXbhzekYNKyCpPync04zengdXXbK7dndZcwi6_IJiuz2Tv2v-emb-dkASCBCOIZbSZDH0W'],
@@ -264,7 +264,7 @@ const BrowseAssets = () => {
             pricePerDay: 50000,
             depositAmount: 500000,
             category: 'Camping',
-            subCategory: 'Cooking',
+            subCategory: 'Bếp & Dụng cụ nấu ăn',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuAYINd15UjJX5_5NclHoJV1hUeJ667GY9xcBXVUB8HkO6c_IKjmmgM_-6S4Yi0M2BCA66STqM-OaQ60EuiMsPAR99MIdPVS-iWKjpviKrn8XWBwdWYQqZ4qpOQCCkcntA15c1PKDGvxDcUtXuVB58RabppLLSCjGbxVhJqeiikrH5Gqxlkof5SVrFoxqgNmAv-GZ1K_fKmgC1Rg4RUcYsb1f42jIOlIhBeFAxb0xRujb21NZsB97WlRcT2oJwQ4ZOiOBdnXqg5aVH-k'],
@@ -279,7 +279,7 @@ const BrowseAssets = () => {
             pricePerDay: 150000,
             depositAmount: 2500000,
             category: 'Camping',
-            subCategory: 'Backpacks',
+            subCategory: 'Balo & Đồ sinh tồn',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuDShvx4SWJ0EEuMstUV-jtCmqTpl9hiRel0vH0lJCrRKH89OpusNsdodb5nnmVwYesh1IZxSh5EADrk7FSEwgG7EER6AVFFpEniQ9QhbJemNDcT39BK91uHatIQVpPw2VWY4llppHJ24Q5gx13Kd11wyBNq9VbiquJkoA6FpenIjPe-jeETqTDkFi35E6gc9zVLXITtfhIunVmyD2q69P9iacqYgIdMsa6Hr4-LR-dnQeRnpGYVYKbN6lPMu12oGtcGK6wP6suIPDmb'],
@@ -294,7 +294,7 @@ const BrowseAssets = () => {
             pricePerDay: 80000,
             depositAmount: 1200000,
             category: 'Camping',
-            subCategory: 'Storage',
+            subCategory: 'Bếp & Dụng cụ nấu ăn',
             condition: 'Excellent',
             status: 'verified',
             images: ['https://lh3.googleusercontent.com/aida-public/AB6AXuBdmOZM5CA2HeDNKRLrBtlukeC2ZPeQaD9IwjZYDu31OXkU9a_2Q0hr461avgm5IPHfLxw3R5sZwqcOCImouQ-aokVfJHglkwMgvq4S1z8kLjWLiHG9rUjFtN9reBpQNEFUTMzbdw8b2Pkrt8QfSaVrEpmRXHbKi_B2UrLewqynsf3W-9mtF_o6aQygD1W-oOc4oCrm6OqL3PCn79TtBJO3d2ys-ot-D53MotqMqV92nXh4kC4yY1YDuJbQlA605J6frPb9Y52E3SBq'],
@@ -316,10 +316,13 @@ const BrowseAssets = () => {
   const isTech = categoryParam.toLowerCase() === 'tech';
 
   const filterSubcategories = isCamping
-    ? ['Tents', 'Cooking', 'Furniture', 'Lighting', 'Backpacks']
+    ? ['Lều & Thảm dã ngoại', 'Bếp & Dụng cụ nấu ăn', 'Bàn ghế dã ngoại', 'Đèn & Thiết bị chiếu sáng', 'Balo & Đồ sinh tồn']
     : isTech
-    ? ['Máy ảnh', 'Flycam', 'Ánh sáng', 'Laptop']
-    : ['Máy ảnh', 'Flycam', 'Ánh sáng', 'Laptop', 'Tents', 'Cooking', 'Furniture', 'Lighting', 'Backpacks'];
+    ? ['Máy ảnh & Ống kính', 'Flycam & Drone', 'Loa & Thiết bị âm thanh', 'Laptop & Phụ kiện', 'Đèn Studio & Ánh sáng']
+    : [
+        'Lều & Thảm dã ngoại', 'Bếp & Dụng cụ nấu ăn', 'Bàn ghế dã ngoại', 'Đèn & Thiết bị chiếu sáng', 'Balo & Đồ sinh tồn',
+        'Máy ảnh & Ống kính', 'Flycam & Drone', 'Loa & Thiết bị âm thanh', 'Laptop & Phụ kiện', 'Đèn Studio & Ánh sáng'
+      ];
 
   const filterBrands = isCamping
     ? ['Naturehike', 'Fire-Maple', 'Coleman', 'Decathlon', 'Osprey']
@@ -380,13 +383,16 @@ const BrowseAssets = () => {
         const hasMatch = selectedSubCategories.some(sub => {
           if (itemSubCat === sub) return true;
           // Fallbacks for descriptions/names
-          if (sub === 'máy ảnh' && item.name.toLowerCase().includes('camera')) return true;
-          if (sub === 'flycam' && item.name.toLowerCase().includes('mavic')) return true;
-          if (sub === 'ánh sáng' && item.name.toLowerCase().includes('light')) return true;
-          if (sub === 'laptop' && item.name.toLowerCase().includes('macbook')) return true;
-          if (sub === 'tents' && item.name.toLowerCase().includes('tent')) return true;
-          if (sub === 'cooking' && (item.name.toLowerCase().includes('stove') || item.name.toLowerCase().includes('bếp'))) return true;
-          if (sub === 'backpacks' && item.name.toLowerCase().includes('backpack')) return true;
+          if (sub === 'lều & thảm dã ngoại' && (item.name.toLowerCase().includes('tent') || item.name.toLowerCase().includes('lều'))) return true;
+          if (sub === 'bếp & dụng cụ nấu ăn' && (item.name.toLowerCase().includes('stove') || item.name.toLowerCase().includes('bếp') || item.name.toLowerCase().includes('nồi') || item.name.toLowerCase().includes('cook') || item.name.toLowerCase().includes('cooking') || item.name.toLowerCase().includes('cookware') || item.name.toLowerCase().includes('bát') || item.name.toLowerCase().includes('đĩa'))) return true;
+          if (sub === 'bàn ghế dã ngoại' && (item.name.toLowerCase().includes('bàn') || item.name.toLowerCase().includes('ghế') || item.name.toLowerCase().includes('table') || item.name.toLowerCase().includes('chair') || item.name.toLowerCase().includes('furniture'))) return true;
+          if (sub === 'đèn & thiết bị chiếu sáng' && (item.name.toLowerCase().includes('đèn') || item.name.toLowerCase().includes('light') || item.name.toLowerCase().includes('flashlight') || item.name.toLowerCase().includes('lighting'))) return true;
+          if (sub === 'balo & đồ sinh tồn' && (item.name.toLowerCase().includes('backpack') || item.name.toLowerCase().includes('balo') || item.name.toLowerCase().includes('túi') || item.name.toLowerCase().includes('bag') || item.name.toLowerCase().includes('survival'))) return true;
+          if (sub === 'máy ảnh & ống kính' && (item.name.toLowerCase().includes('camera') || item.name.toLowerCase().includes('máy ảnh') || item.name.toLowerCase().includes('lens') || item.name.toLowerCase().includes('cameras'))) return true;
+          if (sub === 'flycam & drone' && (item.name.toLowerCase().includes('drone') || item.name.toLowerCase().includes('flycam') || item.name.toLowerCase().includes('mavic'))) return true;
+          if (sub === 'loa & thiết bị âm thanh' && (item.name.toLowerCase().includes('loa') || item.name.toLowerCase().includes('speaker') || item.name.toLowerCase().includes('sound') || item.name.toLowerCase().includes('audio') || item.name.toLowerCase().includes('mic'))) return true;
+          if (sub === 'laptop & phụ kiện' && (item.name.toLowerCase().includes('laptop') || item.name.toLowerCase().includes('macbook') || item.name.toLowerCase().includes('máy tính') || item.name.toLowerCase().includes('pc'))) return true;
+          if (sub === 'đèn studio & ánh sáng' && (item.name.toLowerCase().includes('aputure') || item.name.toLowerCase().includes('softbox') || item.name.toLowerCase().includes('light') || item.name.toLowerCase().includes('đèn') || item.name.toLowerCase().includes('studio') || item.name.toLowerCase().includes('lights'))) return true;
           return false;
         });
         return hasMatch;

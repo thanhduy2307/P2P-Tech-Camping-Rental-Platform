@@ -199,8 +199,37 @@ Lòng tin là cốt lõi của nền tảng chia sẻ thiết bị P2P:
 * **Cơ chế hoạt động**:
   * Ngay khi Renter thực hiện đặt cọc thanh toán đơn hàng VNPay thành công, hệ thống tự động trích xuất dữ liệu eKYC của hai bên (Họ tên, SĐT, Số CCCD, địa chỉ định vị) và thông tin thiết bị để **tự động khởi tạo file PDF Hợp đồng thuê tài sản điện tử**.
   * File hợp đồng được ký số đóng dấu xác thực của nền tảng VeloX, hiển thị trực tiếp trên app cho 2 bên cùng tải xuống hoặc xem trực tiếp thông qua API `GET /api/orders/:id/contract`.
-**** Tính năng cần bổ sung : 
---tìm đồ theo nhu cầu cắm trại như : đi 3ng thì dùng lều gì .... (đi bộ 1-2 ngày )
--- giá tiền cọc, cọc theo giá sản phẩm vào từng thời điểm vd : món đồ đã lâu , mới thì cọc giá khác
---tạo personal page cho renter để đăng bài PR sản phẩm,có thể tag sản phẩm của lender vào
---tích hợp AI vào
+## 7. CÁC TÍNH NĂNG MỚI ĐỀ XUẤT BỔ SUNG (NEW FEATURE PROPOSALS)
+
+Để tối ưu hóa trải nghiệm người dùng và mở rộng tính năng của sàn giao dịch P2P, hệ thống đề xuất tích hợp thêm 4 nghiệp vụ lớn sau:
+
+### 7.1. Tìm Đồ Theo Nhu Cầu Cắm Trại (Smart Camping Planner)
+* **Mô tả nghiệp vụ**: Giúp Renter dễ dàng lên kế hoạch thuê đồ dã ngoại mà không cần có kiến thức chuyên môn trước (ví dụ: đi cắm trại 3 người, đi trekking dã ngoại 1-2 ngày thì cần những gì).
+* **Luồng xử lý**:
+  1. Renter nhập các thông tin cơ bản về chuyến đi: Số lượng thành viên, Số ngày đi, Địa hình/Loại hình dã ngoại (trekking đi bộ, glamping nghỉ dưỡng, cắm trại công viên,...).
+  2. Hệ thống phân tích nhu cầu và gợi ý danh sách kiểm tra (Checklist) các đồ dùng cần thiết (ví dụ: Lều 4 người, Balo dã ngoại, Bếp ga du lịch, Đèn pin, Túi ngủ).
+  3. Renter có thể chọn tính năng **"Thuê trọn bộ gợi ý" (Rent Full Combo)**. Hệ thống sẽ tự động tìm kiếm các thiết bị phù hợp từ các Lender gần nhất dựa trên khoảng cách GPS và thêm vào giỏ hàng để Renter thanh toán trong một giao dịch duy nhất.
+
+### 7.2. Chính Sách Đặt Cọc Động Theo Tình Trạng & Hao Mòn (Dynamic Deposit Policy)
+* **Mô tả nghiệp vụ**: Giá tiền đặt cọc được tính toán linh hoạt dựa theo thời giá và độ hao mòn thực tế của sản phẩm tại từng thời điểm, thay vì giữ cố định một mức cọc bằng giá trị đồ mới. Điều này giúp giảm rào cản tài chính cho Renter khi thuê các thiết bị đã qua sử dụng nhiều lần.
+* **Cơ chế hoạt động**:
+  * Khi Lender đăng ký thiết bị, họ sẽ chọn mức độ mới/tình trạng sản phẩm (%) (ví dụ: Mới 99%, Cũ 80%, Đã dùng nhiều - 60%).
+  * Hệ thống tính tiền cọc động dựa trên giá trị gốc của thiết bị nhân với tỷ lệ hao mòn hiện tại và thời gian sử dụng.
+  * Ngoài ra, tiền cọc có thể được khấu trừ giảm thêm đối với Renter có **Điểm uy tín cao** (Trust-based deposit discount) để khuyến khích tinh thần giữ gìn tài sản chung.
+
+### 7.3. Trang Cá Nhân & Mạng Xã Hội Renter (Renter Social Feed)
+* **Mô tả nghiệp vụ**: Tạo không gian mạng xã hội thu nhỏ cho cộng đồng Renter chia sẻ hình ảnh chuyến đi thực tế, PR sản phẩm và gắn thẻ tag thiết bị của Lender để tạo tính liên kết cao.
+* **Luồng xử lý**:
+  1. Mỗi Renter có một **Trang cá nhân (Personal Profile)** công khai hiển thị lịch sử thuê đồ uy tín, điểm đánh giá và các bài đăng chia sẻ kinh nghiệm dã ngoại.
+  2. Người dùng có thể đăng tải bài viết kèm hình ảnh, video về hành trình dã ngoại của mình và **gắn thẻ tag trực tiếp (Product Tagging)** các sản phẩm thiết bị họ đã thuê từ Lender trong đơn hàng.
+  3. Người xem bài viết có thể click trực tiếp vào thẻ tag để chuyển nhanh đến trang chi tiết của thiết bị đó để thực hiện đặt thuê.
+  4. Hệ thống áp dụng cơ chế tích lũy điểm thưởng (Reward Points) cho Renter đăng bài khi có người dùng khác thuê đồ thông qua link tag PR của họ.
+
+### 7.4. Tích Hợp Trí Tuệ Nhân Tạo (AI Integration)
+Nâng cao tính tự động hóa và trải nghiệm cá nhân hóa bằng mô hình AI:
+* **AI Camping Assistant (Tư vấn viên cắm trại)**:
+  * Trợ lý ảo AI tích hợp trên giao diện Chat giúp tư vấn chuẩn bị đồ dã ngoại dựa trên hội thoại tự nhiên với khách hàng. 
+  * Ví dụ: Renter chat *"Mình đi leo núi Bà Đen cuối tuần này 2 ngày, thời tiết dự báo có gió lớn, cần thuê những gì?"*, AI sẽ tự động phân tích và đưa ra checklist thiết bị cản gió, gọn nhẹ kèm link thuê trên sàn.
+* **AI Damage Inspector (Kiểm định hư hại tự động)**:
+  * Khi bàn giao và nhận lại đồ, Lender chụp ảnh tải lên hệ thống.
+  * AI Computer Vision sẽ tự động quét, đối chiếu hình ảnh trước và sau khi thuê (Handover vs Return photos) để tự động phát hiện các vết rách, nứt, trầy xước trên thiết bị và đưa ra gợi ý đền bù khuyến nghị cho Admin làm căn cứ giải quyết tranh chấp.

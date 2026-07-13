@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -35,7 +36,7 @@ const DashboardLayout = ({ role, children }) => {
           user: userData
         }));
         
-        alert(`Đã chuyển vai trò sang: ${newRole === 'lender' ? 'Người cho thuê (Lender)' : 'Người thuê (Renter)'}`);
+        Swal.fire(`Đã chuyển vai trò sang: ${newRole === 'lender' ? 'Người cho thuê (Lender)' : 'Người thuê (Renter)'}`);
         
         if (newRole === 'lender') {
           navigate('/dashboard-lender');
@@ -46,9 +47,9 @@ const DashboardLayout = ({ role, children }) => {
     } catch (err) {
       console.error(err);
       if (err.response && err.response.data && err.response.data.message) {
-        alert(err.response.data.message);
+        Swal.fire(err.response.data.message);
       } else {
-        alert('Không thể chuyển vai trò. Vui lòng thử lại sau.');
+        Swal.fire('Không thể chuyển vai trò. Vui lòng thử lại sau.');
       }
     }
   };
@@ -94,7 +95,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">dashboard</span>
-                Overview
+                Tổng quan
               </Link>
               <Link 
                 to="/profile" 
@@ -103,7 +104,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">group</span>
-                Users & Roles
+                Thành viên & Vai trò
               </Link>
             </>
           )}
@@ -116,7 +117,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">verified</span>
-                Reviews
+                Kiểm duyệt
               </Link>
             </>
           )}
@@ -129,7 +130,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">payments</span>
-                My Income
+                Thu nhập của tôi
               </Link>
               <Link 
                 to="/lender-inventory" 
@@ -138,7 +139,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">inventory</span>
-                My Gear
+                Thiết bị của tôi
               </Link>
               <Link 
                 to="/lender-orders" 
@@ -147,7 +148,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-                Incoming Orders
+                Yêu cầu thuê
               </Link>
               <Link 
                 to="/lender-chat" 
@@ -156,7 +157,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">chat</span>
-                Chat Inbox
+                Hộp thư chat
               </Link>
               <Link 
                 to="/post-asset" 
@@ -165,7 +166,7 @@ const DashboardLayout = ({ role, children }) => {
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">add_circle</span>
-                Add Gear
+                Thêm thiết bị
               </Link>
             </>
           )}
@@ -176,7 +177,7 @@ const DashboardLayout = ({ role, children }) => {
               className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
             >
               <span className="material-symbols-outlined text-[20px]">storefront</span>
-              Go to Store
+              Đến Cửa hàng
             </Link>
           </div>
         </nav>
@@ -188,11 +189,11 @@ const DashboardLayout = ({ role, children }) => {
         <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-8 shadow-sm">
           <div>
             <h1 className="text-lg font-bold text-slate-800">
-              {isActive('/dashboard-lender') && 'Income Overview'}
-              {isActive('/lender-inventory') && 'My Gear Inventory'}
-              {isActive('/lender-orders') && 'Rental Orders'}
-              {isActive('/post-asset') && 'List New Gear'}
-              {!['/dashboard-lender', '/lender-inventory', '/lender-orders', '/post-asset'].includes(location.pathname) && 'Lender Dashboard'}
+              {isActive('/dashboard-lender') && 'Tổng quan Thu nhập'}
+              {isActive('/lender-inventory') && 'Kho Thiết bị của tôi'}
+              {isActive('/lender-orders') && 'Đơn hàng cho thuê'}
+              {isActive('/post-asset') && 'Đăng thiết bị mới'}
+              {!['/dashboard-lender', '/lender-inventory', '/lender-orders', '/post-asset'].includes(location.pathname) && 'Trang Quản trị Lender'}
             </h1>
           </div>
           
@@ -203,7 +204,7 @@ const DashboardLayout = ({ role, children }) => {
               className="text-secondary-container bg-secondary/10 hover:bg-secondary/15 transition-colors px-3 py-1.5 rounded-lg border border-secondary/20 font-semibold text-xs flex items-center gap-1.5 text-secondary"
             >
               <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-              Switch to Renter
+              Chuyển sang Renter
             </button>
 
             <span className="h-4 w-px bg-slate-350"></span>
@@ -213,7 +214,7 @@ const DashboardLayout = ({ role, children }) => {
               className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-300 rounded-lg bg-white hover:bg-slate-50 transition-colors font-semibold text-xs text-error hover:text-red-700"
             >
               <span className="material-symbols-outlined text-[16px]">logout</span>
-              Logout
+              Đăng xuất
             </button>
           </div>
         </header>

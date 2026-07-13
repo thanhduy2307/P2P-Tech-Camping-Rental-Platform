@@ -50,7 +50,11 @@ const Login = () => {
     } catch (err) {
       console.error(err);
       if (err.response && err.response.data && err.response.data.message) {
-        setErrorMsg(err.response.data.message);
+        let msg = err.response.data.message;
+        if (msg === 'Invalid credentials') {
+          msg = 'Email hoặc mật khẩu không chính xác.';
+        }
+        setErrorMsg(msg);
       } else if (err.response && err.response.status === 401) {
         setErrorMsg('Email hoặc mật khẩu không chính xác.');
       } else {
@@ -179,9 +183,9 @@ const Login = () => {
 
           {/* Main Form */}
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {/* Email Input */}
+            {/* Email / Phone Input */}
             <div className="space-y-2">
-              <label className="font-label-sm text-label-sm text-on-surface" htmlFor="email">Email</label>
+              <label className="font-label-sm text-label-sm text-on-surface" htmlFor="email">Email hoặc Số điện thoại</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <span className="material-symbols-outlined text-outline">mail</span>
@@ -190,9 +194,9 @@ const Login = () => {
                   className="w-full pl-10 pr-3 py-3 border border-outline-variant rounded-lg bg-surface-container-lowest focus:ring-2 focus:ring-secondary-container focus:border-secondary-container transition-shadow text-on-surface font-body-md text-body-md" 
                   id="email" 
                   name="email" 
-                  placeholder="ten@vidu.com" 
+                  placeholder="Email hoặc Số điện thoại" 
                   required 
-                  type="email"
+                  type="text"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

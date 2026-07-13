@@ -1,6 +1,8 @@
 const express = require('express');
 const {
   register,
+  registerPhone,
+  verifyOtp,
   login,
   googleCallback,
   switchRole,
@@ -15,7 +17,10 @@ const {
   getPublicProfile,
   getMe,
   getMyWithdrawals,
-  updateAvatar
+  updateAvatar,
+  applyRenterEkyc,
+  getRenterApplications,
+  verifyRenterApplication
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -24,6 +29,8 @@ const router = express.Router();
 
 router.get('/test-features', runIntegrationTests);
 router.post('/register', register);
+router.post('/register-phone', registerPhone);
+router.post('/verify-otp', verifyOtp);
 router.post('/login', login);
 router.get('/google/callback', googleCallback);
 router.get('/me', protect, getMe);
@@ -34,6 +41,11 @@ router.get('/balance', protect, authorize('renter', 'lender'), getBalance);
 
 // Public User profile (Personal page summary)
 router.get('/users/:id/profile', getPublicProfile);
+
+// Renter eKYC onboarding
+router.post('/renter-onboarding', protect, authorize('renter'), applyRenterEkyc);
+router.get('/renter-applications', protect, authorize('admin'), getRenterApplications);
+router.put('/renter-applications/:id/verify', protect, authorize('admin'), verifyRenterApplication);
 
 // Lender eKYC onboarding
 router.post('/lender-onboarding', protect, authorize('renter'), applyLender);

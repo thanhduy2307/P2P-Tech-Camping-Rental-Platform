@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import api from '../../configs/axios';
@@ -5,6 +6,11 @@ import api from '../../configs/axios';
 const LenderInventory = () => {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [blockModalOpen, setBlockModalOpen] = useState(false);
+  const [selectedAssetForBlock, setSelectedAssetForBlock] = useState(null);
+  const [blockStartDate, setBlockStartDate] = useState('');
+  const [blockEndDate, setBlockEndDate] = useState('');
 
   const fetchMyInventory = async () => {
     setLoading(true);
@@ -24,16 +30,61 @@ const LenderInventory = () => {
     fetchMyInventory();
   }, []);
 
+  const openBlockModal = (asset) => {
+    setSelectedAssetForBlock(asset);
+    setBlockStartDate('');
+    setBlockEndDate('');
+    setBlockModalOpen(true);
+  };
+
+  const handleAddBlockDate = async () => {
+    if (!blockStartDate || !blockEndDate) {
+      Swal.fire("Vui lòng chọn cả ngày bắt đầu và kết thúc.");
+      return;
+    }
+    if (new Date(blockStartDate) > new Date(blockEndDate)) {
+      Swal.fire("Ngày bắt đầu phải trước hoặc bằng ngày kết thúc.");
+      return;
+    }
+    try {
+      const currentBlocks = selectedAssetForBlock.blockedDates || [];
+      const updatedBlocks = [...currentBlocks, { startDate: blockStartDate, endDate: blockEndDate }];
+      const res = await api.put(`/assets/${selectedAssetForBlock._id}/block-dates`, { blockedDates: updatedBlocks });
+      if (res.data?.success) {
+        setBlockStartDate('');
+        setBlockEndDate('');
+        setSelectedAssetForBlock({ ...selectedAssetForBlock, blockedDates: res.data.data });
+        fetchMyInventory();
+      }
+    } catch (err) {
+      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra.');
+    }
+  };
+
+  const handleRemoveBlockDate = async (index) => {
+    try {
+      const updatedBlocks = [...selectedAssetForBlock.blockedDates];
+      updatedBlocks.splice(index, 1);
+      const res = await api.put(`/assets/${selectedAssetForBlock._id}/block-dates`, { blockedDates: updatedBlocks });
+      if (res.data?.success) {
+        setSelectedAssetForBlock({ ...selectedAssetForBlock, blockedDates: res.data.data });
+        fetchMyInventory();
+      }
+    } catch (err) {
+      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra.');
+    }
+  };
+
   const handleStatusUpdate = async (assetId, newStatus) => {
     try {
       const response = await api.put(`/assets/${assetId}/status`, { status: newStatus });
       if (response.data?.success) {
-        alert(`Cập nhật trạng thái thành công sang: ${newStatus}`);
+        Swal.fire(`Cập nhật trạng thái thành công sang: ${newStatus}`);
         fetchMyInventory();
       }
     } catch (err) {
       console.error(err);
-      alert(err.response?.data?.message || 'Không thể cập nhật trạng thái thiết bị.');
+      Swal.fire(err.response?.data?.message || 'Không thể cập nhật trạng thái thiết bị.');
     }
   };
 
@@ -113,6 +164,20 @@ const LenderInventory = () => {
                       {asset.status === 'rejected' && 'Từ chối'}
                     </span>
                   </div>
+
+                  {/* Trust Badges */}
+                  {asset.badges && asset.badges.length > 0 && (
+                    <div className="absolute bottom-3 left-3 flex flex-wrap gap-1">
+                      {asset.badges.map((b, bi) => (
+                        <span 
+                          key={bi}
+                          className="bg-teal-900/95 text-teal-300 backdrop-blur-sm px-2 py-0.5 rounded text-[8px] font-extrabold uppercase tracking-wider shadow border border-teal-500/20"
+                        >
+                          {b}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Details Section */}
@@ -148,15 +213,31 @@ const LenderInventory = () => {
 
                   {/* Actions Toggle at Bottom */}
                   <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col gap-2">
+                    <Link
+                      to={`/post-asset?id=${asset._id}`}
+                      className="text-center text-xs font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 active:scale-98"
+                    >
+                      <span className="material-symbols-outlined text-sm">edit</span>
+                      Chỉnh sửa thông tin
+                    </Link>
+                    
+                    <button
+                      onClick={() => openBlockModal(asset)}
+                      className="text-center text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 active:scale-98"
+                    >
+                      <span className="material-symbols-outlined text-sm">event_busy</span>
+                      Quản lý lịch bận
+                    </button>
+
                     {asset.status === 'pending_approval' && (
                       <p className="text-[11px] text-slate-400 italic text-center py-1">
-                        Thiết bị đang chờ Inspector kiểm duyệt. Vui lòng quay lại sau.
+                        Thiết bị đang chờ Inspector kiểm duyệt.
                       </p>
                     )}
 
                     {asset.status === 'rejected' && (
                       <p className="text-[11px] text-red-400 italic text-center py-1">
-                        Hồ sơ từ chối. Hãy cập nhật lại thông tin.
+                        Hồ sơ từ chối. Hãy bấm chỉnh sửa để cập nhật.
                       </p>
                     )}
 
@@ -198,6 +279,75 @@ const LenderInventory = () => {
           })}
         </div>
       )}
+
+      {/* Block Dates Modal */}
+      {blockModalOpen && selectedAssetForBlock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+              <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
+                <span className="material-symbols-outlined text-amber-500">event_busy</span>
+                Quản lý lịch bận
+              </h3>
+              <button onClick={() => setBlockModalOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors p-1">
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+                Thiết lập các khoảng thời gian mà bạn không muốn cho thuê thiết bị <strong>{selectedAssetForBlock.name}</strong> (VD: bận việc cá nhân, đi bảo trì). Hệ thống sẽ tự động chặn Renter đặt vào những ngày này.
+              </p>
+
+              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex flex-col gap-3">
+                <div className="flex gap-3 items-end">
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>
+                    <input type="date" value={blockStartDate} onChange={(e) => setBlockStartDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Đến ngày</label>
+                    <input type="date" value={blockEndDate} onChange={(e) => setBlockEndDate(e.target.value)} min={blockStartDate || new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
+                  </div>
+                  <button onClick={handleAddBlockDate} className="bg-amber-500 hover:bg-amber-600 text-white font-bold p-2 rounded-lg flex items-center justify-center transition-colors">
+                    <span className="material-symbols-outlined">add</span>
+                  </button>
+                </div>
+              </div>
+
+              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Danh sách ngày đã khóa</h4>
+              {(!selectedAssetForBlock.blockedDates || selectedAssetForBlock.blockedDates.length === 0) ? (
+                <p className="text-sm text-slate-400 italic text-center py-4">Chưa có lịch khóa nào được thiết lập.</p>
+              ) : (
+                <div className="space-y-2">
+                  {selectedAssetForBlock.blockedDates.map((block, index) => (
+                    <div key={index} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
+                      <div className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-slate-400 text-sm">calendar_month</span>
+                        {new Date(block.startDate).toLocaleDateString('vi-VN')} - {new Date(block.endDate).toLocaleDateString('vi-VN')}
+                      </div>
+                      {block.reason === 'manual' ? (
+                        <button onClick={() => handleRemoveBlockDate(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa lịch khóa">
+                          <span className="material-symbols-outlined text-sm">delete</span>
+                        </button>
+                      ) : (
+                        <span className="text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-1 rounded border border-emerald-100">Đã có người thuê</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">
+              <button onClick={() => setBlockModalOpen(false)} className="px-5 py-2 bg-slate-200 text-slate-700 font-bold text-sm rounded-lg hover:bg-slate-300 transition-colors">
+                Đóng cửa sổ
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -37,7 +37,7 @@ const orderSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending_payment', 'reserved', 'active', 'returned', 'completed', 'disputed'],
+    enum: ['pending_payment', 'reserved', 'active', 'returned', 'completed', 'disputed', 'cancelled'],
     default: 'pending_payment'
   },
   vnpayTxnRef: {
@@ -77,7 +77,40 @@ const orderSchema = new mongoose.Schema({
     enum: ['none', 'pending', 'approved', 'rejected'],
     default: 'none'
   },
+  isLateReturn: {
+    type: Boolean,
+    default: false
+  },
+  lateDays: {
+    type: Number,
+    default: 0
+  },
+  lateFee: {
+    type: Number,
+    default: 0
+  },
   contractPdfUrl: {
+    type: String,
+    default: ''
+  },
+  depositMethod: {
+    type: String,
+    enum: ['online', 'cash'],
+    default: 'online'
+  },
+  isCashDepositHandedOver: {
+    type: Boolean,
+    default: false
+  },
+  isCashDepositReturned: {
+    type: Boolean,
+    default: false
+  },
+  actualCashDepositReturned: {
+    type: Number,
+    default: 0
+  },
+  cashDepositDeductionReason: {
     type: String,
     default: ''
   },
@@ -92,6 +125,27 @@ const orderSchema = new mongoose.Schema({
   },
   lenderComment: {
     type: String
+  },
+  disputeCreator: {
+    type: String,
+    enum: ['renter', 'lender', '']
+  },
+  requestedDeductionAmount: {
+    type: Number,
+    default: 0
+  },
+  renterDisputeNotes: {
+    type: String
+  },
+  renterDisputeImages: [{
+    type: String
+  }],
+  disputeStatus: {
+    type: String,
+    enum: ['open', 'responded', 'resolved', '']
+  },
+  disputedAt: {
+    type: Date
   }
 }, { timestamps: true });
 

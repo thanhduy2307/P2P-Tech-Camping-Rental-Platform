@@ -21,6 +21,7 @@ const Profile = () => {
   
   // Edit Profile Form State
   const [isEditing, setIsEditing] = useState(false);
+  const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [street, setStreet] = useState('');
   const [ward, setWard] = useState('');
@@ -76,6 +77,7 @@ const Profile = () => {
           dispatch(updateProfile(freshUser));
           
           // Populate form fields
+          setEmail(freshUser.email || '');
           setPhoneNumber(freshUser.phoneNumber || '');
           if (freshUser.address) {
             setStreet(freshUser.address.street || '');
@@ -221,6 +223,7 @@ const Profile = () => {
 
     try {
       const response = await api.put('/auth/complete-profile', {
+        email,
         phoneNumber,
         address: {
           province,
@@ -799,9 +802,11 @@ const Profile = () => {
                       <label className="block text-xs font-bold text-on-surface-variant mb-1.5">Địa chỉ Email</label>
                       <input 
                         type="email" 
-                        value={user?.email || ''} 
-                        disabled 
-                        className="w-full bg-surface-container-low border border-outline-variant rounded-xl px-3 py-2 text-sm text-on-surface-variant focus:outline-none cursor-not-allowed"
+                        value={email} 
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="Nhập địa chỉ email"
+                        className="w-full bg-surface border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none font-semibold"
+                        required
                       />
                     </div>
                     <div>
@@ -926,6 +931,68 @@ const Profile = () => {
           {/* Right Side: Profile Progress and Actions (Span 4) */}
           <div className="lg:col-span-4 space-y-6">
             
+            {/* Renter eKYC Verification Card */}
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
+              <h3 className="font-title-md text-sm font-bold text-on-surface mb-3 flex items-center">
+                <span className="material-symbols-outlined text-primary mr-1">badge</span>
+                Xác thực CCCD (Renter eKYC)
+              </h3>
+              
+              <div className="space-y-4">
+                {user?.renterStatus === 'approved' ? (
+                  <div className="bg-emerald-50 border border-emerald-250 text-emerald-800 p-4 rounded-xl flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-xl text-emerald-600" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                    <div>
+                      <h4 className="font-bold text-xs">Đã xác thực thành công</h4>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                        Tài khoản của bạn đã được đối soát CCCD thành công. Bạn có thể tự do đặt thuê các thiết bị dã ngoại.
+                      </p>
+                    </div>
+                  </div>
+                ) : user?.renterStatus === 'pending' ? (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl flex items-start gap-2.5">
+                    <span className="material-symbols-outlined text-xl text-amber-600 animate-pulse">hourglass_top</span>
+                    <div>
+                      <h4 className="font-bold text-xs">Đang chờ Admin duyệt</h4>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                        Hồ sơ xác thực eKYC CCCD của bạn đã được gửi lên hệ thống và đang chờ kiểm duyệt.
+                      </p>
+                    </div>
+                  </div>
+                ) : user?.renterStatus === 'rejected' ? (
+                  <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-xl flex flex-col gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="material-symbols-outlined text-xl text-red-650">gpp_bad</span>
+                      <div>
+                        <h4 className="font-bold text-xs">Xác thực bị từ chối</h4>
+                        <p className="text-[10px] text-red-700 mt-1 leading-relaxed">
+                          Lý do: "{user?.renterOnboarding?.rejectReason || 'Thông tin ảnh chụp không rõ ràng'}"
+                        </p>
+                      </div>
+                    </div>
+                    <Link to="/renter-ekyc" className="w-full text-center bg-primary text-white text-xs font-bold py-2 rounded-lg hover:opacity-90 shadow-sm transition-all">
+                      Nộp lại hồ sơ eKYC
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 border border-slate-200 text-slate-700 p-4 rounded-xl flex flex-col gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="material-symbols-outlined text-xl text-slate-400">lock</span>
+                      <div>
+                        <h4 className="font-bold text-xs">Chưa thực hiện eKYC</h4>
+                        <p className="text-[10px] text-slate-500 mt-1 leading-relaxed">
+                          Bạn cần hoàn thành xác thực CCCD để có thể đặt thuê các sản phẩm trên nền tảng.
+                        </p>
+                      </div>
+                    </div>
+                    <Link to="/renter-ekyc" className="w-full text-center bg-primary text-white text-xs font-bold py-2 rounded-lg hover:opacity-90 shadow-sm transition-all">
+                      Xác thực danh tính ngay
+                    </Link>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Completion Progress Card */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
               <h3 className="font-title-md text-sm font-bold text-on-surface mb-3 flex items-center">

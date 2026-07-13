@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import api from '../../configs/axios';
 
@@ -11,6 +12,7 @@ const DashboardAdmin = () => {
   const [stats, setStats] = useState(null);
   const [users, setUsers] = useState([]);
   const [lenderApps, setLenderApps] = useState([]);
+  const [renterApps, setRenterApps] = useState([]);
   const [withdrawals, setWithdrawals] = useState([]);
   const [assets, setAssets] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -26,6 +28,13 @@ const DashboardAdmin = () => {
   const [rejectionModal, setRejectionModal] = useState({ open: false, type: null, id: null });
   const [rejectReason, setRejectReason] = useState('');
   const [lightbox, setLightbox] = useState({ open: false, imgUrl: '', title: '' });
+  const [selectedUserDetails, setSelectedUserDetails] = useState(null);
+  
+  // Dispute Modal States
+  const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [selectedDisputeOrder, setSelectedDisputeOrder] = useState(null);
+  const [lenderCompensation, setLenderCompensation] = useState(0);
+  const [renterRefund, setRenterRefund] = useState(0);
 
   // Notification helper
   const showToast = (message, type = 'success') => {
@@ -96,6 +105,20 @@ const DashboardAdmin = () => {
     }
   };
 
+  const fetchRenterApps = async () => {
+    try {
+      setLoading(true);
+      const res = await api.get('/auth/renter-applications');
+      if (res.data && res.data.success) {
+        setRenterApps(res.data.data);
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Không thể tải đơn đăng ký Renter.', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchWithdrawals = async () => {
     try {
       setLoading(true);
@@ -158,6 +181,9 @@ const DashboardAdmin = () => {
       case 'lenders':
         fetchLenderApps();
         break;
+      case 'renters_ekyc':
+        fetchRenterApps();
+        break;
       case 'withdrawals':
         fetchWithdrawals();
         break;
@@ -184,7 +210,8 @@ const DashboardAdmin = () => {
       ? `Bạn có chắc chắn muốn MỞ KHÓA tài khoản của ${userItem.name}?` 
       : `Bạn có chắc chắn muốn KHÓA (BAN) tài khoản của ${userItem.name}?`;
     
-    if (!window.confirm(confirmMsg)) return;
+    const _swalRes = await Swal.fire({title: confirmMsg, showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
+    if (!_swalRes.isConfirmed) return;
 
     try {
       const res = await api.put(`/admin/users/${userItem._id}/ban`);
@@ -215,7 +242,8 @@ const DashboardAdmin = () => {
   // eKYC App verification approvals
   const handleVerifyLender = async (id, status) => {
     if (status === 'approved') {
-      if (!window.confirm('Xác nhận phê duyệt hồ sơ eKYC này và cấp quyền Lender?')) return;
+      const _swalRes = await Swal.fire({title: 'Xác nhận phê duyệt hồ sơ eKYC này và cấp quyền Lender?', showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
+    if (!_swalRes.isConfirmed) return;
       try {
         const res = await api.put(`/auth/lender-applications/${id}/verify`, { status });
         if (res.data && res.data.success) {
@@ -233,10 +261,32 @@ const DashboardAdmin = () => {
     }
   };
 
+  const handleVerifyRenter = async (id, status) => {
+    if (status === 'approved') {
+      const _swalRes = await Swal.fire({title: 'Xác nhận phê duyệt hồ sơ eKYC Renter này?', showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
+    if (!_swalRes.isConfirmed) return;
+      try {
+        const res = await api.put(`/auth/renter-applications/${id}/verify`, { status });
+        if (res.data && res.data.success) {
+          showToast('Phê duyệt hồ sơ Renter eKYC thành công.');
+          fetchRenterApps();
+          fetchStats();
+        }
+      } catch (err) {
+        showToast(err.response?.data?.message || 'Thao tác thất bại.', 'error');
+      }
+    } else {
+      // open rejection modal
+      setRejectionModal({ open: true, type: 'renter_ekyc', id });
+      setRejectReason('');
+    }
+  };
+
   // Withdrawal verification approvals
   const handleVerifyWithdrawal = async (id, status) => {
     if (status === 'approved') {
-      if (!window.confirm('Xác nhận duyệt yêu cầu rút tiền này? Số dư ví người dùng đã được trừ.')) return;
+      const _swalRes = await Swal.fire({title: 'Xác nhận duyệt yêu cầu rút tiền này? Số dư ví người dùng đã được trừ.', showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
+    if (!_swalRes.isConfirmed) return;
       try {
         const res = await api.put(`/auth/withdrawals/${id}/verify`, { status });
         if (res.data && res.data.success) {
@@ -272,6 +322,16 @@ const DashboardAdmin = () => {
           fetchLenderApps();
           fetchStats();
         }
+      } else if (rejectionModal.type === 'renter_ekyc') {
+        const res = await api.put(`/auth/renter-applications/${rejectionModal.id}/verify`, {
+          status: 'rejected',
+          rejectReason: rejectReason.trim()
+        });
+        if (res.data && res.data.success) {
+          showToast('Đã từ chối hồ sơ xác thực Renter.');
+          fetchRenterApps();
+          fetchStats();
+        }
       } else if (rejectionModal.type === 'withdrawal') {
         const res = await api.put(`/auth/withdrawals/${rejectionModal.id}/verify`, {
           status: 'rejected',
@@ -287,6 +347,26 @@ const DashboardAdmin = () => {
       setRejectReason('');
     } catch (err) {
       showToast(err.response?.data?.message || 'Thao tác từ chối thất bại.', 'error');
+    }
+  };
+
+  const handleResolveDispute = async (e) => {
+    e.preventDefault();
+    if (!selectedDisputeOrder) return;
+    try {
+      const payload = {
+        lenderCompensation: Number(lenderCompensation),
+        renterRefund: Number(renterRefund),
+        adminNotes: 'Đã giải quyết qua Admin Dashboard'
+      };
+      const res = await api.put(`/orders/${selectedDisputeOrder._id}/dispute-resolve`, payload);
+      if (res.data && res.data.success) {
+        showToast('Đã giải quyết tranh chấp và phân bổ tiền thành công.');
+        setDisputeModalOpen(false);
+        fetchOrders();
+      }
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Lỗi khi giải quyết tranh chấp.', 'error');
     }
   };
 
@@ -388,13 +468,15 @@ const DashboardAdmin = () => {
             <div>
               <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Tác Vụ Cần Xử Lý</span>
               <h3 className="text-3xl font-bold text-slate-800 mt-1">
-                {(stats.pendingCounts?.withdrawals || 0) + (stats.pendingCounts?.lenderApplications || 0)}
+                {(stats.pendingCounts?.withdrawals || 0) + (stats.pendingCounts?.lenderApplications || 0) + (stats.pendingCounts?.renterApplications || 0)}
               </h3>
-              <p className="text-xs text-rose-500 mt-2 font-medium flex items-center gap-1">
-                {stats.pendingCounts?.lenderApplications || 0} eKYC | {stats.pendingCounts?.withdrawals || 0} rút tiền
+              <p className="text-xs text-rose-500 mt-2 font-medium flex flex-wrap gap-1">
+                <span>{stats.pendingCounts?.renterApplications || 0} Renter |</span>
+                <span>{stats.pendingCounts?.lenderApplications || 0} Lender |</span>
+                <span>{stats.pendingCounts?.withdrawals || 0} Rút</span>
               </p>
             </div>
-            <div className={`p-3 rounded-xl text-amber-600 ${((stats.pendingCounts?.withdrawals || 0) + (stats.pendingCounts?.lenderApplications || 0)) > 0 ? 'bg-rose-55 hover:bg-rose-100 animate-pulse' : 'bg-slate-50'}`}>
+            <div className={`p-3 rounded-xl text-amber-600 ${((stats.pendingCounts?.withdrawals || 0) + (stats.pendingCounts?.lenderApplications || 0) + (stats.pendingCounts?.renterApplications || 0)) > 0 ? 'bg-rose-55 hover:bg-rose-100 animate-pulse' : 'bg-slate-50'}`}>
               <span className="material-symbols-outlined text-3xl">notifications_active</span>
             </div>
           </div>
@@ -468,7 +550,25 @@ const DashboardAdmin = () => {
           <p className="text-slate-400 text-sm mb-6">
             Duyệt eKYC và lệnh rút tiền đang xếp hàng để giữ cho dòng tiền của hệ thống và quyền lợi chủ đồ được hoạt động liền mạch.
           </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <button
+              onClick={() => setActiveTab('renters_ekyc')}
+              className="flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700 rounded-lg group text-left"
+            >
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-teal-400 text-2xl group-hover:scale-110 transition-transform">how_to_reg</span>
+                <div>
+                  <h5 className="font-semibold text-slate-200">Duyệt eKYC Renter</h5>
+                  <p className="text-xs text-slate-400 mt-0.5">Xác thực ảnh CCCD của người đi thuê</p>
+                </div>
+              </div>
+              {stats.pendingCounts?.renterApplications > 0 && (
+                <span className="px-2.5 py-0.5 bg-rose-500 text-white font-bold text-xs rounded-full">
+                  {stats.pendingCounts.renterApplications} mới
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => setActiveTab('lenders')}
               className="flex items-center justify-between p-4 bg-slate-800 hover:bg-slate-750 transition-colors border border-slate-700 rounded-lg group text-left"
@@ -477,7 +577,7 @@ const DashboardAdmin = () => {
                 <span className="material-symbols-outlined text-emerald-400 text-2xl group-hover:scale-110 transition-transform">assignment_ind</span>
                 <div>
                   <h5 className="font-semibold text-slate-200">Duyệt hồ sơ eKYC Lender</h5>
-                  <p className="text-xs text-slate-400 mt-0.5">Yêu cầu từ Renter đăng ký nâng cấp lên Lender</p>
+                  <p className="text-xs text-slate-400 mt-0.5">Yêu cầu nâng cấp và liên kết ngân hàng</p>
                 </div>
               </div>
               {stats.pendingCounts?.lenderApplications > 0 && (
@@ -657,23 +757,32 @@ const DashboardAdmin = () => {
 
                       {/* Ban toggle action */}
                       <td className="px-6 py-4 text-right">
-                        {userItem.role !== 'admin' ? (
+                        <div className="flex items-center justify-end gap-2">
                           <button
-                            onClick={() => handleToggleBan(userItem)}
-                            className={`px-3 py-1.5 text-xs font-semibold rounded-lg border flex items-center gap-1 ml-auto cursor-pointer transition-colors ${
-                              userItem.isBanned 
-                                ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
-                                : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
-                            }`}
+                            onClick={() => setSelectedUserDetails(userItem)}
+                            className="px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-teal-50 hover:bg-teal-100 text-teal-700 border border-teal-200 cursor-pointer flex items-center gap-1 transition-colors"
                           >
-                            <span className="material-symbols-outlined text-[15px]">
-                              {userItem.isBanned ? 'lock_open' : 'block'}
-                            </span>
-                            {userItem.isBanned ? 'Mở khóa' : 'Khóa'}
+                            <span className="material-symbols-outlined text-[15px]">visibility</span>
+                            Chi tiết
                           </button>
-                        ) : (
-                          <span className="text-xs text-slate-400 italic">Admin Protected</span>
-                        )}
+                          {userItem.role !== 'admin' ? (
+                            <button
+                              onClick={() => handleToggleBan(userItem)}
+                              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border flex items-center gap-1 cursor-pointer transition-colors ${
+                                userItem.isBanned 
+                                  ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200' 
+                                  : 'bg-rose-50 hover:bg-rose-100 text-rose-700 border-rose-200'
+                              }`}
+                            >
+                              <span className="material-symbols-outlined text-[15px]">
+                                {userItem.isBanned ? 'lock_open' : 'block'}
+                              </span>
+                              {userItem.isBanned ? 'Mở' : 'Khóa'}
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Protected</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -682,6 +791,125 @@ const DashboardAdmin = () => {
             </div>
           )}
         </div>
+      </div>
+    );
+  };
+
+  const renderRenterAppsTab = () => {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm text-amber-850">
+          <span className="material-symbols-outlined text-amber-600 text-xl shrink-0">info</span>
+          <div>
+            <span className="font-semibold">Duyệt eKYC Renter:</span> Hãy kiểm tra kỹ ảnh chụp CCCD mặt trước, mặt sau và ảnh chụp selfie chân dung cầm thẻ của người dùng. Duyệt hồ sơ sẽ cho phép họ bắt đầu thực hiện đặt thuê tài sản trên hệ thống.
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="bg-white border rounded-xl p-16 text-center text-slate-500 shadow-sm">Đang tải hồ sơ Renter eKYC...</div>
+        ) : renterApps.length === 0 ? (
+          <div className="bg-white border rounded-xl p-16 text-center text-slate-500 shadow-sm flex flex-col items-center justify-center gap-3">
+            <span className="material-symbols-outlined text-5xl text-emerald-500 bg-emerald-50 p-3 rounded-full">how_to_reg</span>
+            <div className="font-bold text-slate-800 text-lg">Không có hồ sơ eKYC Renter chờ duyệt</div>
+            <div className="text-sm text-slate-400 max-w-sm">Tất cả các hồ sơ xác thực của khách thuê đã được xử lý xong.</div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-6">
+            {renterApps.map((app) => (
+              <div key={app._id} className="bg-white rounded-xl border border-slate-100 shadow-sm p-6 space-y-6">
+                {/* Header Info */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-4 border-b border-slate-100">
+                  <div>
+                    <h4 className="font-bold text-lg text-slate-900 flex items-center gap-2">
+                      {app.name}
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-800 text-xs font-semibold rounded">Chờ duyệt eKYC Renter</span>
+                    </h4>
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-500">
+                      <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[15px]">mail</span>{app.email}</span>
+                      <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[15px]">call</span>{app.phoneNumber || 'Chưa cập nhật'}</span>
+                      <span className="flex items-center gap-1"><span className="material-symbols-outlined text-[15px]">calendar_today</span>Nộp lúc: {formatDate(app.updatedAt)}</span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleVerifyRenter(app._id, 'approved')}
+                      className="px-4 py-2 bg-emerald-600 text-white font-semibold text-xs rounded-lg hover:bg-emerald-700 shadow-sm transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                      Phê Duyệt
+                    </button>
+                    <button
+                      onClick={() => handleVerifyRenter(app._id, 'rejected')}
+                      className="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-250 font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">cancel</span>
+                      Từ Chối
+                    </button>
+                  </div>
+                </div>
+
+                {/* CCCD Documents */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {/* CCCD Front */}
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-slate-500 block">Ảnh CCCD Mặt Trước</span>
+                    <div 
+                      onClick={() => openImageLightbox(app.renterOnboarding?.cccdFront, `CCCD Mặt Trước - ${app.name}`)}
+                      className="aspect-[8/5] bg-slate-100 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 relative group transition-opacity"
+                    >
+                      <img 
+                        src={app.renterOnboarding?.cccdFront} 
+                        alt="Mặt trước CCCD Renter" 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
+                        <span className="material-symbols-outlined text-lg">zoom_in</span> Phóng to
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* CCCD Back */}
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-slate-500 block">Ảnh CCCD Mặt Sau</span>
+                    <div 
+                      onClick={() => openImageLightbox(app.renterOnboarding?.cccdBack, `CCCD Mặt Sau - ${app.name}`)}
+                      className="aspect-[8/5] bg-slate-100 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 relative group transition-opacity"
+                    >
+                      <img 
+                        src={app.renterOnboarding?.cccdBack} 
+                        alt="Mặt sau CCCD Renter" 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
+                        <span className="material-symbols-outlined text-lg">zoom_in</span> Phóng to
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Selfie */}
+                  <div className="space-y-1">
+                    <span className="text-xs font-semibold text-slate-500 block">Ảnh Selfie Chân Dung</span>
+                    <div 
+                      onClick={() => openImageLightbox(app.renterOnboarding?.cccdSelfie, `Selfie Chân Dung - ${app.name}`)}
+                      className="aspect-[8/5] bg-slate-100 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 relative group transition-opacity"
+                    >
+                      <img 
+                        src={app.renterOnboarding?.cccdSelfie} 
+                        alt="Ảnh Selfie Renter" 
+                        className="w-full h-full object-cover" 
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium gap-1">
+                        <span className="material-symbols-outlined text-lg">zoom_in</span> Phóng to
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   };
@@ -1154,6 +1382,21 @@ const DashboardAdmin = () => {
                       {/* Status */}
                       <td className="px-6 py-4">
                         {getStatusBadge(order.status)}
+                        {order.status === 'disputed' && (
+                          <div className="mt-2">
+                            <button
+                              onClick={() => {
+                                setSelectedDisputeOrder(order);
+                                setDisputeModalOpen(true);
+                                setLenderCompensation(order.requestedDeductionAmount || 0);
+                                setRenterRefund((order.deposit || 0) - (order.requestedDeductionAmount || 0));
+                              }}
+                              className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold rounded shadow-sm transition-colors w-full"
+                            >
+                              Phân xử / Quyết định
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -1247,6 +1490,206 @@ const DashboardAdmin = () => {
         </div>
       )}
 
+      {/* Selected User Details Modal */}
+      {selectedUserDetails && (
+        <div className="fixed inset-0 z-[100] bg-black/60 flex items-center justify-center p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl border border-slate-200 max-w-2xl w-full overflow-hidden animate-in zoom-in-95 duration-200 my-8" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined text-teal-400">person</span>
+                Chi tiết thành viên: {selectedUserDetails.name}
+              </h3>
+              <button 
+                onClick={() => setSelectedUserDetails(null)} 
+                className="text-white hover:text-slate-200 cursor-pointer flex items-center bg-transparent border-none"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+            
+            {/* Body */}
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+              {/* Basic Info Grid */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thông tin cơ bản</h4>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg text-sm border border-slate-100">
+                  <div>
+                    <span className="text-slate-400 block text-xs">Họ và tên:</span>
+                    <strong className="text-slate-800">{selectedUserDetails.name || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Email:</span>
+                    <strong className="text-slate-800">{selectedUserDetails.email || 'N/A'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Số điện thoại:</span>
+                    <strong className="text-slate-800">{selectedUserDetails.phoneNumber || 'Chưa cập nhật'}</strong>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-xs">Số dư ví:</span>
+                    <strong className="text-emerald-700 font-bold">{formatCurrency(selectedUserDetails.balance)}</strong>
+                  </div>
+                  <div className="md:col-span-2">
+                    <span className="text-slate-400 block text-xs">Địa chỉ:</span>
+                    <strong className="text-slate-800">
+                      {selectedUserDetails.address 
+                        ? `${selectedUserDetails.address.street || ''}, ${selectedUserDetails.address.ward || ''}, ${selectedUserDetails.address.district || ''}, ${selectedUserDetails.address.city || ''}`
+                        : 'Chưa cập nhật'}
+                    </strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* Renter eKYC Info */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thông tin eKYC Renter</h4>
+                <div className="border border-slate-100 rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-100/60">
+                    <span className="text-slate-500 font-medium">Trạng thái duyệt Renter:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      selectedUserDetails.renterStatus === 'approved' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedUserDetails.renterStatus === 'pending' ? 'bg-amber-100 text-amber-800' :
+                      selectedUserDetails.renterStatus === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedUserDetails.renterStatus === 'approved' ? 'Đã duyệt' :
+                       selectedUserDetails.renterStatus === 'pending' ? 'Chờ duyệt' :
+                       selectedUserDetails.renterStatus === 'rejected' ? 'Bị từ chối' : 'Chưa eKYC'}
+                    </span>
+                  </div>
+
+                  {selectedUserDetails.renterStatus === 'rejected' && selectedUserDetails.renterOnboarding?.rejectReason && (
+                    <div className="bg-rose-50 text-rose-800 text-xs p-2.5 rounded border border-rose-100">
+                      <strong>Lý do từ chối Renter:</strong> {selectedUserDetails.renterOnboarding.rejectReason}
+                    </div>
+                  )}
+
+                  {selectedUserDetails.renterOnboarding && selectedUserDetails.renterOnboarding.cccdFront ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Mặt trước CCCD</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.renterOnboarding?.cccdFront, `CCCD Mặt Trước - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.renterOnboarding?.cccdFront} alt="CCCD Front" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Mặt sau CCCD</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.renterOnboarding?.cccdBack, `CCCD Mặt Sau - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.renterOnboarding?.cccdBack} alt="CCCD Back" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Selfie chân dung</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.renterOnboarding?.cccdSelfie, `Selfie Chân Dung - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.renterOnboarding?.cccdSelfie} alt="Selfie" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 italic text-center py-2">Chưa cập nhật ảnh CCCD Renter</div>
+                  )}
+                </div>
+              </div>
+
+              {/* Lender eKYC Info */}
+              <div>
+                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Thông tin eKYC Lender</h4>
+                <div className="border border-slate-100 rounded-lg p-4 space-y-4">
+                  <div className="flex justify-between items-center text-xs pb-2 border-b border-slate-100/60">
+                    <span className="text-slate-500 font-medium">Trạng thái duyệt Lender:</span>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                      selectedUserDetails.lenderStatus === 'approved' ? 'bg-emerald-100 text-emerald-800' :
+                      selectedUserDetails.lenderStatus === 'pending' ? 'bg-amber-100 text-amber-800' :
+                      selectedUserDetails.lenderStatus === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedUserDetails.lenderStatus === 'approved' ? 'Đã duyệt' :
+                       selectedUserDetails.lenderStatus === 'pending' ? 'Chờ duyệt' :
+                       selectedUserDetails.lenderStatus === 'rejected' ? 'Bị từ chối' : 'Chưa eKYC'}
+                    </span>
+                  </div>
+
+                  {selectedUserDetails.lenderOnboarding?.bankAccount && (
+                    <div className="grid grid-cols-2 gap-4 text-xs bg-teal-50/40 p-3 rounded border border-teal-100/50">
+                      <div>
+                        <span className="text-slate-500 block">Ngân hàng:</span>
+                        <strong className="text-slate-800">{selectedUserDetails.lenderOnboarding.bankAccount.bankName || 'N/A'}</strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Số tài khoản:</span>
+                        <strong className="text-slate-800">{selectedUserDetails.lenderOnboarding.bankAccount.accountNumber || 'N/A'}</strong>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-slate-500 block">Tên chủ tài khoản:</span>
+                        <strong className="text-slate-800">{selectedUserDetails.lenderOnboarding.bankAccount.accountHolder || 'N/A'}</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedUserDetails.lenderStatus === 'rejected' && selectedUserDetails.lenderOnboarding?.rejectReason && (
+                    <div className="bg-rose-50 text-rose-800 text-xs p-2.5 rounded border border-rose-100">
+                      <strong>Lý do từ chối Lender:</strong> {selectedUserDetails.lenderOnboarding.rejectReason}
+                    </div>
+                  )}
+
+                  {selectedUserDetails.lenderOnboarding && selectedUserDetails.lenderOnboarding.cccdFront ? (
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Mặt trước CCCD</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.lenderOnboarding?.cccdFront, `CCCD Lender Mặt Trước - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.lenderOnboarding?.cccdFront} alt="CCCD Lender Front" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Mặt sau CCCD</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.lenderOnboarding?.cccdBack, `CCCD Lender Mặt Sau - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.lenderOnboarding?.cccdBack} alt="CCCD Lender Back" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                      <div>
+                        <span className="text-[10px] font-semibold text-slate-500 block mb-1">Selfie chân dung</span>
+                        <div 
+                          onClick={() => openImageLightbox(selectedUserDetails.lenderOnboarding?.cccdSelfie, `Selfie Lender Chân Dung - ${selectedUserDetails.name}`)}
+                          className="aspect-[4/3] bg-slate-100 rounded overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        >
+                          <img src={selectedUserDetails.lenderOnboarding?.cccdSelfie} alt="Selfie Lender" className="w-full h-full object-cover" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-xs text-slate-400 italic text-center py-2">Chưa cập nhật ảnh CCCD Lender</div>
+                  )}
+                </div>
+              </div>
+            </div>
+            
+            {/* Footer */}
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+              <button 
+                onClick={() => setSelectedUserDetails(null)}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-semibold text-xs transition-colors cursor-pointer shadow"
+              >
+                Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Main Title & Refresh */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -1262,6 +1705,7 @@ const DashboardAdmin = () => {
             fetchStats();
             if (activeTab === 'users') fetchUsers();
             else if (activeTab === 'lenders') fetchLenderApps();
+            else if (activeTab === 'renters_ekyc') fetchRenterApps();
             else if (activeTab === 'withdrawals') fetchWithdrawals();
             else if (activeTab === 'assets') fetchAssets();
             else if (activeTab === 'orders') fetchOrders();
@@ -1303,7 +1747,25 @@ const DashboardAdmin = () => {
             Thành viên (Users)
           </button>
 
-          {/* Tab 3: Lenders (eKYC Applications) */}
+          {/* Tab 3: Renters (eKYC Applications) */}
+          <button
+            onClick={() => setActiveTab('renters_ekyc')}
+            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
+              activeTab === 'renters_ekyc'
+                ? 'border-emerald-600 text-emerald-800'
+                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
+            Duyệt eKYC Renter
+            {stats?.pendingCounts?.renterApplications > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+                {stats.pendingCounts.renterApplications}
+              </span>
+            )}
+          </button>
+
+          {/* Tab 3.5: Lenders (eKYC Applications) */}
           <button
             onClick={() => setActiveTab('lenders')}
             className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
@@ -1381,11 +1843,84 @@ const DashboardAdmin = () => {
       <div className="min-h-[400px]">
         {activeTab === 'stats' && renderStatsTab()}
         {activeTab === 'users' && renderUsersTab()}
+        {activeTab === 'renters_ekyc' && renderRenterAppsTab()}
         {activeTab === 'lenders' && renderLendersTab()}
         {activeTab === 'withdrawals' && renderWithdrawalsTab()}
         {activeTab === 'assets' && renderAssetsTab()}
         {activeTab === 'orders' && renderOrdersTab()}
       </div>
+
+      {/* Dispute Resolution Modal */}
+      {disputeModalOpen && selectedDisputeOrder && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden my-8" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 bg-red-600 text-white flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined text-white">gavel</span>
+                Phân xử tranh chấp đơn hàng #{selectedDisputeOrder._id.substring(selectedDisputeOrder._id.length - 8)}
+              </h3>
+              <button 
+                onClick={() => setDisputeModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-red-700 hover:bg-red-800 transition-colors flex items-center justify-center text-white border-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                  <h4 className="font-bold text-sm text-slate-800 mb-2">Người khiếu nại (Lender)</h4>
+                  <p className="text-xs text-slate-600">Yêu cầu đền bù: <span className="font-bold text-red-600">{formatCurrency(selectedDisputeOrder.requestedDeductionAmount || 0)}</span></p>
+                  <p className="text-xs text-slate-600 mt-2">Lý do/Ghi chú:</p>
+                  <p className="text-xs font-semibold bg-white p-2 border border-slate-100 rounded mt-1">{selectedDisputeOrder.disputeNotes || 'Không có ghi chú'}</p>
+                </div>
+                <div className="bg-slate-50 p-4 rounded border border-slate-200">
+                  <h4 className="font-bold text-sm text-slate-800 mb-2">Lời bào chữa (Renter)</h4>
+                  <p className="text-xs text-slate-600 mt-2">Ghi chú phản hồi:</p>
+                  <p className="text-xs font-semibold bg-white p-2 border border-slate-100 rounded mt-1">{selectedDisputeOrder.renterDisputeNotes || 'Chưa phản hồi / Không có'}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleResolveDispute} className="space-y-4 pt-4 border-t border-slate-200">
+                <p className="text-xs font-semibold text-slate-500">Tiền cọc khả dụng: <span className="text-emerald-600 font-bold">{formatCurrency(selectedDisputeOrder.deposit)}</span></p>
+                
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block">Số tiền đền bù cho Lender (đ)</label>
+                    <input 
+                      type="number"
+                      className="w-full border border-slate-200 rounded px-3 py-2 mt-1 font-bold text-red-600 focus:border-red-500"
+                      value={lenderCompensation}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setLenderCompensation(val);
+                        setRenterRefund((selectedDisputeOrder.deposit || 0) - val);
+                      }}
+                      max={selectedDisputeOrder.deposit}
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block">Số tiền hoàn trả cho Renter (đ)</label>
+                    <input 
+                      type="number"
+                      className="w-full border border-slate-200 rounded px-3 py-2 mt-1 font-bold text-emerald-600 bg-slate-50 cursor-not-allowed"
+                      value={renterRefund}
+                      readOnly
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-4 border-t border-slate-100 mt-4">
+                  <button type="button" onClick={() => setDisputeModalOpen(false)} className="flex-1 py-2 border border-slate-200 rounded text-slate-600 font-bold hover:bg-slate-50 transition-colors text-xs cursor-pointer bg-white">Hủy</button>
+                  <button type="submit" className="flex-1 py-2 bg-red-600 text-white rounded font-bold hover:bg-red-700 transition-colors text-xs shadow cursor-pointer border-none">Xác nhận phân xử</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -57,6 +57,31 @@ const assetSchema = new mongoose.Schema({
   videos: [{
     type: String
   }],
+  serialNumber: {
+    type: String,
+    default: ''
+  },
+  invoiceImage: {
+    type: String,
+    default: ''
+  },
+  warrantyCardImage: {
+    type: String,
+    default: ''
+  },
+  badges: [{
+    type: String,
+    default: []
+  }],
+  aiAntiFraudStatus: {
+    isCopied: { type: Boolean, default: false },
+    reason: { type: String, default: '' },
+    scannedAt: { type: Date }
+  },
+  inspectionChecklist: {
+    type: mongoose.Schema.Types.Mixed,
+    default: {}
+  },
   specs: {
     type: Map,
     of: String,
@@ -72,7 +97,12 @@ const assetSchema = new mongoose.Schema({
   },
   verificationNotes: {
     type: String
-  }
+  },
+  blockedDates: [{
+    startDate: { type: Date, required: true },
+    endDate: { type: Date, required: true },
+    reason: { type: String, enum: ['manual', 'rented'], default: 'manual' }
+  }]
 }, { timestamps: true });
 
 module.exports = mongoose.model('Asset', assetSchema);

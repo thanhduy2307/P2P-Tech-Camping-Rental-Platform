@@ -8,7 +8,9 @@ const {
   aiEstimateDeposit,
   recommendAssetsByNeed,
   getAssetById,
-  getMyAssets
+  getMyAssets,
+  updateAsset,
+  manageBlockedDates
 } = require('../controllers/assetController');
 const { protect, authorize, checkLenderPermission } = require('../middleware/auth');
 
@@ -28,6 +30,12 @@ router.put('/:id/verify', protect, authorize('inspector'), verifyAsset);
 
 // New Asset Availability/Maintenance control route
 router.put('/:id/status', protect, authorize('lender'), updateAssetStatus);
+
+// Edit asset details
+router.put('/:id', protect, authorize('lender'), checkLenderPermission, updateAsset);
+
+// Manage blocked dates
+router.put('/:id/block-dates', protect, authorize('lender'), checkLenderPermission, manageBlockedDates);
 
 router.get('/:id', getAssetById);
 

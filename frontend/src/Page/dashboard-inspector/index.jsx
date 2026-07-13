@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import api from '../../configs/axios';
@@ -19,6 +20,18 @@ const DashboardInspector = () => {
   const [verificationNotes, setVerificationNotes] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [modalImageIndex, setModalImageIndex] = useState(0);
+
+  // Checklist States for In-person Inspections
+  const [techChecklist, setTechChecklist] = useState({
+    shutterCountTest: '',
+    deadPixelSensorCheck: false,
+    lensMoldCheck: false
+  });
+  const [campingChecklist, setCampingChecklist] = useState({
+    zipperWearCheck: false,
+    frameElasticityCheck: false,
+    tentHolesCheck: false
+  });
 
   // Fetch pending inspection tasks
   const fetchTasks = async () => {
@@ -48,6 +61,16 @@ const DashboardInspector = () => {
     setStatus('verified');
     setVerificationNotes('');
     setModalImageIndex(0);
+    setTechChecklist({
+      shutterCountTest: '',
+      deadPixelSensorCheck: false,
+      lensMoldCheck: false
+    });
+    setCampingChecklist({
+      zipperWearCheck: false,
+      frameElasticityCheck: false,
+      tentHolesCheck: false
+    });
     setIsModalOpen(true);
   };
 
@@ -57,18 +80,41 @@ const DashboardInspector = () => {
     if (!selectedAsset) return;
 
     if (!verificationNotes.trim()) {
-      alert('Vui lòng nhập ghi chú kiểm duyệt.');
+      Swal.fire('Vui lòng nhập ghi chú kiểm duyệt.');
       return;
+    }
+
+    const payload = {
+      status,
+      verificationNotes
+    };
+
+    const isOffline = selectedAsset.taskDetails && !selectedAsset.taskDetails.isRemote;
+    if (status === 'verified' && isOffline) {
+      if (selectedAsset.category === 'Tech') {
+        if (techChecklist.shutterCountTest === '') {
+          Swal.fire('Vui lòng nhập số shot đã test của thiết bị.');
+          return;
+        }
+        payload.inspectionChecklist = {
+          shutterCountTest: parseInt(techChecklist.shutterCountTest),
+          deadPixelSensorCheck: techChecklist.deadPixelSensorCheck,
+          lensMoldCheck: techChecklist.lensMoldCheck
+        };
+      } else if (selectedAsset.category === 'Camping') {
+        payload.inspectionChecklist = {
+          zipperWearCheck: campingChecklist.zipperWearCheck,
+          frameElasticityCheck: campingChecklist.frameElasticityCheck,
+          tentHolesCheck: campingChecklist.tentHolesCheck
+        };
+      }
     }
 
     setSubmitLoading(true);
     setError('');
     setSuccess('');
     try {
-      const response = await api.put(`/assets/${selectedAsset._id}/verify`, {
-        status,
-        verificationNotes
-      });
+      const response = await api.put(`/assets/${selectedAsset._id}/verify`, payload);
       if (response.data && response.data.success) {
         setSuccess(`Cập nhật trạng thái kiểm định cho thiết bị "${selectedAsset.name}" thành công!`);
         setIsModalOpen(false);
@@ -77,9 +123,9 @@ const DashboardInspector = () => {
     } catch (err) {
       console.error(err);
       if (err.response && err.response.data && err.response.data.message) {
-        alert(err.response.data.message);
+        Swal.fire(err.response.data.message);
       } else {
-        alert('Gửi kết quả kiểm duyệt thất bại.');
+        Swal.fire('Gửi kết quả kiểm duyệt thất bại.');
       }
     } finally {
       setSubmitLoading(false);
@@ -362,6 +408,69 @@ const DashboardInspector = () => {
                     </div>
                   </div>
 
+                  {/* Serial & AI Anti-Fraud Scan Report */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2">
+                    <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-0.5">Số Serial / IMEI</span>
+                    <span className="font-mono font-bold text-slate-800 uppercase block">{selectedAsset.serialNumber || 'Chưa cung cấp'}</span>
+                    
+                    <div className="mt-2 pt-2 border-t border-slate-200">
+                      <span className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Báo cáo chống gian lận (AI Image Scan)</span>
+                      {selectedAsset.aiAntiFraudStatus ? (
+                        selectedAsset.aiAntiFraudStatus.isCopied ? (
+                          <div className="bg-red-50 text-red-700 p-2.5 rounded-lg text-[10px] font-medium border border-red-200 flex items-start gap-1">
+                            <span className="material-symbols-outlined text-xs mt-0.5 text-red-650">warning</span>
+                            <span><strong>CẢNH BÁO:</strong> {selectedAsset.aiAntiFraudStatus.reason}</span>
+                          </div>
+                        ) : (
+                          <div className="bg-emerald-50 text-emerald-700 p-2.5 rounded-lg text-[10px] font-medium border border-emerald-200 flex items-start gap-1">
+                            <span className="material-symbols-outlined text-xs mt-0.5 text-emerald-650">check_circle</span>
+                            <span><strong>AN TOÀN:</strong> {selectedAsset.aiAntiFraudStatus.reason}</span>
+                          </div>
+                        )
+                      ) : (
+                        <p className="text-[10px] text-slate-500 italic">Chưa thực hiện quét hoặc ảnh an toàn.</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Legal ownership documents previews */}
+                  {(selectedAsset.invoiceImage || selectedAsset.warrantyCardImage) && (
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-2">
+                      <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-wider">Chứng từ sở hữu pháp lý</span>
+                      <div className="flex gap-2">
+                        {selectedAsset.invoiceImage && (
+                          <div className="flex-1 text-center">
+                            <span className="text-[9px] text-slate-500 block mb-1">Hóa đơn mua hàng</span>
+                            <div className="w-full h-20 rounded bg-white border border-slate-200 overflow-hidden cursor-zoom-in group relative">
+                              <img src={selectedAsset.invoiceImage} alt="Invoice" className="w-full h-full object-cover" onClick={() => window.open(selectedAsset.invoiceImage)} />
+                            </div>
+                          </div>
+                        )}
+                        {selectedAsset.warrantyCardImage && (
+                          <div className="flex-1 text-center">
+                            <span className="text-[9px] text-slate-500 block mb-1">Thẻ bảo hành/tem</span>
+                            <div className="w-full h-20 rounded bg-white border border-slate-200 overflow-hidden cursor-zoom-in group relative">
+                              <img src={selectedAsset.warrantyCardImage} alt="Warranty" className="w-full h-full object-cover" onClick={() => window.open(selectedAsset.warrantyCardImage)} />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Financial Warning Flag */}
+                  {(selectedAsset.depositAmount > selectedAsset.originalPrice || selectedAsset.pricePerDay > selectedAsset.originalPrice * 0.5) && (
+                    <div className="bg-amber-50 text-amber-800 p-3.5 rounded-xl border border-amber-250 text-xs font-semibold flex items-start gap-2">
+                      <span className="material-symbols-outlined text-amber-600 text-base mt-0.5">warning</span>
+                      <div>
+                        <p className="font-bold">Cảnh báo bất thường tài chính!</p>
+                        <p className="text-[10px] text-amber-700/80 font-normal leading-relaxed mt-0.5">
+                          Tiền đặt cọc ({selectedAsset.depositAmount?.toLocaleString('vi-VN')} đ) hoặc đơn giá thuê ({selectedAsset.pricePerDay?.toLocaleString('vi-VN')} đ) quá cao so với giá trị món đồ ({selectedAsset.originalPrice?.toLocaleString('vi-VN')} đ). Hãy thẩm duyệt kỹ xem Lender có yêu cầu cọc quá cao để ép Renter hay không.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   <div>
                     <span className="block text-slate-400 text-[10px] font-bold uppercase tracking-wider mb-1">Mô tả của Lender</span>
                     <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 max-h-36 overflow-y-auto text-xs text-slate-600 leading-relaxed whitespace-pre-line">
@@ -372,7 +481,7 @@ const DashboardInspector = () => {
                   <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs font-semibold text-slate-500">
                     <span className="flex items-center gap-1">
                       <span className="material-symbols-outlined text-sm text-amber-500" style={{ fontVariationSettings: "'FILL' 1" }}>star</span>
-                      Độ mới khảo sát: <strong>{selectedAsset.condition || '95'}%</strong>
+                      Độ mới khảo sát: <strong>{selectedAsset.itemConditionRate || '95'}%</strong>
                     </span>
                     <span className="w-1.5 h-1.5 bg-slate-300 rounded-full"></span>
                     <span className="flex items-center gap-1">
@@ -453,6 +562,85 @@ const DashboardInspector = () => {
                     {status === 'unavailable' && <span className="material-symbols-outlined text-slate-600 text-base font-bold">lock</span>}
                   </label>
                 </div>
+
+                {/* Real-world Inspection Checklist (Offline task only) */}
+                {status === 'verified' && selectedAsset.taskDetails && !selectedAsset.taskDetails.isRemote && (
+                  <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4 animate-in fade-in duration-200">
+                    <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-sm">fact_check</span>
+                      Biên bản thẩm định thực tế (Bắt buộc cho Offline)
+                    </h5>
+                    
+                    {selectedAsset.category === 'Tech' ? (
+                      <div className="space-y-3">
+                        <div className="flex flex-col gap-1">
+                          <label className="text-xs font-semibold text-slate-700">Test số shot (máy ảnh) *</label>
+                          <input 
+                            type="number"
+                            placeholder="Nhập số shot đếm được (e.g. 12500)"
+                            className="bg-white border border-slate-250 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-primary w-full md:w-1/2"
+                            value={techChecklist.shutterCountTest}
+                            onChange={(e) => setTechChecklist(prev => ({ ...prev, shutterCountTest: e.target.value }))}
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                            <input 
+                              type="checkbox"
+                              className="text-primary focus:ring-primary rounded"
+                              checked={techChecklist.deadPixelSensorCheck}
+                              onChange={(e) => setTechChecklist(prev => ({ ...prev, deadPixelSensorCheck: e.target.checked }))}
+                            />
+                            <span>Sensor hoạt động tốt, không chết pixel</span>
+                          </label>
+
+                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                            <input 
+                              type="checkbox"
+                              className="text-primary focus:ring-primary rounded"
+                              checked={techChecklist.lensMoldCheck}
+                              onChange={(e) => setTechChecklist(prev => ({ ...prev, lensMoldCheck: e.target.checked }))}
+                            />
+                            <span>Kính lens sạch, không mốc rễ tre</span>
+                          </label>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                          <input 
+                            type="checkbox"
+                            className="text-primary focus:ring-primary rounded"
+                            checked={campingChecklist.zipperWearCheck}
+                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, zipperWearCheck: e.target.checked }))}
+                          />
+                          <span>Khóa kéo tốt, trơn tru không rách mòn</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                          <input 
+                            type="checkbox"
+                            className="text-primary focus:ring-primary rounded"
+                            checked={campingChecklist.frameElasticityCheck}
+                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, frameElasticityCheck: e.target.checked }))}
+                          />
+                          <span>Khung lều đàn hồi tốt, không cong gãy</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                          <input 
+                            type="checkbox"
+                            className="text-primary focus:ring-primary rounded"
+                            checked={campingChecklist.tentHolesCheck}
+                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, tentHolesCheck: e.target.checked }))}
+                          />
+                          <span>Màng chống muỗi kín, không lỗ thủng</span>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Verification notes field */}
                 <div>

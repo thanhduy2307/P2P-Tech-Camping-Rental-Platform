@@ -4,12 +4,33 @@ const User = require('../models/User');
 const { createPaymentUrl, verifyReturnUrl } = require('../services/vnpayService');
 const { differenceInDays, parseISO } = require('date-fns');
 
+// Helper to auto-expire unpaid orders older than 1 minute
+const expireOldPendingOrders = async () => {
+  try {
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    await Order.updateMany(
+      { 
+        status: 'pending_payment', 
+        createdAt: { $lt: oneMinuteAgo } 
+      },
+      { 
+        $set: { 
+          status: 'cancelled', 
+          disputeNotes: 'Hệ thống tự động hủy đơn do không thanh toán trong vòng 1 phút.' 
+        } 
+      }
+    );
+  } catch (error) {
+    console.error('Lỗi khi dọn dẹp đơn hàng hết hạn:', error);
+  }
+};
+
 // @desc    Create a new order & generate VNPay URL
 // @route   POST /api/orders
 // @access  Private (Renter)
 exports.createOrder = async (req, res) => {
   try {
-    const { assetId, startDate, endDate } = req.body;
+    const { assetId, startDate, endDate, depositMethod } = req.body;
 
     const asset = await Asset.findById(assetId);
     if (!asset) {
@@ -25,17 +46,20 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Bạn không thể tự đặt thuê tài sản của chính mình.' });
     }
 
-    // Check availability
+    // Check availability (with 1-day buffer time for preparation)
+    const checkStart = new Date(startDate);
+    checkStart.setDate(checkStart.getDate() - 1); // Subtract 1 day to account for existing orders' buffer
+
     const overlappingOrders = await Order.find({
       asset: assetId,
       status: { $in: ['reserved', 'active'] },
       $or: [
-        { startDate: { $lte: endDate }, endDate: { $gte: startDate } }
+        { startDate: { $lte: endDate }, endDate: { $gte: checkStart } }
       ]
     });
 
     if (overlappingOrders.length > 0) {
-      return res.status(400).json({ success: false, message: 'Asset is already booked for these dates' });
+      return res.status(400).json({ success: false, message: 'Thiết bị đã được đặt hoặc đang trong thời gian chuẩn bị (1 ngày sau khi thuê) trong khoảng thời gian này' });
     }
 
     const start = parseISO(startDate);
@@ -46,6 +70,18 @@ exports.createOrder = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid dates' });
     }
 
+    // Check manual blocked dates
+    if (asset.blockedDates && asset.blockedDates.length > 0) {
+      const isBlocked = asset.blockedDates.some(block => {
+        const blockStart = new Date(block.startDate);
+        const blockEnd = new Date(block.endDate);
+        return start <= blockEnd && end >= blockStart;
+      });
+      if (isBlocked) {
+        return res.status(400).json({ success: false, message: 'Thiết bị không khả dụng trong thời gian này do chủ đồ đã thiết lập lịch bận.' });
+      }
+    }
+
     const totalRent = rentalDays * asset.pricePerDay;
     
     // Apply 20% deposit discount for high reputation Renter (reputationScore >= 4.8)
@@ -54,7 +90,8 @@ exports.createOrder = async (req, res) => {
       deposit = Math.round(deposit * 0.8);
     }
     
-    const totalAmount = totalRent + deposit;
+    const selectedDepositMethod = depositMethod || 'online';
+    const totalAmount = selectedDepositMethod === 'cash' ? totalRent : (totalRent + deposit);
 
     const handoverOTP = Math.floor(100000 + Math.random() * 900000).toString();
     const returnOTP = Math.floor(100000 + Math.random() * 900000).toString();
@@ -67,6 +104,7 @@ exports.createOrder = async (req, res) => {
       rentalDays,
       totalRent,
       deposit,
+      depositMethod: selectedDepositMethod,
       handoverOTP,
       returnOTP,
       status: 'pending_payment'
@@ -140,6 +178,9 @@ exports.confirmHandover = async (req, res) => {
 
     order.status = 'active';
     order.handoverImages = handoverImages;
+    if (order.depositMethod === 'cash') {
+      order.isCashDepositHandedOver = true;
+    }
     await order.save();
 
     res.status(200).json({
@@ -154,7 +195,7 @@ exports.confirmHandover = async (req, res) => {
 
 exports.confirmReturn = async (req, res) => {
   try {
-    const { otp, returnImages } = req.body;
+    const { otp, returnImages, actualCashDepositReturned, cashDepositDeductionReason } = req.body;
 
     if (!otp) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã bảo mật OTP trả hàng từ Renter.' });
@@ -180,27 +221,59 @@ exports.confirmReturn = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Mã xác thực trả hàng OTP không chính xác. Vui lòng kiểm tra lại.' });
     }
 
+    // --- Late Return Logic ---
+    const now = new Date();
+    const endDate = new Date(order.endDate);
+    const msDiff = now - endDate;
+    const hoursLate = msDiff / (1000 * 60 * 60);
+
+    let lateFee = 0;
+    if (hoursLate > 4) {
+      const lateDays = 1 + Math.floor((hoursLate - 4) / 24);
+      order.isLateReturn = true;
+      order.lateDays = lateDays;
+      order.lateFee = lateDays * order.asset.pricePerDay * 1.5;
+      lateFee = order.lateFee;
+    }
+
     order.status = 'completed';
     const platformFeePercent = 0.1; // 10%
     const platformFee = order.totalRent * platformFeePercent;
-    const lenderPayout = order.totalRent - platformFee;
+    let lenderPayout = order.totalRent - platformFee;
 
     order.platformFee = platformFee;
     order.returnImages = returnImages;
+
+    if (order.depositMethod === 'cash') {
+      const returnedAmount = typeof actualCashDepositReturned !== 'undefined' ? Number(actualCashDepositReturned) : order.deposit;
+      order.isCashDepositReturned = true;
+      order.actualCashDepositReturned = returnedAmount;
+      order.cashDepositDeductionReason = cashDepositDeductionReason || '';
+    }
+
     await order.save();
 
     // Settle funds in wallet
     const lender = await User.findById(order.asset.lender);
-    lender.balance += lenderPayout;
+    if (order.depositMethod === 'online') {
+      lender.balance += (lenderPayout + lateFee);
+    } else {
+      // Cash deposit: Lender holds cash, so late fee is handled physically.
+      lender.balance += lenderPayout;
+    }
     await lender.save();
 
-    const renter = await User.findById(order.renter);
-    renter.balance += order.deposit; // Returning deposit
-    await renter.save();
+    if (order.depositMethod === 'online') {
+      const renter = await User.findById(order.renter);
+      renter.balance += (order.deposit - lateFee); // Deduct late fee from deposit
+      await renter.save();
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Trả đồ và quyết toán thành công! Tiền cọc đã được hoàn lại cho Renter và tiền thuê (sau khi khấu trừ 10% phí vận hành) đã được chuyển vào số dư ví của Lender.',
+      message: order.depositMethod === 'cash' 
+        ? (lateFee > 0 ? `Trả đồ thành công! Renter trả muộn ${order.lateDays} ngày. Hãy đảm bảo bạn đã thu đủ phí phạt ${lateFee.toLocaleString('vi-VN')} đ từ tiền cọc mặt.` : 'Trả đồ và quyết toán thành công!')
+        : (lateFee > 0 ? `Trả đồ thành công! Renter trả muộn ${order.lateDays} ngày. Phí phạt ${lateFee.toLocaleString('vi-VN')} đ đã tự động trừ từ cọc và chuyển cho bạn.` : 'Trả đồ và quyết toán thành công!'),
       data: order
     });
   } catch (error) {
@@ -233,9 +306,11 @@ exports.settleOrder = async (req, res) => {
     lender.balance += lenderPayout;
     await lender.save();
 
-    const renter = await User.findById(order.renter);
-    renter.balance += order.deposit; // Returning deposit
-    await renter.save();
+    if (order.depositMethod === 'online') {
+      const renter = await User.findById(order.renter);
+      renter.balance += order.deposit; // Returning deposit
+      await renter.save();
+    }
 
     res.status(200).json({ success: true, message: 'Order settled successfully', data: order });
   } catch (error) {
@@ -248,7 +323,7 @@ exports.settleOrder = async (req, res) => {
 // @access  Private (Lender/Renter)
 exports.raiseDispute = async (req, res) => {
   try {
-    const { disputeNotes } = req.body;
+    const { disputeNotes, returnImages, requestedDeductionAmount } = req.body;
     const order = await Order.findById(req.params.id).populate('asset');
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
@@ -256,11 +331,60 @@ exports.raiseDispute = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Cannot dispute in this status' });
     }
 
+    const isLender = req.user._id.toString() === order.asset.lender.toString();
+    const isRenter = req.user._id.toString() === order.renter.toString();
+
+    if (!isLender && !isRenter) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to dispute this order' });
+    }
+
     order.status = 'disputed';
+    order.disputeCreator = isLender ? 'lender' : 'renter';
     order.disputeNotes = disputeNotes;
+    if (returnImages && returnImages.length > 0) {
+      order.returnImages = returnImages;
+    }
+    
+    if (isLender && requestedDeductionAmount !== undefined) {
+      order.requestedDeductionAmount = Number(requestedDeductionAmount);
+    }
+
+    order.disputeStatus = 'open';
+    order.disputedAt = new Date();
+    
     await order.save();
 
-    res.status(200).json({ success: true, data: order });
+    res.status(200).json({ success: true, message: 'Khiếu nại đã được tạo thành công.', data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Respond to Dispute (Renter Defense)
+// @route   PUT /api/orders/:id/dispute-respond
+// @access  Private (Renter)
+exports.respondDispute = async (req, res) => {
+  try {
+    const { renterDisputeNotes, renterDisputeImages } = req.body;
+    const order = await Order.findById(req.params.id);
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+
+    if (order.status !== 'disputed' || order.disputeCreator !== 'lender' || order.disputeStatus !== 'open') {
+      return res.status(400).json({ success: false, message: 'Cannot respond to this dispute right now.' });
+    }
+
+    if (req.user._id.toString() !== order.renter.toString()) {
+      return res.status(403).json({ success: false, message: 'Chỉ Renter mới có quyền phản hồi khiếu nại này.' });
+    }
+
+    order.renterDisputeNotes = renterDisputeNotes;
+    if (renterDisputeImages && renterDisputeImages.length > 0) {
+      order.renterDisputeImages = renterDisputeImages;
+    }
+    order.disputeStatus = 'responded';
+    
+    await order.save();
+    res.status(200).json({ success: true, message: 'Gửi phản hồi thành công.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -279,19 +403,42 @@ exports.resolveDispute = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Order is not disputed' });
     }
 
+    // Process financial resolution
+    const platformFeePercent = 0.1; // 10%
+    const platformFee = order.totalRent * platformFeePercent;
+    order.platformFee = platformFee;
+    
+    const lender = await User.findById(order.asset.lender);
+    const renter = await User.findById(order.renter);
+
+    if (order.disputeCreator === 'renter') {
+      // Renter rejected item at handover
+      order.platformFee = 0;
+      let renterRefundAmount = order.totalRent;
+      if (order.depositMethod === 'online') {
+        renterRefundAmount += order.deposit;
+      }
+      renter.balance += renterRefundAmount;
+    } else {
+      // Lender disputed at return
+      let lenderPayout = (order.totalRent - platformFee);
+      
+      if (order.depositMethod === 'online') {
+        lender.balance += (lenderPayout + Number(lenderCompensation));
+        renter.balance += Number(renterRefund);
+      } else {
+        lender.balance += lenderPayout;
+      }
+    }
+
     order.status = 'completed';
+    order.disputeStatus = 'resolved';
     order.inspector = req.user._id;
     await order.save();
-
-    const lender = await User.findById(order.asset.lender);
-    lender.balance += lenderCompensation;
     await lender.save();
-
-    const renter = await User.findById(order.renter);
-    renter.balance += renterRefund;
     await renter.save();
 
-    res.status(200).json({ success: true, message: 'Dispute resolved', data: order });
+    res.status(200).json({ success: true, message: 'Đã giải quyết tranh chấp.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -321,7 +468,7 @@ exports.cancelOrder = async (req, res) => {
 
     // Case 1: Order is pending payment (no funds collected yet)
     if (order.status === 'pending_payment') {
-      order.status = 'completed'; // Move to terminal state
+      order.status = 'cancelled'; // Move to terminal state
       order.disputeNotes = 'Hủy đơn hàng chưa thanh toán.';
       await order.save();
       return res.status(200).json({
@@ -337,23 +484,27 @@ exports.cancelOrder = async (req, res) => {
     if (isRenter) {
       // Renter cancels
       let refundRent = 0;
-      let refundDeposit = order.deposit;
+      let refundDeposit = order.depositMethod === 'cash' ? 0 : order.deposit;
       let penalty = 0;
       let message = '';
 
-      if (hoursToStart >= 24) {
-        // >= 24 hours: 100% refund
+      if (hoursToStart >= 48) {
+        // >= 48 hours: 100% refund
         refundRent = order.totalRent;
-        message = 'Hủy đơn hàng trước 24 giờ thành công. Renter được hoàn trả 100% tiền thuê và tiền cọc.';
-      } else if (hoursToStart < 6) {
-        // < 6 hours: 30% rent penalty to Lender
-        penalty = Math.round(order.totalRent * 0.3);
-        refundRent = order.totalRent - penalty;
-        message = `Hủy đơn hàng sát giờ thuê (< 6 giờ). Renter bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ) đền bù cho Lender. Phần còn lại đã được hoàn trả.`;
+        message = order.depositMethod === 'cash'
+          ? 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền thuê.'
+          : 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền thuê và tiền cọc.';
       } else {
-        // Between 6 and 24 hours: No penalty (100% refund) based on guidelines
-        refundRent = order.totalRent;
-        message = 'Hủy đơn hàng thành công. Renter được hoàn trả 100% tiền thuê và tiền cọc.';
+        // < 48 hours: penalty = 30% of rental fee (not deposit)
+        penalty = Math.round(order.totalRent * 0.3);
+        
+        // They always get their deposit back (if paid online)
+        // The penalty is deducted from the rental fee they paid
+        refundRent = order.totalRent - penalty;
+        
+        message = order.depositMethod === 'cash' 
+          ? `Hủy đơn hàng sát ngày (dưới 2 ngày). Bạn bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ) đền bù cho chủ đồ. Bạn được hoàn lại phần tiền thuê còn lại.`
+          : `Hủy đơn hàng sát ngày (dưới 2 ngày). Bạn bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ) đền bù cho chủ đồ. Bạn được hoàn lại 100% tiền cọc và phần tiền thuê còn lại.`;
       }
 
       // Process wallet updates
@@ -367,8 +518,8 @@ exports.cancelOrder = async (req, res) => {
         await lender.save();
       }
 
-      order.status = 'completed';
-      order.disputeNotes = `Renter hủy đơn. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ.`;
+      order.status = 'cancelled';
+      order.disputeNotes = `Renter hủy đơn. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ (Tiền thuê: ${refundRent} đ, Cọc: ${refundDeposit} đ).`;
       await order.save();
 
       return res.status(200).json({
@@ -377,26 +528,47 @@ exports.cancelOrder = async (req, res) => {
         data: order
       });
     } else {
-      // Lender cancels: Refund 100% to renter, deduct 10% rent from Lender, transfer to Renter, penalize reputation score
-      const penalty = Math.round(order.totalRent * 0.1);
-
+      // Lender cancels
+      const { reason } = req.body;
+      const refundDeposit = order.depositMethod === 'cash' ? 0 : order.deposit;
       const renter = await User.findById(order.renter);
-      renter.balance += (order.totalRent + order.deposit + penalty);
-      await renter.save();
-
       const lender = await User.findById(order.asset.lender);
-      lender.balance -= penalty;
-      // Deduct reputation score by 0.5 points
-      lender.reputationScore = Math.max(1.0, Math.round((lender.reputationScore - 0.5) * 10) / 10);
-      await lender.save();
+      
+      let penalty = 0;
+      let repDeduction = 0;
+      let msg = '';
+      
+      // If cancelled < 24 hours before pickup, apply penalty
+      if (hoursToStart < 24) {
+        penalty = Math.round(order.totalRent * 0.3);
+        repDeduction = 0.2;
+        
+        // Deduct penalty and rep from Lender
+        lender.balance -= penalty;
+        lender.reputationScore = Math.max(0, lender.reputationScore - repDeduction);
+        await lender.save();
+        
+        // Give penalty as compensation to Renter + 100% refund of rent and deposit
+        renter.balance += (order.totalRent + refundDeposit + penalty);
+        await renter.save();
+        
+        msg = `Hủy đơn hàng sát ngày (dưới 24h). Phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ) và trừ 0.2 uy tín. Người thuê được hoàn 100% cọc, tiền thuê và nhận tiền phạt đền bù.`;
+        order.disputeNotes = `Lender hủy đơn: ${reason || 'Không có lý do'}. Phạt Lender: ${penalty} đ & -0.2 uy tín. Renter nhận: ${order.totalRent + refundDeposit + penalty} đ.`;
+      } else {
+        // Refund 100% to renter, no penalty for lender
+        renter.balance += (order.totalRent + refundDeposit);
+        await renter.save();
+        
+        msg = `Hủy đơn hàng thành công. Đã hoàn trả 100% tiền thuê và cọc cho Renter. Không có hình phạt.`;
+        order.disputeNotes = `Lender hủy đơn: ${reason || 'Không có lý do'}. Hoàn trả 100% tiền thuê và cọc (${order.totalRent + refundDeposit} đ) cho Renter.`;
+      }
 
-      order.status = 'completed';
-      order.disputeNotes = `Lender hủy đơn đột xuất. Phạt Lender: ${penalty} đ. Bồi thường cho Renter: ${penalty} đ. Hoàn trả: ${order.totalRent + order.deposit} đ. Khấu trừ 0.5 điểm uy tín.`;
+      order.status = 'cancelled';
       await order.save();
 
       return res.status(200).json({
         success: true,
-        message: `Lender hủy đơn đột xuất thành công. Đã hoàn trả 100% tiền thuê + cọc cho Renter và bồi thường 10% tiền thuê (${penalty.toLocaleString('vi-VN')} đ) trích từ số dư ví Lender. Khấu trừ 0.5 điểm uy tín của Lender.`,
+        message: msg,
         data: order
       });
     }
@@ -837,6 +1009,7 @@ exports.getContract = async (req, res) => {
 // @access  Private (Renter)
 exports.getMyRentals = async (req, res) => {
   try {
+    await expireOldPendingOrders();
     const orders = await Order.find({ renter: req.user._id })
       .populate({
         path: 'asset',
@@ -854,6 +1027,7 @@ exports.getMyRentals = async (req, res) => {
 // @access  Private (Lender)
 exports.getIncomingOrders = async (req, res) => {
   try {
+    await expireOldPendingOrders();
     const assets = await Asset.find({ lender: req.user._id });
     const assetIds = assets.map(a => a._id);
     
@@ -863,6 +1037,33 @@ exports.getIncomingOrders = async (req, res) => {
       .sort({ createdAt: -1 });
       
     res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get VNPay payment URL for an existing pending_payment order
+// @route   GET /api/orders/:id/pay
+// @access  Private (Renter)
+exports.getPaymentUrl = async (req, res) => {
+  try {
+    const order = await Order.findById(req.params.id);
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng.' });
+    }
+
+    if (order.status !== 'pending_payment') {
+      return res.status(400).json({ success: false, message: 'Đơn hàng này không thể thanh toán nữa.' });
+    }
+
+    if (req.user._id.toString() !== order.renter.toString()) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền thực hiện hành động này.' });
+    }
+
+    const totalAmount = order.depositMethod === 'cash' ? order.totalRent : (order.totalRent + order.deposit);
+    const paymentUrl = createPaymentUrl(req, order._id.toString(), totalAmount, `Payment for rental order ${order._id}`);
+
+    res.status(200).json({ success: true, paymentUrl });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

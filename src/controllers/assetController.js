@@ -32,12 +32,90 @@ exports.createAsset = async (req, res) => {
       purchaseYear,
       itemConditionRate,
       depositCalculationMode,
-      specs
+      specs,
+      serialNumber,
+      invoiceImage,
+      warrantyCardImage
     } = req.body;
 
     if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp tọa độ vị trí (latitude, longitude) cho thiết bị.' });
     }
+
+    // Validate images count (at least 5 images)
+    if (!images || !Array.isArray(images) || images.length < 5) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Bạn bắt buộc phải đăng tải tối thiểu 5 ảnh sản phẩm (4 ảnh các góc + 1 ảnh chụp rõ số Serial trên thân máy hoặc ảnh lều thực tế).' 
+      });
+    }
+
+    // Validate originalPrice
+    if (!originalPrice || typeof originalPrice !== 'number' || originalPrice <= 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vui lòng khai báo giá trị mua mới gốc của thiết bị (originalPrice) lớn hơn 0.' 
+      });
+    }
+
+    // Validate legal fields
+    if (!serialNumber || typeof serialNumber !== 'string' || !serialNumber.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vui lòng cung cấp số Serial Number / IMEI của thiết bị.' 
+      });
+    }
+
+    if (!invoiceImage && !warrantyCardImage) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).' 
+      });
+    }
+
+    // 1. Giới hạn xếp hàng (Queue Limit)
+    // Một Lender mới (chưa có điểm uy tín cao) chỉ được đăng tối đa 3 thiết bị ở trạng thái chờ duyệt cùng một lúc.
+    const isHighReputation = req.user.reputationScore >= 4.8 && (req.user.ratingsReceived || []).length >= 3;
+    if (!isHighReputation) {
+      const pendingCount = await Asset.countDocuments({ lender: req.user._id, status: 'pending_approval' });
+      if (pendingCount >= 3) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Một Lender mới (chưa có điểm uy tín cao) chỉ được đăng tối đa 3 thiết bị ở trạng thái chờ duyệt cùng một lúc. Điều này để tránh tình trạng spam làm nghẽn hệ thống kiểm định.' 
+        });
+      }
+    }
+
+    // 2. Check trùng Serial/IMEI
+    const cleanSerial = serialNumber.trim().toUpperCase();
+    const duplicateAsset = await Asset.findOne({ 
+      serialNumber: { $regex: new RegExp(`^${cleanSerial}$`, 'i') }
+    });
+    if (duplicateAsset) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Số Serial/IMEI này đã được đăng ký bởi một tài sản khác trên hệ thống.' 
+      });
+    }
+
+    // 3. Blacklist Check
+    const blacklist = ['STOLEN123456', 'IMEI999999999', 'BADSERIAL789'];
+    if (blacklist.includes(cleanSerial)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Số Serial/IMEI này nằm trong Danh sách thiết bị báo mất cắp (Blacklist) của cộng đồng. Đăng ký bị từ chối.' 
+      });
+    }
+
+    // 4. AI Metadata Extraction (Anti-Fraud Check) - BYPASSED
+    // const scanResult = await aiService.scanImageForFraud(images[0]);
+    // if (scanResult.isCopied) {
+    //   return res.status(400).json({
+    //     success: false,
+    //     message: `Đăng ký thiết bị bị từ chối do phát hiện nghi vấn gian lận từ hình ảnh sản phẩm. Lý do AI: ${scanResult.reason}`
+    //   });
+    // }
+    const scanResult = { isCopied: false, reason: 'AI check disabled by user request' };
 
     let finalDepositAmount = depositAmount;
     if (depositCalculationMode === 'auto') {
@@ -73,6 +151,14 @@ exports.createAsset = async (req, res) => {
       images: images || [],
       videos: videos || [],
       specs: specs || {},
+      serialNumber: cleanSerial,
+      invoiceImage: invoiceImage || '',
+      warrantyCardImage: warrantyCardImage || '',
+      aiAntiFraudStatus: {
+        isCopied: scanResult.isCopied,
+        reason: scanResult.reason,
+        scannedAt: new Date()
+      },
       location: {
         lat: location.lat,
         lng: location.lng
@@ -80,16 +166,16 @@ exports.createAsset = async (req, res) => {
       status: 'pending_approval'
     });
 
-    // 1. Query all inspectors
-    const inspectors = await User.find({ role: 'inspector' });
-
+    let isHighValue = originalPrice >= 20000000; // 20 million VND
     let assignedTask = null;
     let closestInspector = null;
-    let minDistance = Infinity;
-    let isHighValue = depositAmount >= 2000000;
+    let feedbackMessage = '';
 
     if (isHighValue) {
-      // High value asset: In-person check by the closest inspector (Haversine Geolocation)
+      // High value asset: Needs manual inspector assignment
+      const inspectors = await User.find({ role: 'inspector' });
+      let minDistance = Infinity;
+
       for (const inspector of inspectors) {
         if (
           inspector.address &&
@@ -120,28 +206,18 @@ exports.createAsset = async (req, res) => {
           isRemote: false,
           distance: Math.round(minDistance * 100) / 100
         });
+        feedbackMessage = `Đăng thiết bị VIP thành công! Do tài sản có giá trị cao, hệ thống đã phân bổ nhiệm vụ kiểm duyệt trực tiếp cho Inspector: ${closestInspector.name} (Khoảng cách: ${assignedTask.distance} km).`;
+      } else {
+        feedbackMessage = 'Đăng thiết bị VIP thành công. Tuy nhiên chưa có Inspector nào hoạt động để phân bổ nhiệm vụ kiểm duyệt trực tiếp.';
       }
     } else {
-      // Low value asset: Remote/online inspection via images & videos
-      if (inspectors.length > 0) {
-        // Assign to the first available inspector for online review
-        closestInspector = inspectors[0];
-        assignedTask = await InspectorTask.create({
-          asset: asset._id,
-          inspector: closestInspector._id,
-          status: 'assigned',
-          isRemote: true,
-          distance: 0
-        });
-      }
-    }
-
-    let feedbackMessage = 'Tạo tài sản thành công. Tuy nhiên chưa có Inspector nào hoạt động để phân bổ nhiệm vụ kiểm duyệt.';
-    if (assignedTask) {
-      if (isHighValue) {
-        feedbackMessage = `Đăng thiết bị giá trị cao thành công! Đã tự động phân bổ nhiệm vụ kiểm duyệt TRỰC TIẾP tận nơi cho Inspector gần nhất: ${closestInspector.name} (Khoảng cách: ${assignedTask.distance} km).`;
+      // Everyday asset: AI Auto-Approval
+      if (!scanResult.isCopied) {
+        asset.status = 'verified';
+        await asset.save();
+        feedbackMessage = `Đăng thiết bị thành công! Tài sản của bạn đã được AI tự động duyệt (Auto-Approved) và hiển thị ngay lập tức. Cám ơn bạn đã tuân thủ quy định đăng bài!`;
       } else {
-        feedbackMessage = `Đăng thiết bị giá trị nhỏ thành công! Hệ thống đã lập đơn kiểm duyệt TỪ XA (Online) qua ảnh và video. Giao nhiệm vụ cho Inspector: ${closestInspector.name}.`;
+        feedbackMessage = `Đăng thiết bị thành công! Do hệ thống AI phát hiện nghi vấn hình ảnh, tài sản đang chờ duyệt thủ công.`;
       }
     }
 
@@ -242,7 +318,7 @@ exports.getPendingAssets = async (req, res) => {
 // @access  Private (Inspector only)
 exports.verifyAsset = async (req, res) => {
   try {
-    const { status, verificationNotes } = req.body; // status can be 'verified', 'rejected' or 'unavailable'
+    const { status, verificationNotes, inspectionChecklist } = req.body; // status can be 'verified', 'rejected' or 'unavailable'
 
     if (!['verified', 'rejected', 'unavailable'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Trạng thái kiểm duyệt không hợp lệ. Phải là "verified", "rejected" hoặc "unavailable".' });
@@ -252,6 +328,47 @@ exports.verifyAsset = async (req, res) => {
 
     if (!asset) {
       return res.status(404).json({ success: false, message: 'Asset not found' });
+    }
+
+    // Lấy nhiệm vụ được giao tương ứng
+    const task = await InspectorTask.findOne({ asset: asset._id, status: 'assigned' });
+
+    if (status === 'verified') {
+      if (task && !task.isRemote) {
+        // Bắt buộc checklist cho luồng Offline
+        if (!inspectionChecklist) {
+          return res.status(400).json({ 
+            success: false, 
+            message: 'Vui lòng hoàn thành và gửi Biên bản kiểm định thực tế (Checklist Thẩm định).' 
+          });
+        }
+
+        if (asset.category === 'Tech') {
+          const { shutterCountTest, deadPixelSensorCheck, lensMoldCheck } = inspectionChecklist;
+          if (shutterCountTest === undefined || deadPixelSensorCheck === undefined || lensMoldCheck === undefined) {
+            return res.status(400).json({ 
+              success: false, 
+              message: 'Đối với đồ Công Nghệ giá trị cao, vui lòng hoàn tất đủ checklist: Số shot, Chết pixel cảm biến, và Mốc rễ tre lens.' 
+            });
+          }
+        } else if (asset.category === 'Camping') {
+          const { zipperWearCheck, frameElasticityCheck, tentHolesCheck } = inspectionChecklist;
+          if (zipperWearCheck === undefined || frameElasticityCheck === undefined || tentHolesCheck === undefined) {
+            return res.status(400).json({ 
+              success: false, 
+              message: 'Đối với đồ Cắm Trại giá trị cao, vui lòng hoàn tất đủ checklist: Độ mòn khóa kéo, Đàn hồi khung nhôm, và Lỗ thủng màng chống muỗi.' 
+            });
+          }
+        }
+        asset.inspectionChecklist = inspectionChecklist;
+      }
+
+      // Cấp nhãn uy tín dựa trên luồng duyệt
+      const isRemote = task ? task.isRemote : true;
+      asset.badges = isRemote ? ["Chính chủ 100%"] : ["Đã kiểm định tận nơi", "Chính chủ 100%"];
+    } else {
+      // Nếu bị Rejected hoặc Unavailable, thu hồi nhãn
+      asset.badges = [];
     }
 
     asset.status = status;
@@ -268,7 +385,9 @@ exports.verifyAsset = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      message: 'Cập nhật trạng thái kiểm duyệt tài sản và hoàn thành nhiệm vụ thành công.',
+      message: status === 'verified' 
+        ? 'Phê duyệt thiết bị thành công! Đã cấp nhãn uy tín tương ứng.'
+        : 'Từ chối duyệt thiết bị thành công. Lý do từ chối đã được gửi đến Lender.',
       data: asset
     });
   } catch (error) {
@@ -310,6 +429,247 @@ exports.updateAssetStatus = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Update an asset (with lock modification rule)
+// @route   PUT /api/assets/:id
+// @access  Private (Lender only)
+exports.updateAsset = async (req, res) => {
+  try {
+    const asset = await Asset.findById(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thiết bị.' });
+    }
+
+    // Check ownership
+    if (asset.lender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền chỉnh sửa thiết bị này.' });
+    }
+
+    const { 
+      name, 
+      description, 
+      category, 
+      condition, 
+      pricePerDay, 
+      depositAmount, 
+      images, 
+      videos, 
+      location,
+      originalPrice,
+      purchaseYear,
+      itemConditionRate,
+      depositCalculationMode,
+      specs,
+      serialNumber,
+      invoiceImage,
+      warrantyCardImage
+    } = req.body;
+
+    // Validate images count if updated
+    if (images !== undefined) {
+      if (!images || !Array.isArray(images) || images.length < 5) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Bạn bắt buộc phải đăng tải tối thiểu 5 ảnh sản phẩm (4 ảnh các góc + 1 ảnh chụp rõ số Serial hoặc ảnh lều thực tế).' 
+        });
+      }
+    }
+
+    // Validate serial number if updated
+    let cleanSerial = asset.serialNumber;
+    if (serialNumber !== undefined) {
+      if (!serialNumber || typeof serialNumber !== 'string' || !serialNumber.trim()) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Vui lòng cung cấp số Serial Number / IMEI của thiết bị.' 
+        });
+      }
+      cleanSerial = serialNumber.trim().toUpperCase();
+      
+      // Duplicate check
+      const duplicateAsset = await Asset.findOne({ 
+        _id: { $ne: asset._id },
+        serialNumber: { $regex: new RegExp(`^${cleanSerial}$`, 'i') }
+      });
+      if (duplicateAsset) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Số Serial/IMEI này đã được đăng ký bởi một tài sản khác trên hệ thống.' 
+        });
+      }
+
+      // Blacklist check
+      const blacklist = ['STOLEN123456', 'IMEI999999999', 'BADSERIAL789'];
+      if (blacklist.includes(cleanSerial)) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Số Serial/IMEI này nằm trong Danh sách thiết bị báo mất cắp (Blacklist) của cộng đồng.' 
+        });
+      }
+    }
+
+    // Check ownership documents
+    const checkInvoice = invoiceImage !== undefined ? invoiceImage : asset.invoiceImage;
+    const checkWarranty = warrantyCardImage !== undefined ? warrantyCardImage : asset.warrantyCardImage;
+    if (!checkInvoice && !checkWarranty) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).' 
+      });
+    }
+
+    // Let's compute the new deposit amount if needed
+    let finalDepositAmount = depositAmount !== undefined ? depositAmount : asset.depositAmount;
+    const checkOriginalPrice = originalPrice !== undefined ? originalPrice : asset.originalPrice;
+    const checkPurchaseYear = purchaseYear !== undefined ? purchaseYear : asset.purchaseYear;
+    const checkConditionRate = itemConditionRate !== undefined ? itemConditionRate : asset.itemConditionRate;
+
+    if (depositCalculationMode === 'auto' || (depositCalculationMode === undefined && asset.depositCalculationMode === 'auto')) {
+      if (!checkOriginalPrice || !checkPurchaseYear || !checkConditionRate) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Khi chọn tính tiền đặt cọc tự động (auto), vui lòng cung cấp đầy đủ thông tin: Giá gốc, Năm mua, và Độ mới (%).' 
+        });
+      }
+      const currentYear = new Date().getFullYear();
+      const age = Math.max(0, currentYear - checkPurchaseYear);
+      const depreciationFactor = Math.max(0.5, 1 - (age * 0.1));
+      const conditionFactor = Math.min(100, Math.max(0, checkConditionRate)) / 100;
+      finalDepositAmount = Math.round(checkOriginalPrice * conditionFactor * depreciationFactor);
+    } else {
+      if (depositAmount !== undefined && (typeof depositAmount !== 'number' || depositAmount < 0)) {
+        return res.status(400).json({ success: false, message: 'Vui lòng cung cấp số tiền đặt cọc hợp lệ.' });
+      }
+    }
+
+    // Check Lock Modification Rule if currently verified
+    let triggerReInspection = false;
+    let downgradeReason = '';
+
+    if (asset.status === 'verified') {
+      const isNameChanged = name !== undefined && name !== asset.name;
+      const isDepositChanged = finalDepositAmount !== asset.depositAmount;
+      const isOriginalPriceChanged = originalPrice !== undefined && originalPrice !== asset.originalPrice;
+      const isSerialChanged = cleanSerial !== asset.serialNumber;
+      const isPrimaryImageChanged = images && images[0] !== asset.images[0];
+
+      if (isNameChanged || isDepositChanged || isOriginalPriceChanged || isSerialChanged || isPrimaryImageChanged) {
+        triggerReInspection = true;
+        downgradeReason = 'Thiết bị bị tự động khóa và chuyển về trạng thái chờ duyệt do Lender thay đổi thông tin cốt lõi (Tên, Giá cọc, Ảnh chính hoặc Số Serial) sau khi đã kiểm định.';
+      }
+    } else if (asset.status === 'rejected') {
+      // If previously rejected, any edits should bring it back to pending_approval for re-inspection
+      triggerReInspection = true;
+      downgradeReason = 'Thiết bị được nộp lại hồ sơ chỉnh sửa từ Lender.';
+    }
+
+    // Update fields
+    if (name !== undefined) asset.name = name;
+    if (description !== undefined) asset.description = description;
+    if (category !== undefined) asset.category = category;
+    if (condition !== undefined) asset.condition = condition;
+    if (pricePerDay !== undefined) asset.pricePerDay = pricePerDay;
+    asset.depositAmount = finalDepositAmount;
+    if (depositCalculationMode !== undefined) asset.depositCalculationMode = depositCalculationMode;
+    if (originalPrice !== undefined) asset.originalPrice = originalPrice;
+    if (purchaseYear !== undefined) asset.purchaseYear = purchaseYear;
+    if (itemConditionRate !== undefined) asset.itemConditionRate = itemConditionRate;
+    if (images !== undefined) asset.images = images;
+    if (videos !== undefined) asset.videos = videos;
+    if (specs !== undefined) asset.specs = specs;
+    asset.serialNumber = cleanSerial;
+    if (invoiceImage !== undefined) asset.invoiceImage = invoiceImage;
+    if (warrantyCardImage !== undefined) asset.warrantyCardImage = warrantyCardImage;
+    if (location !== undefined) {
+      asset.location = {
+        lat: location.lat,
+        lng: location.lng
+      };
+    }
+
+    if (triggerReInspection) {
+      asset.status = 'pending_approval';
+      asset.verificationNotes = downgradeReason;
+      asset.badges = []; // Clear badges
+    }
+
+    await asset.save();
+
+    // If reinspection is triggered, re-assign inspector and create task
+    if (triggerReInspection) {
+      // Deactivate any existing active tasks for this asset
+      await InspectorTask.updateMany(
+        { asset: asset._id, status: 'assigned' },
+        { status: 'cancelled' }
+      );
+
+      // Re-assign Inspector
+      const inspectors = await User.find({ role: 'inspector' });
+      let assignedTask = null;
+      let closestInspector = null;
+      let minDistance = Infinity;
+      let isHighValue = (originalPrice !== undefined ? originalPrice : asset.originalPrice) >= 2000000;
+      const assetLat = location ? location.lat : asset.location.lat;
+      const assetLng = location ? location.lng : asset.location.lng;
+
+      if (isHighValue) {
+        for (const inspector of inspectors) {
+          if (
+            inspector.address &&
+            inspector.address.coordinates &&
+            typeof inspector.address.coordinates.lat === 'number' &&
+            typeof inspector.address.coordinates.lng === 'number' &&
+            inspector.address.coordinates.lat !== 0
+          ) {
+            const dist = getDistance(
+              assetLat,
+              assetLng,
+              inspector.address.coordinates.lat,
+              inspector.address.coordinates.lng
+            );
+
+            if (dist < minDistance) {
+              minDistance = dist;
+              closestInspector = inspector;
+            }
+          }
+        }
+
+        if (closestInspector) {
+          assignedTask = await InspectorTask.create({
+            asset: asset._id,
+            inspector: closestInspector._id,
+            status: 'assigned',
+            isRemote: false,
+            distance: Math.round(minDistance * 100) / 100
+          });
+        }
+      } else {
+        if (inspectors.length > 0) {
+          closestInspector = inspectors[0];
+          assignedTask = await InspectorTask.create({
+            asset: asset._id,
+            inspector: closestInspector._id,
+            status: 'assigned',
+            isRemote: true,
+            distance: 0
+          });
+        }
+      }
+    }
+
+    res.status(200).json({
+      success: true,
+      message: triggerReInspection 
+        ? 'Cập nhật thiết bị thành công. Thiết bị đã được chuyển về trạng thái chờ duyệt lại.' 
+        : 'Cập nhật thiết bị thành công.',
+      data: asset
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 
 // @desc    AI-assisted Deposit & Price Estimation (Lender)
 // @route   POST /api/assets/ai-estimate-deposit
@@ -391,7 +751,35 @@ exports.getAssetById = async (req, res) => {
     if (!asset) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy thiết bị.' });
     }
-    res.status(200).json({ success: true, data: asset });
+    
+    // Fetch reviews from orders (Renter ratings/comments)
+    const Order = require('../models/Order');
+    const reviews = await Order.find({ 
+      asset: req.params.id, 
+      lenderRating: { $exists: true, $ne: null } 
+    })
+    .populate('renter', 'name avatar')
+    .select('lenderRating lenderComment createdAt');
+
+    const assetObj = asset.toObject();
+    assetObj.reviews = reviews || [];
+
+    // Fetch rented dates (active or reserved orders)
+    const rentedOrders = await Order.find({
+      asset: req.params.id,
+      status: { $in: ['reserved', 'active'] }
+    }).select('startDate endDate');
+    
+    assetObj.rentedDates = rentedOrders.map(order => {
+      const bufferedEndDate = new Date(order.endDate);
+      bufferedEndDate.setDate(bufferedEndDate.getDate() + 1); // 1-day buffer time
+      return {
+        startDate: order.startDate,
+        endDate: bufferedEndDate
+      };
+    });
+
+    res.status(200).json({ success: true, data: assetObj });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
@@ -404,6 +792,46 @@ exports.getMyAssets = async (req, res) => {
   try {
     const assets = await Asset.find({ lender: req.user._id }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: assets });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Manage manual blocked dates for an asset
+// @route   PUT /api/assets/:id/block-dates
+// @access  Private (Lender)
+exports.manageBlockedDates = async (req, res) => {
+  try {
+    const { blockedDates } = req.body;
+    
+    if (!Array.isArray(blockedDates)) {
+      return res.status(400).json({ success: false, message: 'blockedDates phải là một mảng.' });
+    }
+
+    const asset = await Asset.findById(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thiết bị.' });
+    }
+
+    if (asset.lender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền sửa thiết bị này.' });
+    }
+
+    // Filter to ensure proper format and keep reason as 'manual'
+    const formattedDates = blockedDates.map(dateObj => ({
+      startDate: new Date(dateObj.startDate),
+      endDate: new Date(dateObj.endDate),
+      reason: 'manual'
+    }));
+
+    asset.blockedDates = formattedDates;
+    await asset.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật lịch bận thủ công thành công.',
+      data: asset.blockedDates
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

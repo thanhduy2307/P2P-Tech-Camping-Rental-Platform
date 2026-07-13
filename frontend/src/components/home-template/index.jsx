@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
@@ -99,7 +100,7 @@ const HomeTemplate = ({ children }) => {
           user: userData
         }));
         
-        alert(`Đã chuyển vai trò sang: ${newRole === 'lender' ? 'Người cho thuê (Lender)' : 'Người thuê (Renter)'}`);
+        Swal.fire(`Đã chuyển vai trò sang: ${newRole === 'lender' ? 'Người cho thuê (Lender)' : 'Người thuê (Renter)'}`);
         
         if (newRole === 'lender') {
           navigate('/dashboard-lender');
@@ -110,9 +111,9 @@ const HomeTemplate = ({ children }) => {
     } catch (err) {
       console.error(err);
       if (err.response && err.response.data && err.response.data.message) {
-        alert(err.response.data.message);
+        Swal.fire(err.response.data.message);
       } else {
-        alert('Không thể chuyển vai trò. Vui lòng thử lại sau.');
+        Swal.fire('Không thể chuyển vai trò. Vui lòng thử lại sau.');
       }
     }
   };
@@ -294,20 +295,30 @@ const HomeTemplate = ({ children }) => {
                     <span className="material-symbols-outlined p-1.5">person</span>
                   )}
                 </Link>
+
+                {storedUser?.lenderStatus === 'approved' && (
+                  <button 
+                    onClick={handleSwitchRole}
+                    className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-container-low flex items-center justify-center"
+                    title={role === 'lender' ? 'Chuyển sang Renter' : 'Chuyển sang Lender'}
+                  >
+                    <span className="material-symbols-outlined">swap_horiz</span>
+                  </button>
+                )}
                 <button 
                   onClick={handleLogout} 
                   className="font-title-md text-[16px] font-semibold text-error hover:text-red-700 transition-colors px-4 py-2"
                 >
-                  Log Out
+                  Đăng xuất
                 </button>
               </div>
             ) : (
               <>
                 <Link to="/login" className="hidden md:block font-title-md text-[16px] font-semibold text-secondary hover:text-secondary-container transition-colors px-4 py-2">
-                  Log In
+                  Đăng nhập
                 </Link>
                 <Link to="/register" className="bg-primary-container text-on-primary hover:bg-primary transition-colors font-title-md text-[16px] font-semibold px-6 py-2.5 rounded-lg shadow-sm active:scale-95">
-                  Register
+                  Đăng ký
                 </Link>
               </>
             )}
@@ -320,23 +331,23 @@ const HomeTemplate = ({ children }) => {
         <div className="flex justify-around items-center w-full px-4 py-2">
           <Link to="/" className="flex flex-col items-center justify-center text-primary bg-primary-container/10 rounded-xl p-2 w-[64px]">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>explore</span>
-            <span className="font-label-sm mt-1">Explore</span>
+            <span className="font-label-sm mt-1">Khám phá</span>
           </Link>
           <Link to="/assets" className="flex flex-col items-center justify-center text-on-surface-variant p-2 w-[64px] hover:bg-surface-container-highest rounded-xl transition-colors">
             <span className="material-symbols-outlined">search</span>
-            <span className="font-label-sm mt-1">Search</span>
+            <span className="font-label-sm mt-1">Tìm kiếm</span>
           </Link>
           <Link to="/orders" className="flex flex-col items-center justify-center text-on-surface-variant p-2 w-[64px] hover:bg-surface-container-highest rounded-xl transition-colors">
             <span className="material-symbols-outlined">calendar_today</span>
-            <span className="font-label-sm mt-1">Rentals</span>
+            <span className="font-label-sm mt-1">Thuê đồ</span>
           </Link>
           <Link to="/chat" className="flex flex-col items-center justify-center text-on-surface-variant p-2 w-[64px] hover:bg-surface-container-highest rounded-xl transition-colors">
             <span className="material-symbols-outlined">chat</span>
-            <span className="font-label-sm mt-1">Chat</span>
+            <span className="font-label-sm mt-1">Tin nhắn</span>
           </Link>
           <Link to="/profile" className="flex flex-col items-center justify-center text-on-surface-variant p-2 w-[64px] hover:bg-surface-container-highest rounded-xl transition-colors">
             <span className="material-symbols-outlined">person</span>
-            <span className="font-label-sm mt-1">Profile</span>
+            <span className="font-label-sm mt-1">Cá nhân</span>
           </Link>
         </div>
       </nav>
@@ -363,29 +374,29 @@ const HomeTemplate = ({ children }) => {
           <div>
             <h4 className="font-title-md text-[18px] text-on-surface font-semibold mb-6">Khám phá</h4>
             <ul className="space-y-4 flex flex-col">
-              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/assets?category=tech">Tech Gear</Link></li>
-              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/assets?category=camping">Camping Essentials</Link></li>
-              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/blogs">How it Works</Link></li>
+              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/assets?category=tech">Đồ công nghệ</Link></li>
+              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/assets?category=camping">Đồ dùng cắm trại</Link></li>
+              <li><Link className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" to="/blogs">Quy trình hoạt động</Link></li>
             </ul>
           </div>
           <div>
             <h4 className="font-title-md text-[18px] text-on-surface font-semibold mb-6">Hỗ trợ</h4>
             <ul className="space-y-4 flex flex-col">
-              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Help Center</a></li>
-              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Trust &amp; Safety</a></li>
+              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Trung tâm trợ giúp</a></li>
+              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Tin cậy & An toàn</a></li>
               <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Liên hệ</a></li>
             </ul>
           </div>
           <div className="col-span-2 md:col-span-1 mt-8 md:mt-0">
             <h4 className="font-title-md text-[18px] text-on-surface font-semibold mb-6">Pháp lý</h4>
             <ul className="space-y-4 flex flex-col">
-              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Terms of Service</a></li>
-              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Privacy Policy</a></li>
+              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Điều khoản dịch vụ</a></li>
+              <li><a className="font-body-md text-body-md text-on-surface-variant dark:text-surface-variant hover:text-secondary hover:underline decoration-secondary transition-all" href="#">Chính sách bảo mật</a></li>
             </ul>
           </div>
         </div>
         <div className="border-t border-outline-variant/20 px-margin-desktop py-6 text-center">
-          <p className="font-body-md text-body-md text-on-surface-variant">© 2024 EquipPeer. Gear Up, Get Out.</p>
+          <p className="font-body-md text-body-md text-on-surface-variant">© 2024 EquipPeer. Sẵn sàng hành trình, an tâm chia sẻ.</p>
         </div>
       </footer>
       <AIChatbot />

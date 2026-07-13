@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useRef, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../configs/axios';
 
 // ─── Specs templates per category ────────────────────────────────────────────
@@ -37,12 +37,24 @@ const fileToBase64 = (file) =>
 // ─── Component ────────────────────────────────────────────────────────────────
 const PostAsset = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Chế độ chỉnh sửa (Edit Mode)
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [assetId, setAssetId] = useState(null);
 
   // Basic info
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState('Tech');
   const [condition, setCondition] = useState('Excellent');
+
+  // Legal fields (Chứng từ pháp lý)
+  const [serialNumber, setSerialNumber] = useState('');
+  const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoicePreview, setInvoicePreview] = useState('');
+  const [warrantyFile, setWarrantyFile] = useState(null);
+  const [warrantyPreview, setWarrantyPreview] = useState('');
 
   // Pricing
   const [pricePerDay, setPricePerDay] = useState('');
@@ -72,10 +84,10 @@ const PostAsset = () => {
   const removeCustomRow = (idx) =>
     setCustomSpecs((prev) => prev.filter((_, i) => i !== idx));
 
-  // ── Images ─────────────────────────────────────────────────────────────────
-  const [imgFiles, setImgFiles] = useState([null, null, null]);
-  const [imgPreviews, setImgPreviews] = useState(['', '', '']);
-  const fileInputRefs = [useRef(), useRef(), useRef()];
+  // ── Images (Tối thiểu 5 ảnh bắt buộc) ──────────────────────────────────────
+  const [imgFiles, setImgFiles] = useState([null, null, null, null, null]);
+  const [imgPreviews, setImgPreviews] = useState(['', '', '', '', '']);
+  const fileInputRefs = [useRef(), useRef(), useRef(), useRef(), useRef()];
 
   const handleFileChange = (e, idx) => {
     const file = e.target.files[0];
@@ -88,6 +100,28 @@ const PostAsset = () => {
       const newPreviews = [...imgPreviews];
       newPreviews[idx] = ev.target.result;
       setImgPreviews(newPreviews);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleInvoiceFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setInvoiceFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setInvoicePreview(ev.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleWarrantyFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setWarrantyFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setWarrantyPreview(ev.target.result);
     };
     reader.readAsDataURL(file);
   };
@@ -131,6 +165,75 @@ const PostAsset = () => {
     );
   };
 
+  // Tải dữ liệu thiết bị nếu trong chế độ chỉnh sửa (Edit Mode)
+  useEffect(() => {
+    const queryParams = new URLSearchParams(location.search);
+    const id = queryParams.get('id');
+    if (id) {
+      setIsEditMode(true);
+      setAssetId(id);
+      
+      const fetchAssetDetails = async (id) => {
+        try {
+          const response = await api.get(`/assets/${id}`);
+          if (response.data && response.data.success) {
+            const item = response.data.data;
+            setName(item.name || '');
+            setDescription(item.description || '');
+            setCategory(item.category || 'Tech');
+            setCondition(item.condition || 'Excellent');
+            setPricePerDay(item.pricePerDay ?? '');
+            setDepositCalculationMode(item.depositCalculationMode || 'fixed');
+            setDepositAmount(item.depositAmount ?? '');
+            setOriginalPrice(item.originalPrice ?? '');
+            setPurchaseYear(item.purchaseYear ?? new Date().getFullYear());
+            setItemConditionRate(item.itemConditionRate ?? 95);
+            setSerialNumber(item.serialNumber || '');
+            setInvoicePreview(item.invoiceImage || '');
+            setWarrantyPreview(item.warrantyCardImage || '');
+
+            if (item.specs) {
+              const specsMap = item.specs;
+              const fixed = {};
+              const custom = [];
+              const allowedFixedKeys = (CATEGORY_SPECS[item.category] || []).map(s => s.key);
+              
+              Object.keys(specsMap).forEach(key => {
+                if (allowedFixedKeys.includes(key)) {
+                  fixed[key] = specsMap[key];
+                } else {
+                  custom.push({ key, value: specsMap[key] });
+                }
+              });
+              setFixedSpecs(fixed);
+              if (custom.length > 0) {
+                setCustomSpecs(custom);
+              }
+            }
+
+            if (item.images && item.images.length > 0) {
+              const previews = ['', '', '', '', ''];
+              item.images.forEach((img, index) => {
+                if (index < 5) previews[index] = img;
+              });
+              setImgPreviews(previews);
+            }
+
+            if (item.location) {
+              setLat(item.location.lat);
+              setLng(item.location.lng);
+              setLocationLabel(`${item.location.lat.toFixed(4)}, ${item.location.lng.toFixed(4)}`);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to fetch asset details:", err);
+          setErrorMsg("Không thể tải thông tin thiết bị để chỉnh sửa.");
+        }
+      };
+      fetchAssetDetails(id);
+    }
+  }, []);
+
   // ── Submit ─────────────────────────────────────────────────────────────────
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -144,20 +247,54 @@ const PostAsset = () => {
     setAssignedTaskInfo(null);
     setLoading(true);
 
-    // Validate at least 1 image
-    const hasImage = imgFiles.some((f) => f !== null);
-    if (!hasImage) {
-      setErrorMsg('Vui lòng cung cấp ít nhất 1 hình ảnh thiết bị.');
+    // Validate images count (at least 5 images)
+    const activeImagesCount = imgPreviews.filter(p => p !== '').length;
+    if (activeImagesCount < 5) {
+      setErrorMsg('Vui lòng cung cấp đầy đủ 5 hình ảnh sản phẩm (4 ảnh các góc + 1 ảnh chụp rõ số Serial trên thân máy hoặc ảnh bung lều thực tế).');
+      setLoading(false);
+      return;
+    }
+
+    // Validate serial number
+    if (!serialNumber || !serialNumber.trim()) {
+      setErrorMsg('Vui lòng cung cấp số Serial Number / IMEI của thiết bị.');
+      setLoading(false);
+      return;
+    }
+
+    // Validate ownership documents (either invoice or warranty)
+    const hasInvoice = invoicePreview || invoiceFile;
+    const hasWarranty = warrantyPreview || warrantyFile;
+    if (!hasInvoice && !hasWarranty) {
+      setErrorMsg('Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).');
+      setLoading(false);
+      return;
+    }
+
+    // Validate original price
+    const finalOriginalPrice = parseFloat(originalPrice);
+    if (isNaN(finalOriginalPrice) || finalOriginalPrice <= 0) {
+      setErrorMsg('Vui lòng cung cấp giá trị gốc lúc mua mới của sản phẩm để phân bổ kiểm định.');
       setLoading(false);
       return;
     }
 
     try {
-      // Convert selected images to base64
+      // Convert selected images to base64 or keep existing preview URLs
       const images = [];
-      for (const file of imgFiles) {
-        if (file) images.push(await fileToBase64(file));
+      for (let i = 0; i < 5; i++) {
+        if (imgFiles[i]) {
+          images.push(await fileToBase64(imgFiles[i]));
+        } else if (imgPreviews[i]) {
+          images.push(imgPreviews[i]);
+        }
       }
+
+      // Convert invoice / warranty if new files uploaded
+      let finalInvoice = invoicePreview;
+      if (invoiceFile) finalInvoice = await fileToBase64(invoiceFile);
+      let finalWarranty = warrantyPreview;
+      if (warrantyFile) finalWarranty = await fileToBase64(warrantyFile);
 
       // Build specs object: fixed + custom rows
       const specs = { ...fixedSpecs };
@@ -172,28 +309,26 @@ const PostAsset = () => {
         condition,
         pricePerDay: parseFloat(pricePerDay),
         depositCalculationMode,
+        originalPrice: finalOriginalPrice,
         location: { lat: parseFloat(lat), lng: parseFloat(lng) },
         images,
+        serialNumber: serialNumber.trim(),
+        invoiceImage: finalInvoice || '',
+        warrantyCardImage: finalWarranty || '',
         specs: Object.keys(specs).length > 0 ? specs : undefined,
       };
 
       if (depositCalculationMode === 'fixed') {
         payload.depositAmount = parseFloat(depositAmount);
         if (isNaN(payload.depositAmount) || payload.depositAmount < 0) {
-          setErrorMsg('Vui lòng cung cấp số tiền đặt cọc hợp lệ.');
+          setErrorMsg('Vui lòng cung cấp số tiền đặt cọc cố định hợp lệ.');
           setLoading(false);
           return;
         }
       } else {
-        payload.originalPrice = parseFloat(originalPrice);
         payload.purchaseYear = parseInt(purchaseYear);
         payload.itemConditionRate = parseInt(itemConditionRate);
 
-        if (isNaN(payload.originalPrice) || payload.originalPrice <= 0) {
-          setErrorMsg('Vui lòng nhập giá gốc của thiết bị.');
-          setLoading(false);
-          return;
-        }
         if (isNaN(payload.purchaseYear) || payload.purchaseYear > new Date().getFullYear()) {
           setErrorMsg('Năm mua thiết bị không hợp lệ.');
           setLoading(false);
@@ -206,17 +341,26 @@ const PostAsset = () => {
         }
       }
 
-      const response = await api.post('/assets', payload);
+      let response;
+      if (isEditMode) {
+        response = await api.put(`/assets/${assetId}`, payload);
+      } else {
+        response = await api.post('/assets', payload);
+      }
+
       if (response.data?.success) {
-        setSuccessMsg(response.data.message || 'Đăng thiết bị thành công! Đang chờ kiểm duyệt.');
+        setSuccessMsg(isEditMode 
+          ? (response.data.message || 'Cập nhật thiết bị thành công! Thiết bị đang được kiểm duyệt lại.')
+          : (response.data.message || 'Đăng thiết bị thành công! Đang chờ kiểm duyệt.')
+        );
         if (response.data.assignedTask) setAssignedTaskInfo(response.data.assignedTask);
         setTimeout(() => navigate('/lender-inventory'), 5000);
       }
     } catch (err) {
       console.error(err);
-      setErrorMsg(err.response?.data?.message || 'Không thể đăng thiết bị. Vui lòng kiểm tra lại thông tin.');
+      setErrorMsg(err.response?.data?.message || 'Không thể lưu thiết bị. Vui lòng kiểm tra lại thông tin.');
     } finally {
-      setLoading(false);
+      loading && setLoading(false);
     }
   };
 
@@ -228,22 +372,28 @@ const PostAsset = () => {
       {/* Header */}
       <div className="bg-slate-900 text-white px-8 py-6 border-b border-slate-800">
         <h2 className="text-xl font-bold flex items-center gap-2">
-          <span className="material-symbols-outlined text-teal-400">add_circle</span>
-          Đăng Ký Cho Thuê Thiết Bị
+          <span className="material-symbols-outlined text-teal-400">
+            {isEditMode ? 'edit_document' : 'add_circle'}
+          </span>
+          {isEditMode ? 'Cập Nhật Thông Tin Thiết Bị' : 'Đăng Ký Cho Thuê Thiết Bị'}
         </h2>
-        <p className="text-slate-400 text-xs mt-1">Điền đầy đủ thông tin để hỗ sơ được kiểm duyệt nhanh nhất.</p>
+        <p className="text-slate-400 text-xs mt-1">
+          {isEditMode 
+            ? 'Chỉnh sửa thông tin thiết bị của bạn. Sửa đổi thông tin cốt lõi sẽ khiến thiết bị cần được thẩm duyệt lại.' 
+            : 'Điền đầy đủ thông tin để hồ sơ được kiểm duyệt nhanh nhất.'}
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="p-8 space-y-8">
         {/* ── Messages ── */}
         {errorMsg && (
-          <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-4 text-xs font-semibold flex items-start gap-2">
+          <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-4 text-xs font-semibold flex items-start gap-2 animate-in fade-in duration-200">
             <span className="material-symbols-outlined text-[16px] mt-0.5">error</span>
             {errorMsg}
           </div>
         )}
         {successMsg && (
-          <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg p-4 space-y-2 text-xs">
+          <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg p-4 space-y-2 text-xs animate-in fade-in duration-200">
             <p className="font-bold flex items-center gap-1.5 text-emerald-700">
               <span className="material-symbols-outlined text-[18px]">check_circle</span>
               {successMsg}
@@ -327,6 +477,101 @@ const PostAsset = () => {
           </div>
         </section>
 
+        {/* ══ Section 1.5: Legal Documents & Serial ════════════════════════ */}
+        <section className="space-y-4">
+          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-sm text-slate-400">gavel</span>
+            1.5. Thông tin pháp lý &amp; Chứng từ sở hữu
+          </h3>
+
+          <div className="space-y-1">
+            <label className="text-xs font-semibold text-slate-700" htmlFor="asset-serial">
+              Số Serial / IMEI thiết bị <span className="text-red-500">*</span>
+            </label>
+            <input
+              id="asset-serial"
+              type="text"
+              placeholder="e.g. SN1234567890 hoặc số IMEI máy ảnh/điện thoại"
+              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 text-sm font-mono uppercase"
+              value={serialNumber}
+              onChange={(e) => setSerialNumber(e.target.value)}
+              required
+            />
+            <p className="text-[10px] text-slate-400 mt-1">Dùng để quét trùng lặp và xác minh danh sách thiết bị mất cắp.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+            {/* Invoice upload */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-700">Hóa đơn mua hàng (Invoice)</p>
+              <div 
+                onClick={() => document.getElementById('invoice-upload').click()}
+                className={`relative w-full h-32 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
+                  invoicePreview ? 'border-teal-400 bg-teal-50/10' : 'border-slate-200 hover:border-teal-300 bg-slate-50'
+                }`}
+              >
+                {invoicePreview ? (
+                  <>
+                    <img src={invoicePreview} alt="Invoice preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                      Đổi hóa đơn
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center p-4">
+                    <span className="material-symbols-outlined text-slate-400 text-2xl">receipt_long</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-1">Tải ảnh hóa đơn</p>
+                  </div>
+                )}
+              </div>
+              <input 
+                id="invoice-upload" 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleInvoiceFileChange} 
+              />
+              {invoiceFile && <p className="text-[9px] text-slate-400 truncate">{invoiceFile.name}</p>}
+            </div>
+
+            {/* Warranty upload */}
+            <div className="space-y-2">
+              <p className="text-xs font-semibold text-slate-700">Ảnh chụp tem/thẻ bảo hành</p>
+              <div 
+                onClick={() => document.getElementById('warranty-upload').click()}
+                className={`relative w-full h-32 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
+                  warrantyPreview ? 'border-teal-400 bg-teal-50/10' : 'border-slate-200 hover:border-teal-300 bg-slate-50'
+                }`}
+              >
+                {warrantyPreview ? (
+                  <>
+                    <img src={warrantyPreview} alt="Warranty preview" className="w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                      Đổi ảnh bảo hành
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center p-4">
+                    <span className="material-symbols-outlined text-slate-400 text-2xl">workspace_premium</span>
+                    <p className="text-[10px] text-slate-400 font-semibold mt-1">Tải ảnh bảo hành/tem</p>
+                  </div>
+                )}
+              </div>
+              <input 
+                id="warranty-upload" 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleWarrantyFileChange} 
+              />
+              {warrantyFile && <p className="text-[9px] text-slate-400 truncate">{warrantyFile.name}</p>}
+            </div>
+          </div>
+          <p className="text-[10px] text-slate-450 italic">
+            * Bắt buộc upload ít nhất một trong hai chứng từ (Hóa đơn hoặc Tem bảo hành) làm cơ sở pháp lý.
+          </p>
+        </section>
+
         {/* ══ Section 2: Technical Specs ════════════════════════════════════ */}
         <section className="space-y-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
@@ -388,7 +633,7 @@ const PostAsset = () => {
                     <button
                       type="button"
                       onClick={() => removeCustomRow(idx)}
-                      className="text-slate-300 hover:text-red-400 transition-colors"
+                      className="text-slate-350 hover:text-red-500 transition-colors"
                     >
                       <span className="material-symbols-outlined text-[18px]">remove_circle</span>
                     </button>
@@ -403,36 +648,57 @@ const PostAsset = () => {
         <section className="space-y-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-slate-400">payments</span>
-            3. Giá thuê &amp; Ký quỹ cọc
+            3. Giá trị, Giá thuê &amp; Ký quỹ cọc
           </h3>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-4">
+            {/* Original value input is ALWAYS required (for routing/anti-fraud reasons) */}
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700" htmlFor="asset-price">
-                Giá thuê một ngày (VNĐ) <span className="text-red-500">*</span>
+              <label className="text-xs font-semibold text-slate-700" htmlFor="asset-orig-price">
+                Giá trị thiết bị lúc mua mới (VNĐ) <span className="text-red-500">*</span>
               </label>
               <input
-                id="asset-price"
+                id="asset-orig-price"
                 type="number"
-                placeholder="e.g. 150000"
+                placeholder="e.g. 12000000"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm"
-                value={pricePerDay}
-                onChange={(e) => setPricePerDay(e.target.value)}
+                value={originalPrice}
+                onChange={(e) => setOriginalPrice(e.target.value)}
                 required
               />
+              <p className="text-[10px] text-slate-400">
+                * Giá trị này quyết định luồng duyệt: Dưới 2.000.000đ duyệt Online, Từ 2.000.000đ duyệt Offline tận nơi.
+              </p>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-700" htmlFor="asset-deposit-mode">Cách tính tiền cọc</label>
-              <select
-                id="asset-deposit-mode"
-                className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm bg-white cursor-pointer"
-                value={depositCalculationMode}
-                onChange={(e) => setDepositCalculationMode(e.target.value)}
-              >
-                <option value="fixed">Hạn mức cố định (Nhập thủ công)</option>
-                <option value="auto">Tính tự động (Hệ thống eKYC khấu hao)</option>
-              </select>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700" htmlFor="asset-price">
+                  Giá thuê một ngày (VNĐ) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="asset-price"
+                  type="number"
+                  placeholder="e.g. 150000"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm"
+                  value={pricePerDay}
+                  onChange={(e) => setPricePerDay(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700" htmlFor="asset-deposit-mode">Cách tính tiền cọc</label>
+                <select
+                  id="asset-deposit-mode"
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm bg-white cursor-pointer"
+                  value={depositCalculationMode}
+                  onChange={(e) => setDepositCalculationMode(e.target.value)}
+                >
+                  <option value="fixed">Hạn mức cố định (Nhập thủ công)</option>
+                  <option value="auto">Tính tự động (Khấu hao theo năm mua &amp; chất lượng)</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -453,19 +719,7 @@ const PostAsset = () => {
               <p className="text-[10px] text-slate-400 mt-1">Khoản tiền cọc renter cần đặt trước khi thuê thiết bị này.</p>
             </div>
           ) : (
-            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/50 grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-700" htmlFor="asset-orig-price">Giá gốc mua (VNĐ)</label>
-                <input
-                  id="asset-orig-price"
-                  type="number"
-                  placeholder="e.g. 12000000"
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-teal-500 text-sm"
-                  value={originalPrice}
-                  onChange={(e) => setOriginalPrice(e.target.value)}
-                  required={depositCalculationMode === 'auto'}
-                />
-              </div>
+            <div className="bg-slate-50 p-4 rounded-lg border border-slate-200/50 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-slate-700" htmlFor="asset-buy-year">Năm mua hàng</label>
                 <input
@@ -492,8 +746,8 @@ const PostAsset = () => {
                   required={depositCalculationMode === 'auto'}
                 />
               </div>
-              <p className="text-[10px] text-slate-400 md:col-span-3 mt-1">
-                * Hệ thống tự động tính cọc: Tiền cọc = Giá trị gốc × độ mới × (khấu hao 10% mỗi năm).
+              <p className="text-[10px] text-slate-450 md:col-span-2 mt-1 italic">
+                * Hệ thống tự động tính cọc: Tiền cọc = Giá trị gốc × độ mới × (khấu hao 10% mỗi năm, tối đa khấu hao 50%).
               </p>
             </div>
           )}
@@ -503,17 +757,22 @@ const PostAsset = () => {
         <section className="space-y-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-slate-400">photo_library</span>
-            4. Hình ảnh thiết bị (tối đa 3 ảnh)
+            4. Hình ảnh thiết bị (Bắt buộc đủ 5 ảnh các góc cạnh)
           </h3>
 
-          <div className="grid grid-cols-3 gap-4">
-            {[0, 1, 2].map((idx) => {
-              const labels = ['Ảnh chính (Toàn cảnh)', 'Ảnh phụ (Chi tiết)', 'Ảnh phụ kiện'];
-              const isRequired = idx === 0;
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[0, 1, 2, 3, 4].map((idx) => {
+              const labels = [
+                'Góc mặt trước', 
+                'Góc mặt sau', 
+                'Góc bên trái', 
+                'Góc bên phải', 
+                category === 'Tech' ? 'Tem mã vạch / Serial' : 'Bung lều thực tế'
+              ];
               return (
                 <div key={idx} className="space-y-2">
-                  <p className="text-[10px] font-semibold text-slate-600">
-                    {labels[idx]} {isRequired && <span className="text-red-500">*</span>}
+                  <p className="text-[10px] font-semibold text-slate-600 text-center truncate">
+                    {labels[idx]} <span className="text-red-500">*</span>
                   </p>
                   <div
                     className={`relative w-full aspect-square rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all group ${
@@ -529,16 +788,16 @@ const PostAsset = () => {
                           className="w-full h-full object-cover"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-1">
-                          <span className="material-symbols-outlined text-white text-2xl">edit</span>
-                          <span className="text-white text-[10px] font-bold">Đổi ảnh</span>
+                          <span className="material-symbols-outlined text-white text-lg">edit</span>
+                          <span className="text-white text-[9px] font-bold">Đổi ảnh</span>
                         </div>
                       </>
                     ) : (
-                      <div className="flex flex-col items-center gap-2 p-4 text-center">
-                        <span className="material-symbols-outlined text-slate-300 text-3xl group-hover:text-teal-400 transition-colors">
+                      <div className="flex flex-col items-center gap-1 p-2 text-center">
+                        <span className="material-symbols-outlined text-slate-350 text-xl group-hover:text-teal-400 transition-colors">
                           add_photo_alternate
                         </span>
-                        <span className="text-[10px] text-slate-400 font-medium">Nhấn để chọn ảnh</span>
+                        <span className="text-[9px] text-slate-400 leading-tight">Chọn ảnh</span>
                       </div>
                     )}
                   </div>
@@ -550,14 +809,14 @@ const PostAsset = () => {
                     onChange={(e) => handleFileChange(e, idx)}
                   />
                   {imgFiles[idx] && (
-                    <p className="text-[9px] text-slate-400 truncate">{imgFiles[idx].name}</p>
+                    <p className="text-[8px] text-slate-400 truncate text-center">{imgFiles[idx].name}</p>
                   )}
                 </div>
               );
             })}
           </div>
           <p className="text-[10px] text-slate-400">
-            * Ảnh chính bắt buộc. Ảnh sẽ được hiển thị cho người thuê — hãy chụp rõ nét, đủ ánh sáng.
+            * Yêu cầu chụp đủ 4 góc cạnh sản phẩm rõ nét kèm ảnh Serial thân máy (Tech) hoặc ảnh dựng lều thực tế (Camping) để AI thực hiện trích xuất và chống giả mạo.
           </p>
         </section>
 
@@ -565,7 +824,7 @@ const PostAsset = () => {
         <section className="space-y-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-slate-400">location_on</span>
-            5. Vị trí nhận đồ
+            5. Vĩ độ &amp; Kinh độ nhận đồ
           </h3>
 
           {/* GPS Button */}
@@ -600,7 +859,7 @@ const PostAsset = () => {
 
             {/* Location result */}
             {locationLabel && (
-              <div className="bg-white rounded-lg border border-teal-200 px-3 py-2 flex items-start gap-2">
+              <div className="bg-white rounded-lg border border-teal-200 px-3 py-2 flex items-start gap-2 animate-in fade-in duration-250">
                 <span className="material-symbols-outlined text-teal-500 text-sm mt-0.5">place</span>
                 <div>
                   <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide mb-0.5">Địa chỉ phát hiện</p>

@@ -27,9 +27,17 @@ connectDB();
 app.use(helmet({
   contentSecurityPolicy: false
 }));
-app.use(cors());
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(cors({
+  origin: function (origin, callback) {
+    // Cho phép mọi origin (từ Frontend web máy khác, hoặc Mobile app không có origin)
+    return callback(null, true);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 app.use(morgan('dev'));
 
 // Static folder for Frontend and Admin Panel

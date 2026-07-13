@@ -55,6 +55,17 @@ const userSchema = new mongoose.Schema({
     type: Boolean,
     default: false
   },
+  renterStatus: {
+    type: String,
+    enum: ['none', 'pending', 'approved', 'rejected'],
+    default: 'none'
+  },
+  renterOnboarding: {
+    cccdFront: { type: String, default: '' },
+    cccdBack: { type: String, default: '' },
+    cccdSelfie: { type: String, default: '' },
+    rejectReason: { type: String, default: '' }
+  },
   lenderStatus: {
     type: String,
     enum: ['none', 'pending', 'approved', 'rejected'],
@@ -70,6 +81,16 @@ const userSchema = new mongoose.Schema({
       accountHolder: { type: String, default: '' }
     },
     rejectReason: { type: String, default: '' }
+  },
+  isPhoneVerified: {
+    type: Boolean,
+    default: false
+  },
+  phoneVerificationOtp: {
+    type: String
+  },
+  phoneVerificationOtpExpires: {
+    type: Date
   },
   isBanned: {
     type: Boolean,

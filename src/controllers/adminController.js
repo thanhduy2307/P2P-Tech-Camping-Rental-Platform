@@ -35,6 +35,7 @@ exports.getStats = async (req, res) => {
 
     const pendingWithdrawalsCount = await WithdrawalRequest.countDocuments({ status: 'pending' });
     const pendingLenderAppsCount = await User.countDocuments({ lenderStatus: 'pending' });
+    const pendingRenterAppsCount = await User.countDocuments({ renterStatus: 'pending' });
 
     res.status(200).json({
       success: true,
@@ -49,7 +50,8 @@ exports.getStats = async (req, res) => {
         },
         pendingCounts: {
           withdrawals: pendingWithdrawalsCount,
-          lenderApplications: pendingLenderAppsCount
+          lenderApplications: pendingLenderAppsCount,
+          renterApplications: pendingRenterAppsCount
         }
       }
     });

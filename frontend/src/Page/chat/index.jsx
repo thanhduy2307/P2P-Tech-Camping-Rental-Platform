@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import api from '../../configs/axios';
@@ -197,7 +198,7 @@ const Chat = () => {
       }
     } catch (err) {
       console.error("Failed to send message:", err);
-      alert("Không thể gửi tin nhắn. Vui lòng thử lại.");
+      Swal.fire("Không thể gửi tin nhắn. Vui lòng thử lại.");
     } finally {
       setSending(false);
     }

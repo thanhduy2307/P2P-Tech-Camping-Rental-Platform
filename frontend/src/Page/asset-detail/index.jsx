@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
@@ -23,6 +24,7 @@ const AssetDetail = () => {
   const [endDate, setEndDate] = useState(searchParams.get('endDate') || '');
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
+  const [depositMethod, setDepositMethod] = useState('online');
 
   // Fetch asset details
   useEffect(() => {
@@ -30,38 +32,49 @@ const AssetDetail = () => {
       setLoading(true);
       setError('');
       try {
-        const response = await api.get(`/assets/${id}`);
+        const response = await api.get(`/assets/${id}?_t=${Date.now()}`);
         if (response.data && response.data.success) {
           const item = response.data.data;
           
           // Map DB categories for visual consistency if needed
-          let category = item.category || '';
-          let subCategory = item.subCategory || '';
-          const catLower = category.toLowerCase();
-          if (['tents', 'lều'].includes(catLower)) {
+          const nameLower = (item.name || '').toLowerCase();
+          const catLower = (item.category || '').toLowerCase();
+          
+          let category = 'Tech';
+          if (catLower === 'camping' || ['lều', 'tent', 'bếp', 'dã ngoại', 'cắm trại', 'balo', 'túi ngủ', 'bàn', 'ghế'].some(kw => nameLower.includes(kw))) {
             category = 'Camping';
-            subCategory = 'Tents';
-          } else if (['cookware', 'cooking', 'cook', 'bếp'].includes(catLower)) {
-            category = 'Camping';
-            subCategory = 'Cooking';
-          } else if (['furniture', 'bàn ghế', 'bàn', 'ghế'].includes(catLower)) {
-            category = 'Camping';
-            subCategory = 'Furniture';
-          } else if (['lighting', 'ánh sáng', 'đèn'].includes(catLower)) {
-            category = 'Camping';
-            subCategory = 'Lighting';
-          } else if (['backpacks', 'balo', 'túi'].includes(catLower)) {
-            category = 'Camping';
-            subCategory = 'Backpacks';
-          } else if (['cameras', 'máy ảnh', 'camera'].includes(catLower)) {
-            category = 'Tech';
-            subCategory = 'Máy ảnh';
-          } else if (['flycam', 'drone'].includes(catLower)) {
-            category = 'Tech';
-            subCategory = 'Flycam';
-          } else if (['audio', 'âm thanh', 'loa'].includes(catLower)) {
-            category = 'Tech';
-            subCategory = 'Máy ảnh';
+          }
+
+          // Determine subcategory
+          let subCategory = 'Khác';
+          if (category === 'Camping') {
+            if (['lều', 'tent', 'tăng', 'bạt', 'thảm', 'footprint', 'túi ngủ', 'đệm'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Lều & Thảm dã ngoại';
+            } else if (['bếp', 'nồi', 'chảo', 'stove', 'cook', 'gas', 'ấm', 'ly', 'chén', 'đĩa', 'vỉ nướng'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Bếp & Dụng cụ nấu ăn';
+            } else if (['bàn', 'ghế', 'table', 'chair', 'giường xếp'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Bàn ghế dã ngoại';
+            } else if (['đèn', 'pin', 'light', 'flashlight', 'đuốc'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Đèn & Thiết bị chiếu sáng';
+            } else if (['balo', 'backpack', 'túi', 'bag', 'rìu', 'dao', 'sinh tồn', 'hộp y tế'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Balo & Đồ sinh tồn';
+            } else {
+              subCategory = 'Lều & Thảm dã ngoại';
+            }
+          } else {
+            if (['máy ảnh', 'camera', 'lens', 'ống kính', 'gimbal', 'tripod', 'sony', 'canon', 'fuji', 'nikon'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Máy ảnh & Ống kính';
+            } else if (['flycam', 'drone', 'mavic', 'phantom', 'dji'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Flycam & Drone';
+            } else if (['loa', 'sound', 'speaker', 'tai nghe', 'headphone', 'micro', 'amp'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Loa & Thiết bị âm thanh';
+            } else if (['laptop', 'macbook', 'máy tính', 'pc', 'ram', 'ổ cứng', 'ssd'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Laptop & Phụ kiện';
+            } else if (['đèn', 'light', 'aputure', 'studio', 'softbox'].some(kw => nameLower.includes(kw))) {
+              subCategory = 'Đèn Studio & Ánh sáng';
+            } else {
+              subCategory = 'Máy ảnh & Ống kính';
+            }
           }
 
           setAsset({
@@ -100,7 +113,7 @@ const AssetDetail = () => {
   const originalDeposit = asset ? asset.depositAmount : 0;
   const hasReputationDiscount = user && user.reputationScore >= 4.8;
   const deposit = hasReputationDiscount ? Math.round(originalDeposit * 0.8) : originalDeposit;
-  const totalAmount = totalRent + deposit;
+  const totalAmount = depositMethod === 'cash' ? totalRent : (totalRent + deposit);
 
   // Format price helper (e.g. 120,000 -> 120k, 1,200,000 -> 1.2tr)
   const formatPrice = (price) => {
@@ -116,13 +129,24 @@ const AssetDetail = () => {
   // Handle Booking Submit
   const handleBooking = async () => {
     if (!token) {
-      alert('Vui lòng đăng nhập trước khi thuê đồ.');
+      Swal.fire('Vui lòng đăng nhập trước khi thuê đồ.');
       navigate('/login');
       return;
     }
 
     if (user && !user.isProfileCompleted) {
       setBookingError('Vui lòng hoàn thiện thông tin cá nhân (Số điện thoại và Địa chỉ) trong trang cá nhân trước khi thuê đồ.');
+      return;
+    }
+
+    if (user && user.renterStatus !== 'approved' && user.lenderStatus !== 'approved') {
+      let errorMsg = 'Vui lòng xác thực hình ảnh CCCD (eKYC Renter) trước khi thực hiện đặt thuê thiết bị.';
+      if (user.renterStatus === 'pending') {
+        errorMsg = 'Hồ sơ eKYC xác thực Renter của bạn đang được kiểm duyệt. Vui lòng quay lại sau.';
+      } else if (user.renterStatus === 'rejected') {
+        errorMsg = `Hồ sơ eKYC xác thực Renter bị từ chối. Lý do: "${user.renterOnboarding?.rejectReason || 'Ảnh không rõ ràng'}". Vui lòng nộp lại hồ sơ.`;
+      }
+      setBookingError(errorMsg);
       return;
     }
 
@@ -136,6 +160,23 @@ const AssetDetail = () => {
       return;
     }
 
+    // Validate blocked dates
+    const checkOverlap = (ranges) => {
+      if (!ranges) return false;
+      const s = new Date(startDate).setHours(0,0,0,0);
+      const e = new Date(endDate).setHours(0,0,0,0);
+      return ranges.some(range => {
+        const rs = new Date(range.startDate).setHours(0,0,0,0);
+        const re = new Date(range.endDate).setHours(0,0,0,0);
+        return s <= re && e >= rs;
+      });
+    };
+
+    if (checkOverlap(asset.blockedDates) || checkOverlap(asset.rentedDates)) {
+      setBookingError('Thiết bị đã được đặt hoặc bị khóa trong khoảng thời gian này. Vui lòng chọn ngày khác.');
+      return;
+    }
+
     setBookingLoading(true);
     setBookingError('');
 
@@ -143,7 +184,8 @@ const AssetDetail = () => {
       const response = await api.post('/orders', {
         assetId: asset._id,
         startDate,
-        endDate
+        endDate,
+        depositMethod
       });
 
       if (response.data && response.data.success) {
@@ -190,7 +232,7 @@ const AssetDetail = () => {
     : ['https://placehold.co/600x450?text=No+Image'];
 
   const selectedImage = assetImages[activeImageIndex] || assetImages[0];
-  const isTent = asset.category?.toLowerCase() === 'camping' && asset.subCategory?.toLowerCase() === 'tents';
+  const isTent = asset.category?.toLowerCase() === 'camping' && ['lều & thảm dã ngoại', 'tents'].includes(asset.subCategory?.toLowerCase());
 
   return (
     <div className="bg-surface text-on-surface antialiased flex flex-col min-h-screen selection:bg-primary-container selection:text-on-primary-container font-body-md">
@@ -242,11 +284,25 @@ const AssetDetail = () => {
                 />
                 {/* Badges Overlay */}
                 {asset.status === 'verified' && (
-                  <div className="absolute top-4 right-4 flex space-x-2">
-                    <span className="bg-surface-container-lowest/90 backdrop-blur text-primary font-label-sm text-label-sm px-3 py-1 rounded-full border border-primary/20 flex items-center shadow-sm font-semibold">
-                      <span className="material-symbols-outlined text-sm mr-1" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
-                      Verified Gear
-                    </span>
+                  <div className="absolute top-4 right-4 flex flex-col sm:flex-row gap-2">
+                    {asset.badges && asset.badges.length > 0 ? (
+                      asset.badges.map((b, bi) => (
+                        <span 
+                          key={bi}
+                          className="bg-emerald-950/90 text-emerald-300 backdrop-blur-md px-3.5 py-1.5 rounded-full text-xs font-extrabold flex items-center shadow-lg border border-emerald-500/30 tracking-wide animate-in fade-in zoom-in-90 duration-300"
+                        >
+                          <span className="material-symbols-outlined text-sm mr-1 text-emerald-450" style={{ fontVariationSettings: "'FILL' 1" }}>
+                            {b.includes('tận nơi') ? 'motorcycle' : 'verified_user'}
+                          </span>
+                          {b}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="bg-surface-container-lowest/90 backdrop-blur text-primary font-label-sm text-label-sm px-3 py-1 rounded-full border border-primary/20 flex items-center shadow-sm font-semibold">
+                        <span className="material-symbols-outlined text-sm mr-1" style={{ fontVariationSettings: "'FILL' 1" }}>verified</span>
+                        Verified Gear
+                      </span>
+                    )}
                   </div>
                 )}
               </div>
@@ -394,7 +450,7 @@ const AssetDetail = () => {
                 <button 
                   onClick={() => {
                     if (!token) {
-                      alert('Vui lòng đăng nhập trước khi liên hệ.');
+                      Swal.fire('Vui lòng đăng nhập trước khi liên hệ.');
                       navigate('/login');
                       return;
                     }
@@ -441,6 +497,81 @@ const AssetDetail = () => {
               </div>
             </div>
 
+            {/* Reviews / Testimonials Section */}
+            <div className="border-t border-outline-variant pt-8">
+              <h2 className="font-title-md text-title-md text-on-surface mb-6 font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary text-[28px]">reviews</span>
+                Đánh giá từ khách thuê ({asset.reviews?.length || 0})
+              </h2>
+
+              {(!asset.reviews || asset.reviews.length === 0) ? (
+                <div className="bg-slate-50 border border-slate-100 rounded-xl p-8 text-center text-slate-400 text-xs">
+                  <span className="material-symbols-outlined text-3xl mb-2 text-slate-300">chat_bubble</span>
+                  <p className="font-medium">Chưa có đánh giá nào cho sản phẩm này.</p>
+                  <p className="text-[10px] mt-0.5 text-slate-300">Những khách hàng đã thuê đồ dã ngoại tại đây sẽ để lại phản hồi sau khi hoàn tất trả hàng.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Reviews Statistics Header */}
+                  <div className="flex items-center gap-4 bg-slate-50 p-4 rounded-xl border border-slate-150/60 mb-6">
+                    <div className="text-center shrink-0 border-r border-slate-200 pr-6">
+                      <div className="text-3xl font-extrabold text-slate-800">
+                        {(asset.reviews.reduce((acc, r) => acc + r.lenderRating, 0) / asset.reviews.length).toFixed(1)}
+                      </div>
+                      <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5 font-mono">/ 5.0</div>
+                    </div>
+                    <div className="text-xs text-slate-500 space-y-1">
+                      <p className="font-semibold text-slate-700">Chất lượng dịch vụ & thiết bị</p>
+                      <p className="leading-relaxed">Khách hàng phản hồi tích cực và hài lòng về chất lượng đồ dùng cắm trại cùng sự nhiệt tình của chủ đồ.</p>
+                    </div>
+                  </div>
+
+                  {/* Reviews List */}
+                  <div className="divide-y divide-slate-100">
+                    {asset.reviews.map((rev) => (
+                      <div key={rev._id} className="py-4 first:pt-0 last:pb-0 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-full overflow-hidden bg-slate-150 border border-slate-200 shrink-0">
+                              {rev.renter?.avatar ? (
+                                <img src={rev.renter.avatar} alt="Avatar" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center font-bold text-slate-650 bg-slate-200 text-xs">
+                                  {rev.renter?.name ? rev.renter.name.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <strong className="text-xs text-slate-850 block">{rev.renter?.name || 'Thành viên EquipPeer'}</strong>
+                              <span className="text-[9px] text-slate-400">
+                                {new Date(rev.createdAt).toLocaleDateString('vi-VN')}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Star rating display */}
+                          <div className="flex items-center text-amber-500 gap-0.5">
+                            {[...Array(5)].map((_, i) => (
+                              <span 
+                                key={i} 
+                                className="material-symbols-outlined text-sm"
+                                style={{ fontVariationSettings: i < rev.lenderRating ? "'FILL' 1" : "'FILL' 0" }}
+                              >
+                                star
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-slate-700 leading-relaxed font-body-md pl-12">
+                          {rev.lenderComment || 'Đánh giá 5 sao từ khách thuê.'}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
           </div>
 
           {/* Right Column: Sticky Rental Sidebar (Span 4) */}
@@ -461,6 +592,11 @@ const AssetDetail = () => {
                   {bookingError.includes('trang cá nhân') && (
                     <Link to="/profile" className="underline text-primary hover:text-primary-container font-bold block mt-1">
                       Đi tới trang cá nhân ngay &rarr;
+                    </Link>
+                  )}
+                  {(bookingError.includes('xác thực hình ảnh CCCD') || bookingError.includes('xác thực Renter bị từ chối')) && (
+                    <Link to="/renter-ekyc" className="underline text-primary hover:text-primary-container font-bold block mt-1">
+                      Xác thực CCCD ngay &rarr;
                     </Link>
                   )}
                 </div>
@@ -513,13 +649,94 @@ const AssetDetail = () => {
                 </div>
               </div>
 
+              {/* Unavailable Dates Alert */}
+              <div className="mb-4 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                <h4 className="text-[11px] font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-sm">event_busy</span>
+                  Các ngày không khả dụng
+                </h4>
+                {((asset.blockedDates && asset.blockedDates.length > 0) || (asset.rentedDates && asset.rentedDates.length > 0)) ? (
+                  <ul className="text-[11px] text-amber-700 space-y-1 pl-1">
+                    {[...(asset.blockedDates || []), ...(asset.rentedDates || [])]
+                      .sort((a, b) => new Date(a.startDate) - new Date(b.startDate))
+                      .map((range, idx) => (
+                        <li key={idx} className="flex items-center gap-1.5">
+                          <span className="w-1 h-1 rounded-full bg-amber-400"></span>
+                          <span>
+                            {new Date(range.startDate).toLocaleDateString('vi-VN')} - {new Date(range.endDate).toLocaleDateString('vi-VN')}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                ) : (
+                  <p className="text-[11px] text-amber-600 italic pl-1">Hiện chưa có lịch bận nào.</p>
+                )}
+                <p className="text-[10px] text-amber-600 italic mt-2 leading-tight">
+                  * Vui lòng không chọn ngày nhận/trả nằm trong hoặc chứa các khoảng thời gian trên.
+                </p>
+              </div>
+
               {/* Duration / Guests */}
-              <div className="border border-outline-variant rounded-xl p-3 mb-6 cursor-pointer hover:bg-surface-container-low transition-colors flex justify-between items-center">
+              <div className="border border-outline-variant rounded-xl p-3 mb-4 cursor-pointer hover:bg-surface-container-low transition-colors flex justify-between items-center">
                 <div>
                   <label className="block font-label-sm text-xs text-on-surface-variant uppercase mb-1 font-bold">Số lượng</label>
                   <div className="font-title-md text-on-surface text-sm font-semibold">1 Thiết bị</div>
                 </div>
                 <span className="material-symbols-outlined text-outline">expand_more</span>
+              </div>
+
+              {/* Deposit Method Selection */}
+              <div className="border border-outline-variant rounded-xl p-4 mb-6 bg-surface-container-low">
+                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-3">Hình thức đặt cọc</label>
+                <div className="space-y-3">
+                  {/* Online Deposit */}
+                  <label className="flex items-start gap-2.5 cursor-pointer">
+                    <input 
+                      type="radio" 
+                      name="depositMethod" 
+                      value="online" 
+                      checked={depositMethod === 'online'}
+                      onChange={() => setDepositMethod('online')}
+                      className="mt-0.5 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-on-surface flex items-center gap-1">
+                        Ký quỹ online qua sàn
+                        <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">Khuyên dùng</span>
+                      </span>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5 leading-relaxed">
+                        Tạm giữ an toàn qua VNPay, tự động hoàn trả 100% về ví ngay khi trả đồ thành công. Hỗ trợ giải quyết tranh chấp.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* Cash Deposit */}
+                  <label className="flex items-start gap-2.5 cursor-pointer border-t border-outline-variant/35 pt-3">
+                    <input 
+                      type="radio" 
+                      name="depositMethod" 
+                      value="cash" 
+                      checked={depositMethod === 'cash'}
+                      onChange={() => setDepositMethod('cash')}
+                      className="mt-0.5 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-on-surface">Cọc tiền mặt trực tiếp</span>
+                      <p className="text-[10px] text-on-surface-variant mt-0.5 leading-relaxed">
+                        Chỉ thanh toán trước tiền thuê online. Tự giao nhận tiền cọc mặt với chủ đồ khi gặp mặt.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+
+                {depositMethod === 'cash' && (
+                  <div className="bg-amber-50 border border-amber-250 text-amber-900 p-3 rounded-lg text-[10px] font-semibold mt-3 leading-relaxed flex gap-1.5">
+                    <span className="material-symbols-outlined text-sm text-amber-600 shrink-0">warning</span>
+                    <span>
+                      Bạn chọn cọc tiền mặt trực tiếp. Sàn miễn trừ mọi trách nhiệm pháp lý nếu xảy ra mất mát, lừa đảo tiền cọc mặt ngoài hệ thống.
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Summary Details */}
@@ -531,7 +748,7 @@ const AssetDetail = () => {
                   </div>
                   <div className="flex justify-between items-center font-body-md text-sm text-on-surface-variant">
                     <span className="underline cursor-pointer flex items-center gap-1">
-                      Ký quỹ đặt cọc
+                      {depositMethod === 'cash' ? 'Đặt cọc trực tiếp (Tiền mặt)' : 'Ký quỹ đặt cọc online'}
                       <span className="material-symbols-outlined text-xs text-outline cursor-help" title="Số tiền này sẽ được hoàn trả 100% sau khi giao trả đồ thành công">help</span>
                       {hasReputationDiscount && (
                         <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold ml-1.5 flex items-center gap-0.5">
@@ -552,11 +769,13 @@ const AssetDetail = () => {
                     </div>
                   </div>
                   <div className="border-t border-outline-variant/50 pt-3 flex justify-between font-title-md text-on-surface font-bold">
-                    <span>Tổng tạm tính</span>
+                    <span>Tổng thanh toán online</span>
                     <span className="text-primary">{totalAmount.toLocaleString('vi-VN')} đ</span>
                   </div>
                   <p className="text-center font-body-md text-[10px] text-on-surface-variant mt-2 italic">
-                    * Renter sẽ được hoàn lại {deposit.toLocaleString('vi-VN')} đ tiền đặt cọc sau khi kết thúc đơn hàng.
+                    {depositMethod === 'cash' 
+                      ? '* Tiền cọc sẽ tự bàn giao & hoàn lại bằng tiền mặt trực tiếp giữa hai bên khi giao trả đồ.'
+                      : `* Renter sẽ được hoàn lại ${deposit.toLocaleString('vi-VN')} đ tiền đặt cọc sau khi kết thúc đơn hàng.`}
                   </p>
                 </div>
               )}

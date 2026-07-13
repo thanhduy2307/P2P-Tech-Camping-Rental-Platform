@@ -16,6 +16,7 @@ import AssetDetail from './Page/asset-detail';
 import Orders from './Page/orders';
 import Profile from './Page/profile';
 import LenderOnboarding from './Page/lender-onboarding';
+import RenterEkyc from './Page/renter-ekyc';
 import PostAsset from './Page/post-asset';
 import LenderInventory from './Page/lender-inventory';
 import LenderOrders from './Page/lender-orders';
@@ -54,6 +55,7 @@ function App() {
             <Route path="/reviews" element={<Reviews />} />
             <Route path="/notifications" element={<Notifications />} />
             <Route path="/lender-onboarding" element={<LenderOnboarding />} />
+            <Route path="/renter-ekyc" element={<RenterEkyc />} />
           </Route>
         </Route>
 

@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../../configs/axios';
@@ -49,24 +50,44 @@ const Blogs = () => {
         if (assetsRes.data && assetsRes.data.success) {
           // Map DB categories for visual consistency
           const mapped = assetsRes.data.data.map(item => {
-            let category = item.category || '';
-            let subCategory = item.subCategory || '';
-            const catLower = category.toLowerCase();
-            if (['tents', 'lều'].includes(catLower)) {
+            const nameLower = (item.name || '').toLowerCase();
+            const catLower = (item.category || '').toLowerCase();
+            
+            let category = 'Tech';
+            if (catLower === 'camping' || ['lều', 'tent', 'bếp', 'dã ngoại', 'cắm trại', 'balo', 'túi ngủ', 'bàn', 'ghế'].some(kw => nameLower.includes(kw))) {
               category = 'Camping';
-              subCategory = 'Tents';
-            } else if (['cookware', 'cooking', 'cook', 'bếp'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Cooking';
-            } else if (['furniture', 'bàn ghế', 'bàn', 'ghế'].includes(catLower)) {
-              category = 'Camping';
-              subCategory = 'Furniture';
-            } else if (['cameras', 'máy ảnh', 'camera'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Máy ảnh';
-            } else if (['flycam', 'drone'].includes(catLower)) {
-              category = 'Tech';
-              subCategory = 'Flycam';
+            }
+
+            // Determine subcategory
+            let subCategory = 'Khác';
+            if (category === 'Camping') {
+              if (['lều', 'tent', 'tăng', 'bạt', 'thảm', 'footprint', 'túi ngủ', 'đệm'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Lều & Thảm dã ngoại';
+              } else if (['bếp', 'nồi', 'chảo', 'stove', 'cook', 'gas', 'ấm', 'ly', 'chén', 'đĩa', 'vỉ nướng'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Bếp & Dụng cụ nấu ăn';
+              } else if (['bàn', 'ghế', 'table', 'chair', 'giường xếp'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Bàn ghế dã ngoại';
+              } else if (['đèn', 'pin', 'light', 'flashlight', 'đuốc'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Đèn & Thiết bị chiếu sáng';
+              } else if (['balo', 'backpack', 'túi', 'bag', 'rìu', 'dao', 'sinh tồn', 'hộp y tế'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Balo & Đồ sinh tồn';
+              } else {
+                subCategory = 'Lều & Thảm dã ngoại';
+              }
+            } else {
+              if (['máy ảnh', 'camera', 'lens', 'ống kính', 'gimbal', 'tripod', 'sony', 'canon', 'fuji', 'nikon'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Máy ảnh & Ống kính';
+              } else if (['flycam', 'drone', 'mavic', 'phantom', 'dji'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Flycam & Drone';
+              } else if (['loa', 'sound', 'speaker', 'tai nghe', 'headphone', 'micro', 'amp'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Loa & Thiết bị âm thanh';
+              } else if (['laptop', 'macbook', 'máy tính', 'pc', 'ram', 'ổ cứng', 'ssd'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Laptop & Phụ kiện';
+              } else if (['đèn', 'light', 'aputure', 'studio', 'softbox'].some(kw => nameLower.includes(kw))) {
+                subCategory = 'Đèn Studio & Ánh sáng';
+              } else {
+                subCategory = 'Máy ảnh & Ống kính';
+              }
             }
             return { ...item, category, subCategory };
           });
@@ -124,7 +145,7 @@ const Blogs = () => {
   // Handle Like Toggle
   const handleLike = async (postId) => {
     if (!token) {
-      alert('Vui lòng đăng nhập để thích bài viết.');
+      Swal.fire('Vui lòng đăng nhập để thích bài viết.');
       navigate('/login');
       return;
     }
@@ -156,7 +177,7 @@ const Blogs = () => {
   const handleCommentSubmit = async (e, postId) => {
     e.preventDefault();
     if (!token) {
-      alert('Vui lòng đăng nhập để bình luận.');
+      Swal.fire('Vui lòng đăng nhập để bình luận.');
       navigate('/login');
       return;
     }
@@ -191,7 +212,7 @@ const Blogs = () => {
   // Handle AI Content Generation
   const handleAIGenerate = async () => {
     if (!selectedAssetId) {
-      alert('Vui lòng chọn một thiết bị để viết bài PR/Review.');
+      Swal.fire('Vui lòng chọn một thiết bị để viết bài PR/Review.');
       return;
     }
     
@@ -208,11 +229,11 @@ const Blogs = () => {
         setContent(aiContent || '');
         setShowAIPanel(false);
       } else {
-        alert('Sinh nội dung AI thất bại. Vui lòng tự nhập.');
+        Swal.fire('Sinh nội dung AI thất bại. Vui lòng tự nhập.');
       }
     } catch (err) {
       console.error(err);
-      alert('Lỗi kết nối với Gemini AI.');
+      Swal.fire('Lỗi kết nối với Gemini AI.');
     } finally {
       setAiLoading(false);
     }
@@ -232,7 +253,7 @@ const Blogs = () => {
       setImagePreview(base64);
     } catch (err) {
       console.error("Failed to convert image to base64:", err);
-      alert("Không thể đọc file ảnh.");
+      Swal.fire("Không thể đọc file ảnh.");
     }
   };
 
@@ -240,7 +261,7 @@ const Blogs = () => {
   const handleCreatePost = async (e) => {
     e.preventDefault();
     if (!token) {
-      alert('Vui lòng đăng nhập trước khi đăng bài.');
+      Swal.fire('Vui lòng đăng nhập trước khi đăng bài.');
       navigate('/login');
       return;
     }

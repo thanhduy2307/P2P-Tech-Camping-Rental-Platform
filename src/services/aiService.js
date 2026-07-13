@@ -392,3 +392,140 @@ ${userRequest ? `Ghi chú thêm: ${userRequest}` : 'Các bạn nào chuẩn bị
     aiSource: "Local Fallback Simulation"
   };
 }
+
+/**
+ * Helper to call Gemini with an image part + text prompt.
+ */
+const callGeminiWithImage = (mimeType, base64Data, textPrompt) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return reject(new Error('GEMINI_API_KEY is not configured in .env file'));
+    }
+
+    const data = JSON.stringify({
+      contents: [{
+        parts: [
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Data
+            }
+          },
+          {
+            text: textPrompt
+          }
+        ]
+      }]
+    });
+
+    let isSettled = false;
+    const timer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        req.destroy();
+        reject(new Error('Gemini API image request global timeout (60s)'));
+      }
+    }, 60000);
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (isSettled) return;
+        clearTimeout(timer);
+        isSettled = true;
+        try {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Gemini API error (Status ${res.statusCode}): ${body}`));
+          }
+          const json = JSON.parse(body);
+          if (json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts[0]) {
+            resolve(json.candidates[0].content.parts[0].text);
+          } else {
+            reject(new Error(`Invalid response structure from Gemini API: ${body}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      if (isSettled) return;
+      clearTimeout(timer);
+      isSettled = true;
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+};
+
+/**
+ * AI-powered Image Anti-Fraud Scan.
+ */
+exports.scanImageForFraud = async (imageB64) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey || !imageB64) {
+    return {
+      isCopied: false,
+      reason: "[Dự phòng] Mô phỏng quét ảnh chống giả: Ảnh chụp thực tế của sản phẩm không phát hiện watermark hoặc nguồn sao chép trực tuyến.",
+      aiSource: "Local Fallback Simulation"
+    };
+  }
+
+  try {
+    let mimeType = 'image/jpeg';
+    let base64Data = imageB64;
+
+    if (imageB64.startsWith('data:')) {
+      const parts = imageB64.split(';base64,');
+      if (parts.length === 2) {
+        mimeType = parts[0].replace('data:', '');
+        base64Data = parts[1];
+      }
+    }
+
+    const prompt = `
+Bạn là chuyên gia thẩm định và phòng chống gian lận thương mại điện tử P2P.
+Hãy phân tích bức ảnh sản phẩm này để kiểm duyệt:
+1. Phát hiện xem ảnh có bị lấy từ trên mạng không (ví dụ: ảnh stock photo chuyên nghiệp, ảnh của hãng sản xuất, ảnh có watermark chìm của các trang thương mại điện tử khác như Shopee, Lazada, Amazon, hoặc web khác).
+2. Phát hiện xem ảnh có bị chụp lại từ màn hình điện thoại hoặc máy tính khác để làm giả hình thức không.
+3. Nếu ảnh chụp thực tế và trung thực, hãy báo cáo là an toàn. Nếu ảnh là ảnh mạng hoặc sao chép, hãy đánh dấu là gian lận.
+
+Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
+{
+  "isCopied": true_hoặc_false,
+  "reason": "Giải thích chi tiết bằng tiếng Việt về lý do đánh giá (nêu rõ các đặc điểm phát hiện)."
+}
+Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
+`;
+
+    const aiResponse = await callGeminiWithImage(mimeType, base64Data, prompt);
+    const parsed = cleanAndParseJSON(aiResponse);
+    parsed.aiSource = "Gemini AI";
+    return parsed;
+  } catch (error) {
+    console.error('Error in scanImageForFraud with AI, falling back to local:', error.message);
+    return {
+      isCopied: false,
+      reason: `[Dự phòng - Lỗi API] Quét ảnh chống giả tạm tính: Ảnh chụp hợp lệ. Chi tiết lỗi: ${error.message}`,
+      aiSource: "Local Fallback Simulation"
+    };
+  }
+};
+

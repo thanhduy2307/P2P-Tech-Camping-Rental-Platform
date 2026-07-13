@@ -1,3 +1,4 @@
+import Swal from 'sweetalert2';
 import React, { useState, useEffect, useRef } from 'react';
 import api from '../../configs/axios';
 
@@ -77,7 +78,7 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
       }
     } catch (err) {
       console.error("Failed to send message:", err);
-      alert("Không thể gửi tin nhắn.");
+      Swal.fire("Không thể gửi tin nhắn.");
     } finally {
       setSending(false);
     }
