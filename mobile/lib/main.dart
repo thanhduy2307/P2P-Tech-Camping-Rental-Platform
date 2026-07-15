@@ -19,7 +19,7 @@ import 'package:velox_mobile/screens/lender/lender_dashboard_screen.dart';
 import 'package:velox_mobile/screens/lender/post_asset_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
-import 'package:velox_mobile/core/constants.dart';
+import 'package:velox_mobile/core/theme.dart';
 
 class AppRoutes {
   static const splash = '/';
@@ -57,14 +57,15 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
       ],
       child: MaterialApp(
-        title: 'VeloX',
+        title: 'EquipPeer',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primaryColor: const Color(AppConstants.primaryColorValue),
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(AppConstants.primaryColorValue)),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.light,
+        builder: (context, child) {
+          return MediaQuery(
+            data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.0)),
+            child: child!,
+          );
+        },
         initialRoute: AppRoutes.splash,
         routes: {
           AppRoutes.splash: (_) => const SplashScreen(),

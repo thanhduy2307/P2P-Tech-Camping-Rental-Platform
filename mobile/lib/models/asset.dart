@@ -15,6 +15,8 @@ class Asset {
   final String? lenderName;
   final String? lenderAvatar;
   final double? distance;
+  final double? rating;
+  final int? ratingCount;
   final List<String> badges;
 
   Asset({
@@ -34,6 +36,8 @@ class Asset {
     this.lenderName,
     this.lenderAvatar,
     this.distance,
+    this.rating,
+    this.ratingCount,
     this.badges = const [],
   });
 
@@ -59,6 +63,10 @@ class Asset {
       distance: json['distance'] != null
           ? (json['distance'] as num).toDouble()
           : null,
+      rating: json['avgRating'] != null
+          ? (json['avgRating'] as num).toDouble()
+          : (json['rating'] != null ? (json['rating'] as num).toDouble() : null),
+      ratingCount: json['ratingCount'] != null ? (json['ratingCount'] as num).toInt() : null,
       badges: _toStringList(json['badges']),
     );
   }

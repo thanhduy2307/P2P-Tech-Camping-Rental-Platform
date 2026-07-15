@@ -3,29 +3,23 @@ import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/widgets/asset_card.dart';
 import 'package:velox_mobile/widgets/common.dart';
-import 'package:velox_mobile/screens/home/asset_detail_screen.dart';
-import 'package:velox_mobile/screens/orders/my_orders_screen.dart';
-import 'package:velox_mobile/screens/chat/conversations_screen.dart';
-import 'package:velox_mobile/screens/profile/profile_screen.dart';
+import 'package:velox_mobile/widgets/app_shell.dart';
 
 class BrowseScreen extends StatelessWidget {
   const BrowseScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Khám phá thiết bị'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.auto_awesome),
-            tooltip: 'AI gợi ý theo nhu cầu',
-            onPressed: () => _showAiRecommend(context),
-          ),
-        ],
+    return MainScaffold(
+      currentIndex: 0,
+      body: const _BrowseBody(),
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF10B981),
+        foregroundColor: const Color(0xFF005236),
+        tooltip: 'AI gợi ý theo nhu cầu',
+        onPressed: () => _showAiRecommend(context),
+        child: const Icon(Icons.auto_awesome),
       ),
-      body: const _AssetList(),
-      bottomNavigationBar: _HomeNavBar(current: 0),
     );
   }
 
@@ -43,15 +37,12 @@ class BrowseScreen extends StatelessWidget {
             TextField(
               controller: ctrl,
               maxLines: 2,
-              decoration:
-                  const InputDecoration(hintText: 'Nhu cầu của bạn...'),
+              decoration: const InputDecoration(hintText: 'Nhu cầu của bạn...'),
             ),
           ],
         ),
         actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Hủy')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
@@ -63,13 +54,10 @@ class BrowseScreen extends StatelessWidget {
                   builder: (_) => AlertDialog(
                     title: const Text('Gợi ý từ AI'),
                     content: SingleChildScrollView(
-                      child: Text(data['recommendations']?.toString() ??
-                          'Không có gợi ý.'),
+                      child: Text(data['recommendations']?.toString() ?? 'Không có gợi ý.'),
                     ),
                     actions: [
-                      TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Đóng')),
+                      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
                     ],
                   ),
                 );
@@ -85,17 +73,22 @@ class BrowseScreen extends StatelessWidget {
   }
 }
 
-class _AssetList extends StatefulWidget {
-  const _AssetList();
+class _BrowseBody extends StatefulWidget {
+  const _BrowseBody();
 
   @override
-  State<_AssetList> createState() => _AssetListState();
+  State<_BrowseBody> createState() => _BrowseBodyState();
 }
 
-class _AssetListState extends State<_AssetList> {
+class _BrowseBodyState extends State<_BrowseBody> {
   List<Asset> _assets = [];
   bool _loading = true;
   String _query = '';
+  String _category = 'Tất cả';
+
+  final List<String> _categories = [
+    'Tất cả', 'Công nghệ', 'Cắm trại', 'Blogs'
+  ];
 
   @override
   void initState() {
@@ -114,79 +107,122 @@ class _AssetListState extends State<_AssetList> {
     }
   }
 
+  List<Asset> get _filtered {
+    return _assets.where((a) {
+      final matchQ = a.name.toLowerCase().contains(_query.toLowerCase()) ||
+          a.category.toLowerCase().contains(_query.toLowerCase());
+      final matchC = _category == 'Tất cả' || a.category == _category;
+      return matchQ && matchC;
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filtered = _assets
-        .where((a) =>
-            a.name.toLowerCase().contains(_query.toLowerCase()) ||
-            a.category.toLowerCase().contains(_query.toLowerCase()))
-        .toList();
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(12),
-          child: TextField(
-            onChanged: (v) => setState(() => _query = v),
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'Tìm kiếm thiết bị...',
-              border: OutlineInputBorder(),
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: CustomScrollView(
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Khám phá thiết bị cắm trại',
+                    style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800, fontSize: 22),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text('Thuê thiết bị chất lượng từ cộng đồng EquipPeer',
+                      style: TextStyle(fontSize: 14, color: Color(0xFF3C4A42))),
+                  const SizedBox(height: 14),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF1F4F2),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBBCABF)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.search, color: Color(0xFF3C4A42)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            onChanged: (v) => setState(() => _query = v),
+                            decoration: const InputDecoration(
+                              hintText: 'Tìm kiếm thiết bị...',
+                              border: InputBorder.none,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    height: 36,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _categories.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 8),
+                      itemBuilder: (_, i) {
+                        final c = _categories[i];
+                        final active = c == _category;
+                        return GestureDetector(
+                          onTap: () => setState(() => _category = c),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: active ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEDF0EE),
+                              borderRadius: BorderRadius.circular(999),
+                              border: active
+                                  ? Border.all(color: const Color(0xFF10B981))
+                                  : null,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              c,
+                              style: TextStyle(
+                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                color: active ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        Expanded(
-          child: _loading
-              ? const Center(child: CircularProgressIndicator())
-              : filtered.isEmpty
-                  ? const Center(child: Text('Không có thiết bị nào.'))
-                  : RefreshIndicator(
-                      onRefresh: _load,
-                      child: ListView.builder(
-                        itemCount: filtered.length,
-                        itemBuilder: (_, i) => AssetCard(
-                          asset: filtered[i],
-                          onTap: () => Navigator.pushNamed(
-                              context, '/asset-detail',
-                              arguments: filtered[i].id),
-                        ),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-}
-
-class _HomeNavBar extends StatelessWidget {
-  final int current;
-  const _HomeNavBar({this.current = 0});
-
-  @override
-  Widget build(BuildContext context) {
-    return BottomNavigationBar(
-      currentIndex: current,
-      type: BottomNavigationBarType.fixed,
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Khám phá'),
-        BottomNavigationBarItem(icon: Icon(Icons.receipt_long), label: 'Đơn'),
-        BottomNavigationBarItem(icon: Icon(Icons.chat), label: 'Chat'),
-        BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Tôi'),
-      ],
-      onTap: (i) {
-        switch (i) {
-          case 0:
-            break;
-          case 1:
-            Navigator.pushNamed(context, '/my-orders');
-            break;
-          case 2:
-            Navigator.pushNamed(context, '/conversations');
-            break;
-          case 3:
-            Navigator.pushNamed(context, '/profile');
-            break;
-        }
-      },
+          if (_loading)
+            const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
+          else if (_filtered.isEmpty)
+            const SliverFillRemaining(child: Center(child: Text('Không có thiết bị nào.')))
+          else
+            SliverPadding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              sliver: SliverGrid(
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 14,
+                  crossAxisSpacing: 14,
+                  childAspectRatio: 0.72,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (_, i) => AssetCard(
+                    asset: _filtered[i],
+                    onTap: () => Navigator.pushNamed(context, '/asset-detail',
+                        arguments: _filtered[i].id),
+                  ),
+                  childCount: _filtered.length,
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 }
