@@ -24,8 +24,13 @@ const Orders = () => {
   const [extensionDays, setExtensionDays] = useState(1);
   const [extensionLoading, setExtensionLoading] = useState(false);
 
+  // Image drafts for handover and return
+  const [handoverDrafts, setHandoverDrafts] = useState({});
+  const [returnDrafts, setReturnDrafts] = useState({});
+
   // Dispute states
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
+  const [selectedOrderForDispute, setSelectedOrderForDispute] = useState(null);
   const [disputeNotes, setDisputeNotes] = useState('');
   
   const [defenseModalOpen, setDefenseModalOpen] = useState(false);
@@ -79,7 +84,10 @@ const Orders = () => {
     e.preventDefault();
     if (!disputeNotes.trim()) return Swal.fire('Vui lòng nhập lý do khiếu nại');
     try {
-      const response = await api.put(`/orders/${selectedOrderForDispute}/dispute`, { disputeNotes });
+      const response = await api.put(`/orders/${selectedOrderForDispute}/dispute`, { 
+        disputeNotes,
+        disputeType: 'quality_issue' 
+      });
       if (response.data?.success) {
         Swal.fire('Thành công', 'Đã gửi khiếu nại. Vui lòng chờ Admin phân xử.', 'success');
         setDisputeModalOpen(false);
@@ -88,6 +96,30 @@ const Orders = () => {
       }
     } catch (err) {
       Swal.fire('Lỗi', err.response?.data?.message || 'Lỗi khi gửi khiếu nại', 'error');
+    }
+  };
+
+  const handleAcceptDeduction = async (orderId) => {
+    const _swalRes = await Swal.fire({
+      title: 'Xác nhận đền bù',
+      text: 'Bạn có chắc chắn đồng ý với khoản đền bù này không? Hệ thống sẽ tự động trừ tiền cọc.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Đồng ý đền bù',
+      cancelButtonText: 'Không đồng ý'
+    });
+    
+    if (!_swalRes.isConfirmed) return;
+    
+    try {
+      const response = await api.put(`/orders/${orderId}/accept-deduction`);
+      if (response.data?.success) {
+        Swal.fire('Thành công', 'Đã xác nhận đền bù. Đơn hàng hoàn tất.', 'success');
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      Swal.fire('Lỗi', err.response?.data?.message || 'Lỗi xác nhận đền bù', 'error');
     }
   };
 
@@ -111,10 +143,27 @@ const Orders = () => {
     const confirmMsg = orderStatus === 'reserved'
       ? 'Bạn có chắc chắn muốn hủy đơn hàng ĐÃ ĐẶT CỌC này không? Tùy theo thời gian hủy so với lúc nhận đồ, bạn có thể bị trừ tiền cọc.'
       : 'Bạn có chắc chắn muốn hủy đơn hàng chưa thanh toán này không?';
-    const _swalRes = await Swal.fire({title: confirmMsg, showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
+
+    const _swalRes = await Swal.fire({
+      title: confirmMsg,
+      input: 'textarea',
+      inputLabel: 'Lý do hủy đơn',
+      inputPlaceholder: 'Vui lòng nhập lý do hủy đơn...',
+      inputValidator: (value) => {
+        if (!value) {
+          return 'Bạn cần nhập lý do hủy đơn!';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: "Đồng ý",
+      cancelButtonText: "Hủy"
+    });
+
     if (!_swalRes.isConfirmed) return;
+    const reason = _swalRes.value;
+
     try {
-      const response = await api.put(`/orders/${orderId}/cancel`);
+      const response = await api.put(`/orders/${orderId}/cancel`, { reason });
       if (response.data?.success) {
         Swal.fire(response.data.message || 'Hủy đơn hàng thành công.');
         // Re-fetch to update list
@@ -180,6 +229,64 @@ const Orders = () => {
 
     fetchOrders();
   }, [token]);
+
+  const handlePickSingleImage = (orderId, type, index) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.click();
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = () => {
+        if (type === 'handover') {
+          setHandoverDrafts(prev => {
+            const current = prev[orderId] || ['', '', ''];
+            const next = [...current];
+            next[index] = reader.result;
+            return { ...prev, [orderId]: next };
+          });
+        } else {
+          setReturnDrafts(prev => {
+            const current = prev[orderId] || ['', '', ''];
+            const next = [...current];
+            next[index] = reader.result;
+            return { ...prev, [orderId]: next };
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    };
+  };
+
+  const handleSubmitHandoverImages = async (orderId) => {
+    const images = handoverDrafts[orderId] || [];
+    if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    try {
+      const res = await api.put(`/orders/${orderId}/renter-handover-images`, { images });
+      if (res.data?.success) {
+        Swal.fire('Tải ảnh thành công! Bạn có thể xem mã OTP.');
+        window.location.reload();
+      }
+    } catch (err) {
+      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
+
+  const handleSubmitReturnImages = async (orderId) => {
+    const images = returnDrafts[orderId] || [];
+    if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    try {
+      const res = await api.put(`/orders/${orderId}/renter-return-images`, { images });
+      if (res.data?.success) {
+        Swal.fire('Tải ảnh trả đồ thành công! Bạn có thể xem mã OTP.');
+        window.location.reload();
+      }
+    } catch (err) {
+      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+    }
+  };
 
   // Filter orders by active tab status
   const getFilteredOrders = () => {
@@ -403,6 +510,52 @@ const Orders = () => {
                             <span>Quá hạn trả đồ! Bạn sẽ bị phạt 150% giá thuê cho mỗi ngày trả muộn.</span>
                           </div>
                         )}
+
+                        {/* Exact Pickup Location (Unlocked after deposit) */}
+                        {order.status !== 'pending_payment' && asset.lender && (
+                          <div className="mt-3 bg-primary/5 p-3.5 rounded-xl border border-primary/20 space-y-2 max-w-md">
+                            <h4 className="font-bold text-xs text-primary uppercase tracking-wider flex items-center gap-1.5">
+                              <span className="material-symbols-outlined text-sm">location_on</span>
+                              Thông tin nhận đồ (Đã bảo mật)
+                            </h4>
+                            <div className="text-sm font-medium text-on-surface space-y-1.5">
+                              <p className="flex items-start gap-2">
+                                <span className="material-symbols-outlined text-outline mt-0.5 text-base">home</span>
+                                <span>{asset.location?.addressString || (asset.lender.address ? `${asset.lender.address.street}, ${asset.lender.address.ward}, ${asset.lender.address.district}, ${asset.lender.address.province}` : 'Đang cập nhật')}</span>
+                              </p>
+                              <p className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-outline text-base">call</span>
+                                <span>{asset.lender.phoneNumber || 'Đang cập nhật'} ({asset.lender.name})</span>
+                              </p>
+                            </div>
+                            <div className="pt-2 flex gap-2">
+                              <a 
+                                href={asset.location?.lat && asset.location?.lng ? `https://www.google.com/maps/search/?api=1&query=${asset.location.lat},${asset.location.lng}` : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${asset.lender.address?.street || ''}, ${asset.lender.address?.ward || ''}, ${asset.lender.address?.district || ''}, ${asset.lender.address?.province || ''}`)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 bg-white border border-primary/30 hover:bg-primary hover:text-white transition-colors text-primary font-bold text-xs py-2 rounded-lg flex justify-center items-center gap-1 shadow-sm"
+                              >
+                                <span className="material-symbols-outlined text-sm">directions</span>
+                                Chỉ đường Google Maps
+                              </a>
+                              <button 
+                                onClick={() => {
+                                  window.dispatchEvent(new CustomEvent('open-chat', {
+                                    detail: {
+                                      userId: asset.lender._id,
+                                      name: asset.lender.name,
+                                      role: asset.lender.role
+                                    }
+                                  }));
+                                }}
+                                className="flex-1 bg-white border border-secondary/30 hover:bg-secondary hover:text-white transition-colors text-secondary font-bold text-xs py-2 rounded-lg flex justify-center items-center gap-1 shadow-sm"
+                              >
+                                <span className="material-symbols-outlined text-sm">chat</span>
+                                Liên hệ chủ đồ
+                              </button>
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Billing breakdown */}
@@ -460,7 +613,7 @@ const Orders = () => {
                       {/* OTP codes display */}
                       <div className="space-y-3">
                         {order.status === 'reserved' && (
-                          <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-200 shadow-inner">
+                          <div className="bg-teal-50/50 p-4 rounded-xl border border-teal-200">
                             <span className="text-[10px] text-teal-800 font-extrabold uppercase tracking-wide flex items-center gap-1 mb-2">
                               <span className="material-symbols-outlined text-xs">checklist</span>
                               Kiểm tra trước khi nhận
@@ -479,37 +632,103 @@ const Orders = () => {
                                 <span>Đã cùng Lender chụp ảnh/quay video xác nhận lúc nhận</span>
                               </label>
                             </div>
-                            <span className="text-[10px] text-teal-800 font-extrabold uppercase tracking-wide flex items-center gap-1 mb-1">
-                              <span className="material-symbols-outlined text-xs">key</span>
-                              OTP Bàn giao (Handover)
-                            </span>
-                            <div className="text-2xl font-extrabold text-teal-900 tracking-wider font-mono bg-white rounded-lg border border-teal-100 py-1.5 text-center shadow-sm">
-                              {order.handoverOTP || '------'}
-                            </div>
-                            <p className="text-[9px] text-teal-700/80 mt-1.5 text-center leading-relaxed font-semibold mb-3">
-                              Cảnh báo: Chỉ cung cấp mã này cho Lender sau khi đã check đủ 3 điều kiện trên. Cung cấp mã này đồng nghĩa bạn xác nhận tình trạng đồ vật hoàn toàn bình thường.
-                            </p>
+                            {(!order.renterHandoverImages || order.renterHandoverImages.length < 3) ? (
+                              <div className="bg-white p-3 rounded border border-teal-200 text-center">
+                                <p className="text-[10px] font-bold text-teal-900 mb-2">Bắt buộc: Tải lên 3 ảnh nhận đồ</p>
+                                <div className="flex gap-2 justify-center mb-3">
+                                  {[0, 1, 2].map((idx) => (
+                                    <div 
+                                      key={idx}
+                                      onClick={() => handlePickSingleImage(order._id, 'handover', idx)}
+                                      className="w-16 h-16 rounded border-2 border-dashed border-teal-300 flex items-center justify-center cursor-pointer hover:bg-teal-50 overflow-hidden relative"
+                                    >
+                                      {handoverDrafts[order._id]?.[idx] ? (
+                                        <img src={handoverDrafts[order._id][idx]} className="w-full h-full object-cover" alt="" />
+                                      ) : (
+                                        <span className="material-symbols-outlined text-teal-400 text-xl">add_a_photo</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  onClick={() => handleSubmitHandoverImages(order._id)}
+                                  className="w-full text-[10px] font-bold text-white bg-teal-600 hover:bg-teal-700 py-2 rounded shadow-sm transition-colors"
+                                >
+                                  Gửi ảnh & Nhận OTP
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-teal-800 font-extrabold uppercase tracking-wide flex items-center gap-1 mb-1">
+                                  <span className="material-symbols-outlined text-xs">key</span>
+                                  OTP Bàn giao (Handover)
+                                </span>
+                                <div className="text-2xl font-extrabold text-teal-900 tracking-wider font-mono bg-white rounded-lg border border-teal-100 py-1.5 text-center shadow-sm">
+                                  {order.handoverOTP || '------'}
+                                </div>
+                                <p className="text-[9px] text-teal-700/80 mt-1.5 text-center leading-relaxed font-semibold mb-3">
+                                  Cảnh báo: Chỉ cung cấp mã này cho Lender sau khi đã check đủ 3 điều kiện trên. Cung cấp mã này đồng nghĩa bạn xác nhận tình trạng đồ vật hoàn toàn bình thường.
+                                </p>
+                              </>
+                            )}
                             <button
+                              type="button"
                               onClick={() => { setSelectedOrderForDispute(order._id); setDisputeModalOpen(true); }}
-                              className="w-full text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-1.5 rounded transition-colors"
+                              className="w-full text-[10px] font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-2 rounded-lg transition-colors cursor-pointer relative z-10 mt-2"
                             >
                               Từ chối nhận đồ & Khiếu nại
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleCancelNoShow(order._id)}
+                              className="w-full text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300 py-2 rounded-lg transition-colors cursor-pointer relative z-10 mt-2"
+                            >
+                              Hủy đơn (Không liên hệ được Lender)
                             </button>
                           </div>
                         )}
 
                         {order.status === 'active' && (
                           <div className="bg-primary-container/10 p-4 rounded-xl border border-primary/20 shadow-inner">
-                            <span className="text-[10px] text-primary font-extrabold uppercase tracking-wide flex items-center gap-1 mb-1">
-                              <span className="material-symbols-outlined text-xs">vpn_key</span>
-                              OTP Trả đồ (Return)
-                            </span>
-                            <div className="text-2xl font-extrabold text-primary tracking-wider font-mono bg-white rounded-lg border border-primary/10 py-1.5 text-center shadow-sm">
-                              {order.returnOTP || '------'}
-                            </div>
-                            <p className="text-[9px] text-primary/70 mt-1.5 text-center leading-relaxed font-semibold">
-                              Cung cấp mã này cho Lender khi giao trả thiết bị để hoàn tất giao dịch.
-                            </p>
+                            {(!order.renterReturnImages || order.renterReturnImages.length < 3) ? (
+                              <div className="bg-white p-3 rounded border border-primary/20 text-center">
+                                <p className="text-[10px] font-bold text-primary mb-2">Bắt buộc: Tải lên 3 ảnh trả đồ</p>
+                                <div className="flex gap-2 justify-center mb-3">
+                                  {[0, 1, 2].map((idx) => (
+                                    <div 
+                                      key={idx}
+                                      onClick={() => handlePickSingleImage(order._id, 'return', idx)}
+                                      className="w-16 h-16 rounded border-2 border-dashed border-primary/30 flex items-center justify-center cursor-pointer hover:bg-primary/5 overflow-hidden relative"
+                                    >
+                                      {returnDrafts[order._id]?.[idx] ? (
+                                        <img src={returnDrafts[order._id][idx]} className="w-full h-full object-cover" alt="" />
+                                      ) : (
+                                        <span className="material-symbols-outlined text-primary/40 text-xl">add_a_photo</span>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                                <button
+                                  onClick={() => handleSubmitReturnImages(order._id)}
+                                  className="w-full text-[10px] font-bold text-white bg-primary hover:bg-primary/90 py-2 rounded shadow-sm transition-colors"
+                                >
+                                  Gửi ảnh & Nhận OTP
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-primary font-extrabold uppercase tracking-wide flex items-center gap-1 mb-1">
+                                  <span className="material-symbols-outlined text-xs">vpn_key</span>
+                                  OTP Trả đồ (Return)
+                                </span>
+                                <div className="text-2xl font-extrabold text-primary tracking-wider font-mono bg-white rounded-lg border border-primary/10 py-1.5 text-center shadow-sm">
+                                  {order.returnOTP || '------'}
+                                </div>
+                                <p className="text-[9px] text-primary/70 mt-1.5 text-center leading-relaxed font-semibold">
+                                  Cung cấp mã này cho Lender khi giao trả thiết bị để hoàn tất giao dịch.
+                                </p>
+                              </>
+                            )}
                           </div>
                         )}
 
@@ -533,7 +752,34 @@ const Orders = () => {
                           </div>
                         )}
 
-                        {['completed', 'returned'].includes(order.status) && (
+                        {order.status === 'disputed' && (
+                          <div className="bg-red-50 p-4 rounded-xl border border-red-200 text-center">
+                            <span className="material-symbols-outlined text-red-600 text-3xl mb-1">gavel</span>
+                            <h4 className="text-xs font-bold text-red-900 mb-2">Đơn hàng đang có tranh chấp</h4>
+                            {order.disputeStatus === 'inspector_reviewed' ? (
+                              <div className="bg-white p-3 rounded text-left border border-red-100">
+                                <p className="text-[10px] text-red-800 font-semibold mb-1">
+                                  Yêu cầu đền bù từ Lender: <span className="text-red-600">{order.requestedDeductionAmount?.toLocaleString('vi-VN')} đ</span>
+                                </p>
+                                <p className="text-[9px] text-red-700/80 mb-3">
+                                  Inspector đã xem xét hóa đơn sửa chữa. Nếu bạn đồng ý, hệ thống sẽ trừ khoản này từ tiền cọc của bạn.
+                                </p>
+                                <button
+                                  onClick={() => handleAcceptDeduction(order._id)}
+                                  className="w-full text-[10px] font-bold text-white bg-red-600 hover:bg-red-700 py-2 rounded shadow-sm transition-colors"
+                                >
+                                  Đồng ý đền bù
+                                </button>
+                              </div>
+                            ) : (
+                              <p className="text-[10px] text-red-800/80">
+                                Vui lòng chờ Admin phân xử hoặc kiểm tra các thông báo khác.
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {['completed', 'returned'].includes(order.status) && order.disputeStatus !== 'resolved' && (
                           <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100 flex flex-col items-center gap-1.5 text-center">
                             <span className="material-symbols-outlined text-emerald-600 text-3xl">verified</span>
                             <span className="text-xs font-bold text-emerald-950">Giao dịch đã kết thúc</span>
@@ -558,6 +804,42 @@ const Orders = () => {
                               <div className="text-[10px] text-emerald-800 bg-emerald-100 px-2.5 py-1 rounded-md font-bold mt-1">
                                 Bạn đã đánh giá: {order.lenderRating} ⭐
                               </div>
+                            )}
+                            {order.asset?._id && (
+                              <Link
+                                to={`/assets/${order.asset._id}`}
+                                className="mt-2 w-full inline-flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm transition-colors no-underline"
+                              >
+                                <span className="material-symbols-outlined text-sm">replay</span>
+                                Thuê lại
+                              </Link>
+                            )}
+                          </div>
+                        )}
+
+                        {order.status === 'completed' && order.disputeStatus === 'resolved' && (
+                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col items-center gap-1.5 text-center">
+                            <span className="material-symbols-outlined text-slate-600 text-3xl">gavel</span>
+                            <span className="text-xs font-bold text-slate-900">Tranh chấp đã được xử lý</span>
+                            <p className="text-[10px] text-slate-600 leading-relaxed mb-2 font-medium">
+                              Admin đã đưa ra phán quyết cuối cùng cho khiếu nại này.
+                            </p>
+                            {order.cashDepositDeductionReason && (
+                              <div className="bg-white border border-slate-100 p-2 rounded w-full text-left">
+                                <p className="text-[9px] text-slate-500 font-bold mb-0.5">Kết luận từ hệ thống:</p>
+                                <p className="text-[10px] text-slate-800 font-medium">
+                                  {order.cashDepositDeductionReason}
+                                </p>
+                              </div>
+                            )}
+                            {order.asset?._id && (
+                              <Link
+                                to={`/assets/${order.asset._id}`}
+                                className="mt-2 w-full inline-flex items-center justify-center gap-1.5 bg-primary hover:bg-primary/90 text-white font-bold text-xs py-2 px-4 rounded-lg shadow-sm transition-colors no-underline"
+                              >
+                                <span className="material-symbols-outlined text-sm">replay</span>
+                                Xem lại thiết bị
+                              </Link>
                             )}
                           </div>
                         )}

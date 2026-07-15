@@ -1,10 +1,13 @@
 import Swal from 'sweetalert2';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import api from '../../configs/axios';
 
 const DashboardAdmin = () => {
   // Navigation & UI States
-  const [activeTab, setActiveTab] = useState('stats');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'stats';
+  const setActiveTab = (tab) => setSearchParams({ tab });
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState({ show: false, message: '', type: 'success' });
 
@@ -62,16 +65,49 @@ const DashboardAdmin = () => {
   };
 
   // API Call Handlers
-  const fetchStats = async () => {
+  const prevStatsRef = useRef(null);
+
+  const fetchStats = async (isPolling = false) => {
     try {
       const res = await api.get('/admin/stats');
       if (res.data && res.data.success) {
-        setStats(res.data.data);
+        const newStats = res.data.data;
+        
+        if (isPolling && prevStatsRef.current) {
+          const prev = prevStatsRef.current;
+          
+          if (newStats.pendingCounts?.withdrawals > (prev.pendingCounts?.withdrawals || 0)) {
+            showToast('🔔 Có yêu cầu rút tiền mới cần duyệt!', 'success');
+          }
+          if (newStats.pendingCounts?.renterApplications > (prev.pendingCounts?.renterApplications || 0)) {
+            showToast('🔔 Có hồ sơ eKYC Renter mới!', 'success');
+          }
+          if (newStats.pendingCounts?.lenderApplications > (prev.pendingCounts?.lenderApplications || 0)) {
+            showToast('🔔 Có hồ sơ eKYC Lender mới!', 'success');
+          }
+          if (newStats.assets?.pending > (prev.assets?.pending || 0)) {
+            showToast('🔔 Có thiết bị mới chờ duyệt!', 'success');
+          }
+        }
+        
+        prevStatsRef.current = newStats;
+        setStats(newStats);
       }
     } catch (err) {
-      showToast(err.response?.data?.message || 'Không thể tải số liệu thống kê.', 'error');
+      if (!isPolling) {
+        showToast(err.response?.data?.message || 'Không thể tải số liệu thống kê.', 'error');
+      }
     }
   };
+
+  // Set up polling interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchStats(true);
+    }, 15000); // 15 seconds
+    
+    return () => clearInterval(interval);
+  }, []);
 
   const fetchUsers = async () => {
     try {
@@ -1719,125 +1755,7 @@ const DashboardAdmin = () => {
       </div>
 
       {/* Tab Bars Navigation */}
-      <div className="border-b border-slate-200">
-        <div className="flex flex-wrap -mb-px gap-1">
-          {/* Tab 1: Stats */}
-          <button
-            onClick={() => setActiveTab('stats')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer ${
-              activeTab === 'stats'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">query_stats</span>
-            Tổng quan (Stats)
-          </button>
-
-          {/* Tab 2: Users */}
-          <button
-            onClick={() => setActiveTab('users')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer ${
-              activeTab === 'users'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">group</span>
-            Thành viên (Users)
-          </button>
-
-          {/* Tab 3: Renters (eKYC Applications) */}
-          <button
-            onClick={() => setActiveTab('renters_ekyc')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
-              activeTab === 'renters_ekyc'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">how_to_reg</span>
-            Duyệt eKYC Renter
-            {stats?.pendingCounts?.renterApplications > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                {stats.pendingCounts.renterApplications}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 3.5: Lenders (eKYC Applications) */}
-          <button
-            onClick={() => setActiveTab('lenders')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
-              activeTab === 'lenders'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">assignment_ind</span>
-            Duyệt eKYC Lender
-            {stats?.pendingCounts?.lenderApplications > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                {stats.pendingCounts.lenderApplications}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 4: Withdrawals */}
-          <button
-            onClick={() => setActiveTab('withdrawals')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
-              activeTab === 'withdrawals'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
-            Duyệt rút tiền
-            {stats?.pendingCounts?.withdrawals > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
-                {stats.pendingCounts.withdrawals}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 5: Assets */}
-          <button
-            onClick={() => setActiveTab('assets')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
-              activeTab === 'assets'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">category</span>
-            Quản lý thiết bị (Assets)
-            {stats?.assets?.pending > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-amber-500 text-[9px] font-bold text-white">
-                {stats.assets.pending}
-              </span>
-            )}
-          </button>
-
-          {/* Tab 6: Orders */}
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`flex items-center gap-1.5 px-5 py-3 border-b-2 font-bold text-sm transition-all cursor-pointer relative ${
-              activeTab === 'orders'
-                ? 'border-emerald-600 text-emerald-800'
-                : 'border-transparent text-slate-450 hover:text-slate-700 hover:border-slate-300'
-            }`}
-          >
-            <span className="material-symbols-outlined text-[18px]">shopping_cart</span>
-            Đơn đặt thuê (Orders)
-            {stats?.orders?.disputed > 0 && (
-              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white">
-                {stats.orders.disputed}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
+      {/* Tabs have been moved to the sidebar */}
 
       {/* Main Content Area mapping to Active Tab */}
       <div className="min-h-[400px]">

@@ -15,7 +15,12 @@ const {
   getContract,
   getMyRentals,
   getIncomingOrders,
-  getPaymentUrl
+  getPaymentUrl,
+  getDisputedOrders,
+  uploadRenterHandoverImages,
+  uploadRenterReturnImages,
+  requestRenterDeductionConfirmation,
+  acceptDeduction
 } = require('../controllers/orderController');
 const { protect, authorize, checkProfileCompleted, checkRenterVerified } = require('../middleware/auth');
 
@@ -26,13 +31,18 @@ router.get('/vnpay_return', vnpayReturn); // Public endpoint for VNPay callback
 
 router.get('/my-rentals', protect, getMyRentals);
 router.get('/incoming', protect, authorize('lender'), getIncomingOrders);
+router.get('/disputed', protect, authorize('admin', 'inspector'), getDisputedOrders);
 
 router.put('/:id/handover', protect, authorize('renter', 'lender'), confirmHandover);
+router.put('/:id/renter-handover-images', protect, authorize('renter'), uploadRenterHandoverImages);
 router.put('/:id/return', protect, authorize('lender'), confirmReturn);
+router.put('/:id/renter-return-images', protect, authorize('renter'), uploadRenterReturnImages);
 router.put('/:id/settle', protect, authorize('admin'), settleOrder);
 router.put('/:id/dispute', protect, authorize('renter', 'lender'), raiseDispute);
 router.put('/:id/dispute-respond', protect, authorize('renter'), respondDispute);
 router.put('/:id/resolve-dispute', protect, authorize('admin', 'inspector'), resolveDispute);
+router.put('/:id/dispute-request-confirmation', protect, authorize('admin', 'inspector'), requestRenterDeductionConfirmation);
+router.put('/:id/accept-deduction', protect, authorize('renter'), acceptDeduction);
 
 // New Advanced Core Routes
 router.put('/:id/cancel', protect, authorize('renter', 'lender'), cancelOrder);

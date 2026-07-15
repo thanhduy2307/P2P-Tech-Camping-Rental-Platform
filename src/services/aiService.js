@@ -501,16 +501,17 @@ exports.scanImageForFraud = async (imageB64) => {
     }
 
     const prompt = `
-Bạn là chuyên gia thẩm định và phòng chống gian lận thương mại điện tử P2P.
-Hãy phân tích bức ảnh sản phẩm này để kiểm duyệt:
-1. Phát hiện xem ảnh có bị lấy từ trên mạng không (ví dụ: ảnh stock photo chuyên nghiệp, ảnh của hãng sản xuất, ảnh có watermark chìm của các trang thương mại điện tử khác như Shopee, Lazada, Amazon, hoặc web khác).
-2. Phát hiện xem ảnh có bị chụp lại từ màn hình điện thoại hoặc máy tính khác để làm giả hình thức không.
-3. Nếu ảnh chụp thực tế và trung thực, hãy báo cáo là an toàn. Nếu ảnh là ảnh mạng hoặc sao chép, hãy đánh dấu là gian lận.
+Bạn là chuyên gia thẩm định, phòng chống gian lận thương mại điện tử và kiểm duyệt nội dung an toàn.
+Hãy phân tích bức ảnh sản phẩm này để kiểm duyệt dựa trên 2 tiêu chí chính:
+1. Nội dung nhạy cảm/không an toàn (NSFW): Phát hiện xem ảnh có chứa nội dung người lớn, khiêu dâm, bạo lực, rùng rợn, hoặc các chất cấm không phù hợp thuần phong mỹ tục không.
+2. Gian lận hình ảnh (Fraud/Copied): Phát hiện xem ảnh có bị lấy từ trên mạng không (ví dụ: ảnh stock photo chuyên nghiệp, ảnh của hãng sản xuất, ảnh có watermark chìm của các trang thương mại điện tử khác như Shopee, Lazada, Amazon, hoặc web khác) hay bị chụp lại từ màn hình điện thoại/máy tính khác.
+
+Nếu ảnh chứa nội dung nhạy cảm HOẶC là ảnh sao chép/mạng, hãy đánh dấu là vi phạm (isCopied = true). Nếu ảnh chụp thực tế sản phẩm một cách trung thực và an toàn, hãy báo cáo là an toàn (isCopied = false).
 
 Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
 {
   "isCopied": true_hoặc_false,
-  "reason": "Giải thích chi tiết bằng tiếng Việt về lý do đánh giá (nêu rõ các đặc điểm phát hiện)."
+  "reason": "Giải thích chi tiết bằng tiếng Việt về lý do đánh giá (nêu rõ vi phạm nội dung nhạy cảm hay vi phạm bản quyền/gian lận hình ảnh, hoặc an toàn)."
 }
 Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
 `;

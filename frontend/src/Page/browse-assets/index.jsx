@@ -25,6 +25,9 @@ const BrowseAssets = () => {
   const [onlyAvailable, setOnlyAvailable] = useState(false);
   const [sortBy, setSortBy] = useState('suggested');
 
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
+
   const [searchTerm, setSearchTerm] = useState(searchParam);
   const [startDate, setStartDate] = useState(startDateParam);
   const [endDate, setEndDate] = useState(endDateParam);
@@ -33,7 +36,14 @@ const BrowseAssets = () => {
     setSearchTerm(searchParams.get('search') || '');
     setStartDate(searchParams.get('startDate') || '');
     setEndDate(searchParams.get('endDate') || '');
+    setCurrentPage(1); // Reset page on query change
   }, [searchParams]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedSubCategories, minPrice, maxPrice, selectedBrand, onlyAvailable, sortBy, maxRadius]);
+
 
   const handleBrowseSearch = (e) => {
     if (e) e.preventDefault();
@@ -445,6 +455,9 @@ const BrowseAssets = () => {
       return 0;
     });
 
+  const totalPages = Math.ceil(filteredAssets.length / itemsPerPage);
+  const paginatedAssets = filteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
   return (
     <div className="flex flex-col lg:flex-row gap-8">
       {/* Sidebar Filters */}
@@ -742,7 +755,7 @@ const BrowseAssets = () => {
         ) : (
           /* Products Grid */
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-            {filteredAssets.map(item => {
+            {paginatedAssets.map(item => {
               const priceVND = (item.pricePerDay >= 1000000) 
                 ? `${(item.pricePerDay / 1000000).toFixed(1)}tr` 
                 : `${(item.pricePerDay / 1000).toFixed(0)}k`;
@@ -827,21 +840,41 @@ const BrowseAssets = () => {
         )}
 
         {/* Pagination */}
-        <div className="flex justify-center mt-12 mb-8">
-          <nav aria-label="Pagination" className="flex items-center gap-1">
-            <button className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors disabled:opacity-50" disabled>
-              <span className="material-symbols-outlined">chevron_left</span>
-            </button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg bg-primary text-on-primary font-title-md text-sm shadow-sm">1</button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg text-on-surface hover:bg-surface-container font-title-md text-sm transition-colors">2</button>
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg text-on-surface hover:bg-surface-container font-title-md text-sm transition-colors">3</button>
-            <span className="w-10 h-10 flex items-center justify-center text-on-surface-variant font-title-md text-sm">...</span>
-            <button className="w-10 h-10 flex items-center justify-center rounded-lg text-on-surface hover:bg-surface-container font-title-md text-sm transition-colors">8</button>
-            <button className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors">
-              <span className="material-symbols-outlined">chevron_right</span>
-            </button>
-          </nav>
-        </div>
+        {totalPages > 1 && (
+          <div className="flex justify-center mt-12 mb-8">
+            <nav aria-label="Pagination" className="flex items-center gap-1">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined">chevron_left</span>
+              </button>
+              
+              {[...Array(totalPages)].map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentPage(idx + 1)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-lg font-title-md text-sm transition-colors ${
+                    currentPage === idx + 1
+                      ? 'bg-primary text-on-primary shadow-sm'
+                      : 'text-on-surface hover:bg-surface-container'
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 text-on-surface-variant hover:text-primary hover:bg-surface-container rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="material-symbols-outlined">chevron_right</span>
+              </button>
+            </nav>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -34,6 +34,10 @@ const Blogs = () => {
   const [activeCommentsPostId, setActiveCommentsPostId] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
 
+  // Share post state
+  const [activeSharePostId, setActiveSharePostId] = useState(null);
+  const [shareText, setShareText] = useState('');
+
   // Fetch initial data
   useEffect(() => {
     const fetchData = async () => {
@@ -209,6 +213,25 @@ const Blogs = () => {
     setCommentInputs(prev => ({ ...prev, [postId]: value }));
   };
 
+  // Handle Share Post
+  const handleShareSubmit = async (e) => {
+    e.preventDefault();
+    if (!activeSharePostId) return;
+
+    try {
+      const res = await api.post(`/posts/${activeSharePostId}/share`, { sharedText: shareText });
+      if (res.data && res.data.success) {
+        setPosts(prev => [res.data.data, ...prev]);
+        setActiveSharePostId(null);
+        setShareText('');
+        Swal.fire('Thành công', 'Đã chia sẻ bài viết lên tường nhà bạn!', 'success');
+      }
+    } catch (err) {
+      console.error('Failed to share post:', err);
+      Swal.fire('Lỗi', 'Không thể chia sẻ bài viết.', 'error');
+    }
+  };
+
   // Handle AI Content Generation
   const handleAIGenerate = async () => {
     if (!selectedAssetId) {
@@ -382,11 +405,16 @@ const Blogs = () => {
         {token ? (
           /* Create Post Input */
           <div className="glass-panel rounded-xl p-4 flex gap-4 items-center bg-white border border-outline-variant shadow-sm">
-            <img 
-              alt="User Avatar" 
-              className="w-10 h-10 rounded-full border border-outline-variant bg-surface-container flex-shrink-0 object-cover" 
-              src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"} 
-            />
+            <Link to={`/user/${currentUser?._id}`} className="flex-shrink-0 relative group" title="Trang cá nhân của tôi">
+              <img 
+                alt="User Avatar" 
+                className="w-10 h-10 rounded-full border border-outline-variant bg-surface-container object-cover group-hover:opacity-80 transition-opacity" 
+                src={currentUser?.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80"} 
+              />
+              <div className="absolute inset-0 bg-black/20 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="material-symbols-outlined text-white text-[16px]">person</span>
+              </div>
+            </Link>
             <button 
               onClick={() => setIsModalOpen(true)}
               className="flex-1 bg-surface-bright hover:bg-surface-container text-left border border-outline-variant/60 rounded-full px-5 py-2.5 text-on-surface-variant text-sm font-medium transition-colors"
@@ -446,54 +474,83 @@ const Blogs = () => {
 
             return (
               <article key={post._id} className="feed-card rounded-xl overflow-hidden bg-white border border-outline-variant/50 shadow-sm hover:shadow-md transition-shadow">
-                {/* Header */}
-                <div className="p-4 flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <img 
-                      alt={authorName} 
-                      className="w-10 h-10 rounded-full border border-outline-variant bg-surface-container object-cover" 
-                      src={post.author?.avatar || (post.author?.role === 'lender' 
-                        ? 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80' 
-                        : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'
-                      )} 
-                    />
-                    <div>
-                      <h4 className="font-body-md font-semibold text-on-surface flex items-center gap-1.5 text-sm">
-                        {authorName}
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
-                          post.author?.role === 'lender' ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
-                        }`}>
-                          {authorRole}
-                        </span>
-                      </h4>
-                      <p className="font-label-sm text-[10px] text-outline mt-0.5">{postDate}</p>
+                
+                {/* Shared Post Context */}
+                {post.isShared && (
+                  <div className="bg-surface-container-low px-4 py-2 border-b border-outline-variant/30 text-xs text-on-surface-variant flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[16px]">repeat</span>
+                    <Link to={`/user/${post.author?._id}`} className="font-semibold hover:underline text-on-surface">{authorName}</Link> 
+                    đã chia sẻ một bài viết.
+                  </div>
+                )}
+
+                {/* Shared Text (Caption) */}
+                {post.isShared && post.sharedText && (
+                  <div className="px-4 pt-3 pb-1">
+                    <p className="font-body-md text-sm text-on-surface whitespace-pre-line">{post.sharedText}</p>
+                  </div>
+                )}
+
+                <div 
+                  onClick={(e) => {
+                    if (e.target.closest('a') || e.target.closest('button')) return;
+                    if (post.isShared && post.originalPost?.author?._id) {
+                      navigate(`/user/${post.originalPost.author._id}`);
+                    }
+                  }}
+                  className={post.isShared ? "m-3 border border-outline-variant/30 rounded-lg overflow-hidden cursor-pointer hover:bg-surface-container-lowest transition-colors group/shared" : ""}
+                >
+                  {/* Header */}
+                  <div className="p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <img 
+                        alt={post.isShared ? (post.originalPost?.author?.name || 'Ẩn danh') : authorName} 
+                        className="w-10 h-10 rounded-full border border-outline-variant bg-surface-container object-cover" 
+                        src={(post.isShared ? post.originalPost?.author?.avatar : post.author?.avatar) || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=150&q=80'} 
+                      />
+                      <div>
+                        <h4 className="font-body-md font-semibold text-on-surface flex items-center gap-1.5 text-sm">
+                          <Link to={`/user/${post.isShared ? post.originalPost?.author?._id : post.author?._id}`} className="hover:underline">
+                            {post.isShared ? (post.originalPost?.author?.name || 'Ẩn danh') : authorName}
+                          </Link>
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                            (post.isShared ? post.originalPost?.author?.role : post.author?.role) === 'lender' ? 'bg-secondary/15 text-secondary' : 'bg-primary/15 text-primary'
+                          }`}>
+                            {(post.isShared ? post.originalPost?.author?.role : post.author?.role) === 'lender' ? 'Lender' : 'Renter'}
+                          </span>
+                        </h4>
+                        <p className="font-label-sm text-[10px] text-outline mt-0.5">
+                          {new Date(post.isShared ? post.originalPost?.createdAt : post.createdAt).toLocaleDateString('vi-VN', {
+                            hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
+                          })}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 {/* Content */}
                 <div className="px-4 pb-3">
-                  <h3 className="font-title-md text-base font-bold text-on-surface mb-1">{post.title}</h3>
+                  <h3 className="font-title-md text-base font-bold text-on-surface mb-1">{post.isShared ? post.originalPost?.title : post.title}</h3>
                   <p className="font-body-md text-on-surface-variant text-sm leading-relaxed whitespace-pre-line">
-                    {post.content}
+                    {post.isShared ? post.originalPost?.content : post.content}
                   </p>
                 </div>
 
                 {/* Image if any */}
-                {post.images && post.images.length > 0 && (
+                {((post.isShared ? post.originalPost?.images : post.images) || []).length > 0 && (
                   <div className="w-full aspect-[16/9] bg-surface-container-high relative overflow-hidden border-y border-outline-variant/30">
                     <img 
-                      alt={post.title} 
+                      alt={post.isShared ? post.originalPost?.title : post.title} 
                       className="w-full h-full object-cover" 
-                      src={post.images[0]} 
+                      src={(post.isShared ? post.originalPost?.images : post.images)[0]} 
                     />
                   </div>
                 )}
 
                 {/* Tagged Gear Link */}
-                {((post.taggedAssets && post.taggedAssets.length > 0) || (post.productLink)) && (
+                {(((post.isShared ? post.originalPost?.taggedAssets : post.taggedAssets) || []).length > 0 || (post.isShared ? post.originalPost?.productLink : post.productLink)) && (
                   <div className="px-4 py-3 border-b border-outline-variant/30 bg-surface-bright/50 space-y-2">
-                    {post.taggedAssets && post.taggedAssets.map((asset) => (
+                    {(post.isShared ? post.originalPost?.taggedAssets : post.taggedAssets)?.filter(asset => asset && asset._id).map((asset) => (
                       <Link 
                         key={asset._id}
                         to={`/assets/${asset._id}`} 
@@ -517,9 +574,9 @@ const Blogs = () => {
                       </Link>
                     ))}
 
-                    {post.productLink && (
+                    {(post.isShared ? post.originalPost?.productLink : post.productLink) && (
                       <a 
-                        href={post.productLink} 
+                        href={post.isShared ? post.originalPost?.productLink : post.productLink} 
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="flex items-center gap-3 bg-white p-2.5 rounded-lg hover:bg-surface-container transition-colors border border-outline-variant/30 shadow-sm"
@@ -529,7 +586,7 @@ const Blogs = () => {
                         </div>
                         <div className="flex-grow min-w-0">
                           <p className="font-label-sm text-[9px] text-teal-600 font-bold uppercase tracking-wider mb-0.5">Liên kết sản phẩm ngoài</p>
-                          <p className="font-body-md text-xs font-bold text-on-surface truncate">{post.productLink}</p>
+                          <p className="font-body-md text-xs font-bold text-on-surface truncate">{post.isShared ? post.originalPost?.productLink : post.productLink}</p>
                         </div>
                         <div className="flex items-center text-teal-600 font-semibold text-xs shrink-0 bg-teal-50 px-2.5 py-1 rounded border border-teal-200">
                           Mở liên kết
@@ -539,6 +596,7 @@ const Blogs = () => {
                     )}
                   </div>
                 )}
+                </div>
 
                 {/* Actions Row */}
                 <div className="px-4 py-2 flex items-center gap-6 border-b border-outline-variant/20">
@@ -563,6 +621,18 @@ const Blogs = () => {
                       chat_bubble
                     </span>
                     <span className="font-body-md text-xs">{post.comments?.length || 0}</span>
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!token) return Swal.fire('Bạn cần đăng nhập', 'Vui lòng đăng nhập để chia sẻ bài viết', 'info');
+                      setActiveSharePostId(post._id);
+                    }}
+                    className={`flex items-center gap-1.5 py-1 px-2 rounded-lg hover:bg-primary/10 transition-colors text-outline hover:text-primary ml-auto`}
+                  >
+                    <span className="material-symbols-outlined text-[20px]">
+                      share
+                    </span>
+                    <span className="font-body-md text-xs">Chia sẻ</span>
                   </button>
                 </div>
 
@@ -932,6 +1002,54 @@ const Blogs = () => {
                   className="px-5 py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:bg-primary/95 transition-all shadow-sm disabled:opacity-50"
                 >
                   {createLoading ? 'Đang đăng bài...' : 'Đăng bài viết'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* SHARE MODAL */}
+      {activeSharePostId && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm transition-all animate-fadeIn">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full overflow-hidden border border-outline-variant/30 relative flex flex-col">
+            <div className="px-6 py-4 border-b border-outline-variant/30 flex justify-between items-center bg-surface-bright">
+              <h3 className="font-title-md text-base font-bold text-on-surface flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-primary">share</span>
+                Chia sẻ bài viết
+              </h3>
+              <button 
+                onClick={() => { setActiveSharePostId(null); setShareText(''); }}
+                className="text-outline hover:text-on-surface p-1 rounded-full hover:bg-surface-container transition-colors"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            
+            <form onSubmit={handleShareSubmit} className="p-6 space-y-4">
+              <div>
+                <label className="text-xs font-bold text-on-surface block mb-2">Thêm cảm nghĩ của bạn (Tùy chọn)</label>
+                <textarea 
+                  value={shareText}
+                  onChange={(e) => setShareText(e.target.value)}
+                  placeholder="Hãy nói gì đó về bài viết này..."
+                  className="w-full px-4 py-3 text-sm border border-outline-variant rounded-xl focus:outline-none focus:border-secondary focus:ring-1 focus:ring-secondary min-h-[100px] resize-none bg-surface-container-lowest"
+                />
+              </div>
+
+              <div className="pt-2 flex justify-end gap-3">
+                <button 
+                  type="button"
+                  onClick={() => { setActiveSharePostId(null); setShareText(''); }}
+                  className="px-4 py-2 border border-outline-variant rounded-lg text-xs font-semibold hover:bg-surface-container transition-colors"
+                >
+                  Hủy
+                </button>
+                <button 
+                  type="submit"
+                  className="px-5 py-2 bg-primary text-on-primary rounded-lg text-xs font-semibold hover:bg-primary/95 transition-all shadow-sm"
+                >
+                  Chia sẻ ngay
                 </button>
               </div>
             </form>

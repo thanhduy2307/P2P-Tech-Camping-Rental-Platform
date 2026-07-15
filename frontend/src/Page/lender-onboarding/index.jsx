@@ -190,7 +190,7 @@ const LenderOnboarding = () => {
     try {
       setLoading(true);
       setErrorMessage('');
-      const response = await api.put('/auth/switch-role');
+      const response = await api.put('/auth/switch-role', { targetRole: user?.role === 'renter' ? 'lender' : 'renter' });
       if (response.data && response.data.success) {
         const { token: newToken, role: newRole, ...userData } = response.data.data;
         dispatch(loginSuccess({

@@ -238,6 +238,24 @@ const AssetDetail = () => {
     <div className="bg-surface text-on-surface antialiased flex flex-col min-h-screen selection:bg-primary-container selection:text-on-primary-container font-body-md">
       <main className="flex-grow w-full max-w-container-max mx-auto px-margin-mobile md:px-margin-desktop pt-10 pb-16">
         
+        {asset.status === 'deleted' && (
+          <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-r shadow-sm">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <span className="material-symbols-outlined text-red-500">warning</span>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700 font-bold">
+                  Thiết bị này đã bị xóa hoặc ngưng cung cấp.
+                </p>
+                <p className="text-xs text-red-600 mt-1">
+                  Thông tin dưới đây chỉ nhằm mục đích lưu trữ lịch sử cho các đơn hàng cũ. Bạn không thể tiếp tục đặt thuê thiết bị này.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Breadcrumbs */}
         <nav aria-label="Breadcrumb" className="flex text-on-surface-variant font-label-sm text-label-sm mb-6">
           <ol className="inline-flex items-center space-x-1 md:space-x-3">
@@ -276,12 +294,30 @@ const AssetDetail = () => {
             {/* Image Gallery */}
             <div className="space-y-4">
               {/* Hero Image */}
-              <div className="w-full bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant relative aspect-[4/3]">
+              <div className="w-full bg-surface-container rounded-xl overflow-hidden shadow-sm border border-outline-variant relative aspect-[4/3] group">
                 <img 
                   alt={asset.name} 
                   className="w-full h-full object-cover" 
                   src={selectedImage} 
                 />
+                
+                {/* Navigation Arrows */}
+                {assetImages.length > 1 && (
+                  <>
+                    <button
+                      onClick={() => setActiveImageIndex((prev) => (prev === 0 ? assetImages.length - 1 : prev - 1))}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 hover:bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm z-10"
+                    >
+                      <span className="material-symbols-outlined font-bold">chevron_left</span>
+                    </button>
+                    <button
+                      onClick={() => setActiveImageIndex((prev) => (prev === assetImages.length - 1 ? 0 : prev + 1))}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/30 hover:bg-black/60 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all backdrop-blur-sm z-10"
+                    >
+                      <span className="material-symbols-outlined font-bold">chevron_right</span>
+                    </button>
+                  </>
+                )}
                 {/* Badges Overlay */}
                 {asset.status === 'verified' && (
                   <div className="absolute top-4 right-4 flex flex-col sm:flex-row gap-2">
@@ -359,7 +395,7 @@ const AssetDetail = () => {
                 <span className="w-1 h-1 bg-outline-variant rounded-full"></span>
                 <div className="flex items-center">
                   <span className="material-symbols-outlined mr-1 text-lg">location_on</span>
-                  <span>{asset.lender?.address?.province || 'Đà Lạt'}, Việt Nam</span>
+                  <span>{asset.location?.addressString ? asset.location.addressString.split(',').slice(-2).join(',').trim() : (asset.lender?.address?.province || 'Đà Lạt')}</span>
                 </div>
               </div>
             </div>
@@ -480,18 +516,24 @@ const AssetDetail = () => {
 
             {/* Map Section */}
             <div className="border-t border-outline-variant pt-8">
-              <h2 className="font-title-md text-title-md text-on-surface mb-4 font-bold">Vị trí nhận đồ</h2>
-              <p className="font-body-md text-on-surface-variant mb-4 text-sm">Địa chỉ chi tiết sẽ được cung cấp sau khi đơn thuê được xác nhận thanh toán thành công. Gần Hồ Tuyền Lâm.</p>
+              <h2 className="font-title-md text-title-md text-on-surface mb-4 font-bold flex items-center gap-2">
+                <span className="material-symbols-outlined text-primary">location_searching</span>
+                Vị trí nhận đồ
+              </h2>
+              <p className="font-body-md text-on-surface-variant mb-4 text-sm bg-primary-container/30 p-3 rounded-lg border border-primary/10">
+                <span className="font-bold text-primary mr-1">Bảo mật:</span> 
+                Địa chỉ chi tiết và số điện thoại của người cho thuê sẽ được cung cấp ngay sau khi bạn đặt cọc thành công. Khu vực nhận đồ ước tính ở xung quanh <strong>{asset.location?.addressString ? asset.location.addressString.split(',').slice(-3).join(',').trim() : (asset.lender?.address?.ward ? `${asset.lender.address.ward}, ` : '') + (asset.lender?.address?.district || 'khu vực này')}</strong>.
+              </p>
               <div className="w-full h-64 bg-surface-container rounded-xl overflow-hidden border border-outline-variant shadow-sm relative">
                 <img 
-                  className="w-full h-full object-cover opacity-80" 
+                  className="w-full h-full object-cover opacity-80 blur-[2px] transition-all duration-700" 
                   alt="Pickup map"
                   src="https://lh3.googleusercontent.com/aida-public/AB6AXuCClhgoxT766NZFJXPO7lpZE-cLFHiqKI9Nr7CdQbm0PiCZVFHOqkp7jQQzB9lbtwrmz9422KQeXvSUj0NvhzhDv7j13UeYEozGA-hDWuIpsc6IvccROnV5eAxzwyaaJdhMy_prCrH1fXkRP6DRijo07lE2w6tXzEtH5Pz7Ymfn2AFEW_zkpGa5m_w8Htfoel5rmSnJfVVwn9TZMpF1wC5kqb4K4mR8dsNare3Gbia1hCEGdZYAAlJnD8APcLMtbMOI2TacT2_ZI9sl" 
                 />
-                {/* Center Pin Overlay */}
+                {/* Center Radius Overlay */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                  <div className="bg-primary text-on-primary rounded-full p-3 shadow-lg transform -translate-y-4">
-                    <span className="material-symbols-outlined">location_on</span>
+                  <div className="w-32 h-32 md:w-48 md:h-48 bg-primary/20 border-2 border-primary/40 rounded-full animate-pulse flex items-center justify-center shadow-[0_0_15px_rgba(0,108,73,0.3)] backdrop-blur-[1px]">
+                    <span className="material-symbols-outlined text-primary/80">explore</span>
                   </div>
                 </div>
               </div>
@@ -783,11 +825,15 @@ const AssetDetail = () => {
               {/* CTA Action */}
               <button 
                 onClick={handleBooking}
-                disabled={bookingLoading}
-                className="w-full bg-primary-container text-on-primary-container font-title-md text-title-md py-4 rounded-xl shadow-md hover:opacity-90 active:scale-[0.98] transition-all flex justify-center items-center font-bold"
+                disabled={bookingLoading || asset.status === 'deleted'}
+                className={`w-full font-title-md text-title-md py-4 rounded-xl shadow-md transition-all flex justify-center items-center font-bold ${
+                  asset.status === 'deleted' 
+                    ? 'bg-slate-200 text-slate-500 cursor-not-allowed'
+                    : 'bg-primary-container text-on-primary-container hover:opacity-90 active:scale-[0.98]'
+                }`}
               >
                 <span className="material-symbols-outlined mr-2">shopping_bag</span>
-                {bookingLoading ? 'Đang khởi tạo...' : 'Thuê Ngay'}
+                {asset.status === 'deleted' ? 'Ngừng cung cấp' : (bookingLoading ? 'Đang khởi tạo...' : 'Thuê Ngay')}
               </button>
 
               <p className="text-center font-body-md text-xs text-on-surface-variant mt-4">

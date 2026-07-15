@@ -20,7 +20,8 @@ const {
   updateAvatar,
   applyRenterEkyc,
   getRenterApplications,
-  verifyRenterApplication
+  verifyRenterApplication,
+  updatePublicProfileInfo
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -41,6 +42,7 @@ router.get('/balance', protect, authorize('renter', 'lender'), getBalance);
 
 // Public User profile (Personal page summary)
 router.get('/users/:id/profile', getPublicProfile);
+router.put('/users/profile', protect, updatePublicProfileInfo);
 
 // Renter eKYC onboarding
 router.post('/renter-onboarding', protect, authorize('renter'), applyRenterEkyc);

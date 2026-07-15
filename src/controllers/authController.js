@@ -3,6 +3,7 @@ const WithdrawalRequest = require('../models/WithdrawalRequest');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
+const { notifyUser, notifyUsersByRole } = require('../utils/notificationHelper');
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -316,7 +317,13 @@ exports.switchRole = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (user.role === 'renter') {
+    const { targetRole } = req.body || {};
+    let nextRole = targetRole;
+    if (!nextRole) {
+      nextRole = user.role === 'renter' ? 'lender' : 'renter';
+    }
+
+    if (nextRole === 'lender') {
       // Check lenderStatus before allowing to switch to lender
       if (user.lenderStatus !== 'approved') {
         let errorMsg = 'Bạn chưa đăng ký làm Người cho thuê (Lender). Vui lòng gửi hồ sơ eKYC trước.';
@@ -333,7 +340,7 @@ exports.switchRole = async (req, res) => {
         });
       }
       user.role = 'lender';
-    } else if (user.role === 'lender') {
+    } else if (nextRole === 'renter') {
       user.role = 'renter';
     } else {
       return res.status(400).json({ success: false, message: 'Role switching only available between renter and lender' });
@@ -493,6 +500,15 @@ exports.applyLender = async (req, res) => {
 
     await user.save();
 
+    // Send notification to inspector
+    await notifyUsersByRole(
+      'inspector',
+      'EKYC',
+      'Yêu cầu duyệt Lender mới',
+      `Người dùng ${user.name} vừa nộp hồ sơ đăng ký trở thành Người cho thuê (Lender).`,
+      '/dashboard-inspector'
+    );
+
     res.status(200).json({
       success: true,
       message: 'Nộp hồ sơ eKYC đăng ký Lender thành công. Vui lòng quay lại sau khi hồ sơ được phê duyệt.',
@@ -553,6 +569,17 @@ exports.verifyLenderApplication = async (req, res) => {
     }
 
     await applicant.save();
+
+    // Send notification to applicant
+    await notifyUser(
+      applicant._id,
+      'EKYC',
+      status === 'approved' ? 'Hồ sơ Lender được duyệt' : 'Hồ sơ Lender bị từ chối',
+      status === 'approved' 
+        ? 'Chúc mừng! Hồ sơ đăng ký Người cho thuê của bạn đã được phê duyệt. Bạn có thể bắt đầu đăng thiết bị.'
+        : `Hồ sơ của bạn đã bị từ chối với lý do: ${rejectReason}`,
+      '/profile'
+    );
 
     res.status(200).json({
       success: true,
@@ -649,6 +676,15 @@ exports.createWithdrawal = async (req, res) => {
       status: 'pending'
     });
 
+    // Notify admin
+    await notifyUsersByRole(
+      'admin',
+      'WITHDRAWAL',
+      'Yêu cầu rút tiền mới',
+      `Người dùng ${user.name} vừa gửi yêu cầu rút số tiền ${amount.toLocaleString()}đ.`,
+      '/dashboard-admin'
+    );
+
     res.status(201).json({
       success: true,
       message: 'Tạo yêu cầu rút tiền thành công. Số tiền rút đã được tạm đóng băng.',
@@ -708,6 +744,17 @@ exports.verifyWithdrawal = async (req, res) => {
 
     await request.save();
 
+    // Send notification to lender
+    await notifyUser(
+      request.lender,
+      'WITHDRAWAL',
+      status === 'approved' ? 'Yêu cầu rút tiền thành công' : 'Yêu cầu rút tiền bị từ chối',
+      status === 'approved'
+        ? `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn đã được phê duyệt và chuyển khoản.`
+        : `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn bị từ chối. Lý do: ${rejectReason}. Số tiền đã được hoàn lại vào ví.`,
+      '/profile'
+    );
+
     res.status(200).json({
       success: true,
       message: status === 'approved' ? 'Phê duyệt yêu cầu rút tiền thành công.' : 'Từ chối yêu cầu rút tiền thành công và hoàn trả số dư ví.',
@@ -735,6 +782,8 @@ exports.getPublicProfile = async (req, res) => {
         name: user.name,
         role: user.role,
         avatar: user.avatar,
+        coverImage: user.coverImage,
+        bio: user.bio,
         reputationScore: user.reputationScore,
         isProfileCompleted: user.isProfileCompleted,
         createdAt: user.createdAt,
@@ -807,6 +856,36 @@ exports.updateAvatar = async (req, res) => {
   }
 };
 
+exports.updatePublicProfileInfo = async (req, res) => {
+  try {
+    const { bio, coverImage, name } = req.body;
+    
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
+    }
+
+    if (bio !== undefined) user.bio = bio;
+    if (coverImage !== undefined) user.coverImage = coverImage;
+    if (name !== undefined) user.name = name;
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Cập nhật thông tin trang cá nhân thành công!',
+      data: {
+        _id: user._id,
+        name: user.name,
+        bio: user.bio,
+        coverImage: user.coverImage
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.applyRenterEkyc = async (req, res) => {
   try {
     const { cccdFront, cccdBack, cccdSelfie } = req.body;
@@ -832,6 +911,15 @@ exports.applyRenterEkyc = async (req, res) => {
     };
 
     await user.save();
+
+    // Send notification to inspector
+    await notifyUsersByRole(
+      'inspector',
+      'EKYC',
+      'Yêu cầu xác thực Renter mới',
+      `Người dùng ${user.name} vừa nộp hồ sơ eKYC xác thực Người đi thuê (Renter).`,
+      '/dashboard-inspector'
+    );
 
     res.status(200).json({
       success: true,
@@ -890,6 +978,17 @@ exports.verifyRenterApplication = async (req, res) => {
     }
 
     await applicant.save();
+
+    // Send notification to applicant
+    await notifyUser(
+      applicant._id,
+      'EKYC',
+      status === 'approved' ? 'Hồ sơ Renter được duyệt' : 'Hồ sơ Renter bị từ chối',
+      status === 'approved' 
+        ? 'Chúc mừng! Hồ sơ xác minh danh tính Người đi thuê (Renter eKYC) của bạn đã được phê duyệt.'
+        : `Hồ sơ xác minh danh tính của bạn đã bị từ chối với lý do: ${rejectReason}. Vui lòng nộp lại.`,
+      '/profile'
+    );
 
     res.status(200).json({
       success: true,

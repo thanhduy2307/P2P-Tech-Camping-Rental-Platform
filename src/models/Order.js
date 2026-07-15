@@ -64,6 +64,12 @@ const orderSchema = new mongoose.Schema({
   returnImages: [{
     type: String
   }],
+  renterHandoverImages: [{
+    type: String
+  }],
+  renterReturnImages: [{
+    type: String
+  }],
   extensionDays: {
     type: Number,
     default: 0
@@ -130,6 +136,10 @@ const orderSchema = new mongoose.Schema({
     type: String,
     enum: ['renter', 'lender', '']
   },
+  disputeType: {
+    type: String,
+    enum: ['quality_issue', 'damage_issue', '']
+  },
   requestedDeductionAmount: {
     type: Number,
     default: 0
@@ -142,8 +152,15 @@ const orderSchema = new mongoose.Schema({
   }],
   disputeStatus: {
     type: String,
-    enum: ['open', 'responded', 'resolved', '']
+    enum: ['open', 'inspector_reviewed', 'responded', 'resolved', '']
   },
+  deductionConfirmedByRenter: {
+    type: Boolean,
+    default: false
+  },
+  repairQuotationImages: [{
+    type: String
+  }],
   disputedAt: {
     type: Date
   }

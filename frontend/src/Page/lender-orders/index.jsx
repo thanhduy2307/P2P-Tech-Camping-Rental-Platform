@@ -181,6 +181,7 @@ const LenderOrders = () => {
           payload.returnImages = images;
           payload.disputeNotes = cashDepositDeductionReason;
           payload.requestedDeductionAmount = Number(actualCashDepositReturned);
+          payload.disputeType = 'damage_issue';
         } else {
           url = `/orders/${selectedOrder._id}/return`;
           payload.returnImages = images;
