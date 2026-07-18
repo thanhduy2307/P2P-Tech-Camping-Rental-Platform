@@ -1,8 +1,7 @@
 class AppConstants {
-  // Base URL of the VeloX backend API.
-  // 10.0.2.2 is the loopback alias to the host machine for Android emulators.
+  // Base URL of the EquipPeer backend API (deployed on Oracle VPS).
   static const String apiBaseUrl =
-      'http://10.0.2.2:5000/api';
+      'http://150.136.248.214/api';
 
   // Role constants matching the backend.
   static const String roleRenter = 'renter';
