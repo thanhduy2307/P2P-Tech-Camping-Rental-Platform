@@ -9,6 +9,7 @@ const swaggerDocument = require('./swagger.json');
 
 const path = require('path');
 const connectDB = require('./config/db');
+const { isDbHealthy } = require('./config/db');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -30,8 +31,15 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: function (origin, callback) {
-    // Cho phép mọi origin (từ Frontend web máy khác, hoặc Mobile app không có origin)
-    return callback(null, true);
+    // Mobile apps send no Origin header -> always allow.
+    if (!origin) return callback(null, true);
+    const allowed = process.env.CORS_ORIGIN
+      ? process.env.CORS_ORIGIN.split(',').map(s => s.trim())
+      : null;
+    if (!allowed || allowed.indexOf(origin) !== -1) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS not allowed for origin: ${origin}`), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
@@ -55,6 +63,18 @@ app.use('/api/notifications', notificationRoutes);
 
 // Swagger API Docs
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// Health check (for deployment platforms)
+app.get('/api/health', (req, res) => {
+  const db = isDbHealthy();
+  res.status(db.connected ? 200 : 503).json({
+    success: true,
+    status: db.connected ? 'ok' : 'degraded',
+    db: db.state,
+    uptime: process.uptime(),
+    timestamp: new Date().toISOString(),
+  });
+});
 
 // Root Endpoint - Serve Test Frontend Single Page App
 app.get('/', (req, res) => {
