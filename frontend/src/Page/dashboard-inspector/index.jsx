@@ -8,10 +8,20 @@ const DashboardInspector = () => {
   const { user } = useSelector((state) => state.auth);
 
   // States
+  const [activeTab, setActiveTab] = useState('assets');
   const [tasks, setTasks] = useState([]);
+  const [disputes, setDisputes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDisputes, setLoadingDisputes] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Dispute Modal States
+  const [selectedDispute, setSelectedDispute] = useState(null);
+  const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
+  const [lenderCompensation, setLenderCompensation] = useState('');
+  const [renterRefund, setRenterRefund] = useState('');
+  const [resolveLoading, setResolveLoading] = useState(false);
   
   // Modal & Form States
   const [selectedAsset, setSelectedAsset] = useState(null);
@@ -51,9 +61,85 @@ const DashboardInspector = () => {
     }
   };
 
+  // Fetch disputed orders
+  const fetchDisputes = async () => {
+    if (!token) return;
+    setLoadingDisputes(true);
+    setError('');
+    try {
+      const response = await api.get('/orders/disputed');
+      if (response.data && response.data.success) {
+        setDisputes(response.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Không thể tải danh sách khiếu nại.');
+    } finally {
+      setLoadingDisputes(false);
+    }
+  };
+
   useEffect(() => {
-    fetchTasks();
-  }, [token]);
+    if (activeTab === 'assets') {
+      fetchTasks();
+    } else if (activeTab === 'disputes') {
+      fetchDisputes();
+    }
+  }, [activeTab, token]);
+
+  // Dispute Handlers
+  const handleOpenDisputeReview = (order) => {
+    setSelectedDispute(order);
+    setLenderCompensation('');
+    setRenterRefund('');
+    setIsDisputeModalOpen(true);
+  };
+
+  const handleResolveAction = async (actionStr) => {
+    if (!selectedDispute) return;
+
+    if (actionStr === 'force_compensation' && (lenderCompensation === '' || renterRefund === '')) {
+      Swal.fire('Vui lòng nhập đầy đủ số tiền đền bù/hoàn trả (có thể nhập 0).');
+      return;
+    }
+
+    setResolveLoading(true);
+    setError('');
+    setSuccess('');
+    try {
+      const payload = {
+        action: actionStr,
+        lenderCompensation: lenderCompensation ? Number(lenderCompensation) : 0,
+        renterRefund: renterRefund ? Number(renterRefund) : 0
+      };
+      const response = await api.put(`/orders/${selectedDispute._id}/resolve-dispute`, payload);
+      if (response.data && response.data.success) {
+        Swal.fire('Thành công', response.data.message || 'Giải quyết khiếu nại thành công!', 'success');
+        setIsDisputeModalOpen(false);
+        fetchDisputes();
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Thất bại', err.response?.data?.message || 'Giải quyết khiếu nại thất bại.', 'error');
+    } finally {
+      setResolveLoading(false);
+    }
+  };
+
+  const handleRequestRenterConfirmation = async (orderId, amount) => {
+    try {
+      const payload = { approvedDeductionAmount: amount };
+      const response = await api.put(`/orders/${orderId}/dispute-request-confirmation`, payload);
+      if (response.data?.success) {
+        Swal.fire('Thành công', 'Đã gửi yêu cầu xác nhận đền bù cho Renter.', 'success');
+        setIsDisputeModalOpen(false);
+        fetchDisputes();
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire(err.response?.data?.message || 'Không thể gửi yêu cầu xác nhận đền bù.');
+    }
+  };
 
   // Open modal
   const handleOpenReview = (asset) => {
@@ -172,6 +258,37 @@ const DashboardInspector = () => {
         </div>
       )}
 
+      {/* Tabs */}
+      <div className="flex border-b border-slate-200 gap-6">
+        <button
+          className={`py-3 px-1 border-b-2 font-bold text-sm transition-colors ${
+            activeTab === 'assets'
+              ? 'border-teal-600 text-teal-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+          onClick={() => setActiveTab('assets')}
+        >
+          Thiết bị chờ duyệt
+        </button>
+        <button
+          className={`py-3 px-1 border-b-2 font-bold text-sm transition-colors flex items-center gap-2 ${
+            activeTab === 'disputes'
+              ? 'border-teal-600 text-teal-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+          onClick={() => setActiveTab('disputes')}
+        >
+          Đơn khiếu nại
+          {disputes.length > 0 && (
+            <span className="bg-red-500 text-white text-[10px] px-1.5 py-0.5 rounded-full">
+              {disputes.length}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === 'assets' ? (
+        <>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
         <div className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm flex items-center gap-4">
@@ -314,6 +431,102 @@ const DashboardInspector = () => {
           </div>
         )}
       </div>
+        </>
+      ) : (
+        /* Disputes View */
+        <div className="bg-white border border-slate-150 rounded-2xl shadow-sm overflow-hidden">
+          <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+            <h3 className="font-extrabold text-sm text-slate-800 uppercase tracking-wide flex items-center gap-2">
+              <span className="material-symbols-outlined text-slate-500 text-base">report</span>
+              Danh sách đơn khiếu nại chờ xử lý
+            </h3>
+            <span className="bg-red-100 text-red-700 font-bold text-xs px-2.5 py-1 rounded-full">{disputes.length} đơn</span>
+          </div>
+
+          {loadingDisputes ? (
+            <div className="py-20 text-center text-slate-400">
+              <span className="material-symbols-outlined animate-spin text-3xl text-slate-300">autorenew</span>
+              <p className="text-sm mt-2 font-medium">Đang tải danh sách khiếu nại...</p>
+            </div>
+          ) : disputes.length === 0 ? (
+            <div className="py-20 text-center text-slate-400">
+              <span className="material-symbols-outlined text-5xl text-slate-200">check_circle</span>
+              <p className="text-sm mt-3 font-semibold text-slate-700">Tuyệt vời! Không có khiếu nại nào chờ xử lý</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 bg-slate-50/30 text-slate-400 font-bold text-xs">
+                    <th className="p-4 pl-6">Mã Đơn / Thiết bị</th>
+                    <th className="p-4">Người khiếu nại</th>
+                    <th className="p-4">Ngày khiếu nại</th>
+                    <th className="p-4">Trạng thái</th>
+                    <th className="p-4 pr-6 text-right">Thao tác</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {disputes.map((order) => {
+                    const dateStr = order.disputedAt
+                      ? new Date(order.disputedAt).toLocaleDateString('vi-VN', {
+                          day: '2-digit', month: '2-digit', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit'
+                        })
+                      : '-';
+
+                    return (
+                      <tr key={order._id} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="p-4 pl-6">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-slate-100 overflow-hidden border border-slate-200 flex-shrink-0">
+                              <img 
+                                src={order.asset?.images?.[0] || 'https://placehold.co/150'} 
+                                alt="asset"
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <p className="font-bold text-xs text-slate-800 truncate max-w-[200px]" title={order.asset?.name}>
+                                {order.asset?.name}
+                              </p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">Order ID: {order._id.substring(0,8)}...</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              order.disputeCreator === 'lender' ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {order.disputeCreator === 'lender' ? 'Lender' : 'Renter'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="p-4 text-xs text-slate-500 font-medium">{dateStr}</td>
+                        <td className="p-4">
+                          <span className={`inline-flex items-center px-2 py-1 rounded-full text-[10px] font-bold ${
+                            order.disputeStatus === 'open' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-600'
+                          }`}>
+                            {order.disputeStatus === 'open' ? 'Chờ Renter phản hồi' : 'Đã có phản hồi'}
+                          </span>
+                        </td>
+                        <td className="p-4 pr-6 text-right">
+                          <button 
+                            onClick={() => handleOpenDisputeReview(order)}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3 rounded-xl shadow-sm hover:shadow transition-all"
+                          >
+                            Xử lý
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Review Modal */}
       {isModalOpen && selectedAsset && (
@@ -678,6 +891,216 @@ const DashboardInspector = () => {
 
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Dispute Modal */}
+      {isDisputeModalOpen && selectedDispute && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl flex flex-col animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 border-b border-slate-150 bg-slate-900 text-white flex justify-between items-center">
+              <div>
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-red-400">
+                  Xử lý khiếu nại
+                </span>
+                <h3 className="font-extrabold text-base mt-0.5">Order ID: {selectedDispute._id}</h3>
+              </div>
+              <button 
+                onClick={() => setIsDisputeModalOpen(false)}
+                className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/75 hover:text-white transition-colors"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
+              <div className="bg-orange-50 border border-orange-200 rounded-xl p-4">
+                <h4 className="font-bold text-orange-800 text-xs uppercase mb-2">Thông tin khiếu nại (Từ {selectedDispute.disputeCreator === 'lender' ? 'Lender' : 'Renter'})</h4>
+                <p className="text-sm text-slate-700">{selectedDispute.disputeNotes}</p>
+                {selectedDispute.requestedDeductionAmount > 0 && (
+                  <p className="text-sm font-bold text-red-600 mt-2">Mức yêu cầu bồi thường: {selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ</p>
+                )}
+
+                {/* --- LENDER IMAGES --- */}
+                <div className="mt-4 border-t border-orange-200/50 pt-3">
+                  <h5 className="font-bold text-[10px] text-orange-700 uppercase mb-2">Ảnh của Lender</h5>
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    <div>
+                      <p className="text-[9px] text-slate-500 mb-1">Lúc giao đồ (Handover)</p>
+                      <div className="flex gap-2">
+                        {selectedDispute.handoverImages && selectedDispute.handoverImages.length > 0 ? (
+                          selectedDispute.handoverImages.map((img, i) => (
+                            <img key={i} src={img} alt="Bằng chứng" className="h-16 w-16 object-cover rounded shadow-sm border border-slate-200" />
+                          ))
+                        ) : <span className="text-[10px] text-slate-400 italic">Không có</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-500 mb-1">Lúc nhận lại (Return)</p>
+                      <div className="flex gap-2">
+                        {selectedDispute.returnImages && selectedDispute.returnImages.length > 0 ? (
+                          selectedDispute.returnImages.map((img, i) => (
+                            <img key={i} src={img} alt="Bằng chứng" className="h-16 w-16 object-cover rounded shadow-sm border border-slate-200" />
+                          ))
+                        ) : <span className="text-[10px] text-slate-400 italic">Không có</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- RENTER IMAGES --- */}
+                <div className="mt-4 border-t border-orange-200/50 pt-3">
+                  <h5 className="font-bold text-[10px] text-blue-700 uppercase mb-2">Ảnh của Renter</h5>
+                  <div className="flex gap-4 overflow-x-auto pb-2">
+                    <div>
+                      <p className="text-[9px] text-slate-500 mb-1">Lúc nhận đồ (Handover)</p>
+                      <div className="flex gap-2">
+                        {selectedDispute.renterHandoverImages && selectedDispute.renterHandoverImages.length > 0 ? (
+                          selectedDispute.renterHandoverImages.map((img, i) => (
+                            <img key={i} src={img} alt="Bằng chứng" className="h-16 w-16 object-cover rounded shadow-sm border border-slate-200" />
+                          ))
+                        ) : <span className="text-[10px] text-slate-400 italic">Không có</span>}
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-[9px] text-slate-500 mb-1">Lúc trả đồ (Return)</p>
+                      <div className="flex gap-2">
+                        {selectedDispute.renterReturnImages && selectedDispute.renterReturnImages.length > 0 ? (
+                          selectedDispute.renterReturnImages.map((img, i) => (
+                            <img key={i} src={img} alt="Bằng chứng" className="h-16 w-16 object-cover rounded shadow-sm border border-slate-200" />
+                          ))
+                        ) : <span className="text-[10px] text-slate-400 italic">Không có</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {selectedDispute.renterDisputeNotes && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <h4 className="font-bold text-blue-800 text-xs uppercase mb-2">Phản hồi từ Renter</h4>
+                  <p className="text-sm text-slate-700">{selectedDispute.renterDisputeNotes}</p>
+                  {selectedDispute.renterDisputeImages && selectedDispute.renterDisputeImages.length > 0 && (
+                    <div className="flex gap-2 mt-3 overflow-x-auto pb-2">
+                      {selectedDispute.renterDisputeImages.map((img, i) => (
+                        <img key={i} src={img} alt="Bằng chứng" className="h-20 w-20 object-cover rounded-lg border border-blue-200" />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedDispute.disputeCreator === 'renter' ? (
+                <div className="space-y-4 pt-4 border-t border-slate-100">
+                  <div className="bg-blue-50 text-blue-800 p-4 rounded-xl text-sm mb-4">
+                    <strong>Renter khiếu nại lúc nhận đồ.</strong><br/>
+                    - Nếu đúng hàng Lỗi/Fake: Chấp nhận khiếu nại (Hoàn 100% tiền cho Renter).<br/>
+                    - Nếu Renter sai: Bác bỏ khiếu nại (Renter mất tiền thuê, hoàn cọc).
+                  </div>
+                  <div className="flex justify-end gap-3 flex-wrap">
+                    <button 
+                      type="button" 
+                      onClick={() => setIsDisputeModalOpen(false)}
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs py-2.5 px-5 rounded-xl transition-all"
+                    >
+                      Đóng
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={resolveLoading}
+                      onClick={() => handleResolveAction('reject_renter_dispute')}
+                      className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl transition-all shadow active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                      Bác bỏ khiếu nại (Renter sai)
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={resolveLoading}
+                      onClick={() => handleResolveAction('accept_renter_dispute')}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl transition-all shadow active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">check_circle</span>
+                      Chấp nhận khiếu nại (Hoàn 100% tiền)
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={(e) => { e.preventDefault(); handleResolveAction('force_compensation'); }} className="space-y-4">
+                  <div className="bg-orange-50 text-orange-800 p-4 rounded-xl text-sm mb-4">
+                    <strong>Lender yêu cầu bồi thường hư hỏng.</strong><br/>
+                    - Nhập số tiền bồi thường để Cưỡng chế trừ cọc Renter.<br/>
+                    - Hoặc Bác bỏ nếu yêu cầu vô lý.
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền bồi thường cho Lender (đ)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={lenderCompensation}
+                        onChange={(e) => setLenderCompensation(e.target.value)}
+                        placeholder="VD: 500000"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền hoàn trả cho Renter (đ)</label>
+                      <input 
+                        type="number" 
+                        min="0"
+                        value={renterRefund}
+                        onChange={(e) => setRenterRefund(e.target.value)}
+                        placeholder="VD: 0"
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div className="text-[10px] text-slate-500 italic">
+                    * Tổng số tiền bồi thường và hoàn trả phải được phân bổ hợp lý dựa trên tổng giá trị cọc và thuê của đơn hàng.
+                  </div>
+
+                  <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 flex-wrap">
+                    {selectedDispute.requestedDeductionAmount > 0 && selectedDispute.disputeStatus !== 'inspector_reviewed' && (
+                      <button 
+                        type="button" 
+                        onClick={() => handleRequestRenterConfirmation(selectedDispute._id, selectedDispute.requestedDeductionAmount)}
+                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all shadow flex items-center gap-1.5"
+                      >
+                        <span className="material-symbols-outlined text-sm">forward_to_inbox</span>
+                        Gửi Renter xác nhận đền bù ({selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ)
+                      </button>
+                    )}
+                    <button 
+                      type="button" 
+                      onClick={() => setIsDisputeModalOpen(false)}
+                      className="border border-slate-200 hover:bg-slate-50 text-slate-700 font-bold text-xs py-2.5 px-5 rounded-xl transition-all"
+                    >
+                      Đóng
+                    </button>
+                    <button 
+                      type="button"
+                      disabled={resolveLoading}
+                      onClick={() => handleResolveAction('reject_lender_dispute')}
+                      className="bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl transition-all shadow active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">cancel</span>
+                      Bác bỏ yêu cầu bồi thường
+                    </button>
+                    <button 
+                      type="submit"
+                      disabled={resolveLoading}
+                      className="bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs py-2.5 px-6 rounded-xl transition-all shadow active:scale-95 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      <span className="material-symbols-outlined text-sm">gavel</span>
+                      {resolveLoading ? 'Đang xử lý...' : 'Cưỡng chế trừ cọc'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}

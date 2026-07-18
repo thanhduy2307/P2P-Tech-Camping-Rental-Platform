@@ -11,6 +11,13 @@ const LenderInventory = () => {
   const [selectedAssetForBlock, setSelectedAssetForBlock] = useState(null);
   const [blockStartDate, setBlockStartDate] = useState('');
   const [blockEndDate, setBlockEndDate] = useState('');
+  
+  // Calendar states
+  const [calendarData, setCalendarData] = useState(null);
+  const [currentDate, setCurrentDate] = useState(new Date());
+
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 8;
 
   const fetchMyInventory = async () => {
     setLoading(true);
@@ -30,11 +37,22 @@ const LenderInventory = () => {
     fetchMyInventory();
   }, []);
 
-  const openBlockModal = (asset) => {
+  const openBlockModal = async (asset) => {
     setSelectedAssetForBlock(asset);
     setBlockStartDate('');
     setBlockEndDate('');
     setBlockModalOpen(true);
+    setCalendarData(null);
+    setCurrentDate(new Date());
+
+    try {
+      const res = await api.get(`/assets/${asset._id}`);
+      if (res.data?.success) {
+        setCalendarData(res.data.data);
+      }
+    } catch (err) {
+      console.error("Failed to load asset details for calendar", err);
+    }
   };
 
   const handleAddBlockDate = async () => {
@@ -54,6 +72,9 @@ const LenderInventory = () => {
         setBlockStartDate('');
         setBlockEndDate('');
         setSelectedAssetForBlock({ ...selectedAssetForBlock, blockedDates: res.data.data });
+        if (calendarData) {
+           setCalendarData({ ...calendarData, blockedDates: res.data.data });
+        }
         fetchMyInventory();
       }
     } catch (err) {
@@ -68,10 +89,36 @@ const LenderInventory = () => {
       const res = await api.put(`/assets/${selectedAssetForBlock._id}/block-dates`, { blockedDates: updatedBlocks });
       if (res.data?.success) {
         setSelectedAssetForBlock({ ...selectedAssetForBlock, blockedDates: res.data.data });
+        if (calendarData) {
+           setCalendarData({ ...calendarData, blockedDates: res.data.data });
+        }
         fetchMyInventory();
       }
     } catch (err) {
       Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra.');
+    }
+  };
+
+  const handleDeleteAsset = async (assetId) => {
+    const res = await Swal.fire({
+      title: 'Xóa thiết bị?',
+      text: 'Thiết bị này sẽ bị xóa khỏi hệ thống. Hành động này không thể hoàn tác.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xóa thiết bị',
+      cancelButtonText: 'Hủy'
+    });
+    if (res.isConfirmed) {
+      try {
+        const response = await api.delete(`/assets/${assetId}`);
+        if (response.data?.success) {
+          Swal.fire('Đã xóa', 'Thiết bị đã được xóa.', 'success');
+          fetchMyInventory();
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Lỗi', err.response?.data?.message || 'Không thể xóa thiết bị này.', 'error');
+      }
     }
   };
 
@@ -99,6 +146,85 @@ const LenderInventory = () => {
       </div>
     );
   }
+
+  // Generate Calendar Grid
+  const getDaysInMonth = (year, month) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year, month) => new Date(year, month, 1).getDay(); // 0 is Sunday
+
+  const renderCalendar = () => {
+    if (!calendarData) return <div className="p-8 flex justify-center items-center"><span className="material-symbols-outlined animate-spin text-teal-600 text-3xl">autorenew</span></div>;
+
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const prevMonthDays = firstDay === 0 ? 6 : firstDay - 1; // Start week on Monday
+
+    const days = [];
+    for (let i = 0; i < prevMonthDays; i++) {
+      days.push(<div key={`empty-${i}`} className="p-2 border border-slate-100 bg-slate-50/50"></div>);
+    }
+
+    const checkOverlap = (dateStr, ranges) => {
+      if (!ranges) return false;
+      const t = new Date(dateStr).setHours(0,0,0,0);
+      return ranges.some(r => {
+        const s = new Date(r.startDate).setHours(0,0,0,0);
+        const e = new Date(r.endDate).setHours(0,0,0,0);
+        return t >= s && t <= e;
+      });
+    };
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      const isRented = checkOverlap(dateStr, calendarData.rentedDates);
+      const isBlocked = checkOverlap(dateStr, calendarData.blockedDates);
+      const isToday = new Date().setHours(0,0,0,0) === new Date(dateStr).setHours(0,0,0,0);
+      const isPast = new Date(dateStr).setHours(0,0,0,0) < new Date().setHours(0,0,0,0);
+
+      let statusClass = "bg-white hover:bg-teal-50 cursor-default";
+      let statusText = "";
+      if (isRented) {
+        statusClass = "bg-red-50 border-red-200 text-red-700 font-bold";
+        statusText = "Đang thuê";
+      } else if (isBlocked) {
+        statusClass = "bg-slate-200 border-slate-300 text-slate-600";
+        statusText = "Bảo trì";
+      } else if (!isPast) {
+        statusText = "Rảnh";
+        statusClass = "bg-white hover:bg-emerald-50 text-slate-700";
+      }
+
+      days.push(
+        <div key={d} className={`p-1.5 border border-slate-100 flex flex-col justify-between min-h-[60px] transition-colors ${statusClass} ${isPast ? 'opacity-40 grayscale' : ''}`}>
+          <span className={`text-xs font-semibold w-6 h-6 flex items-center justify-center ${isToday ? 'bg-teal-600 text-white rounded-full shadow-sm' : ''}`}>{d}</span>
+          {statusText && <span className={`text-[9px] leading-tight text-center mt-1 py-0.5 rounded ${isRented ? 'bg-red-100' : isBlocked ? 'bg-slate-300' : isPast ? 'bg-transparent text-slate-400' : 'bg-emerald-100 text-emerald-700'}`}>{statusText}</span>}
+        </div>
+      );
+    }
+
+    const weekDays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
+
+    return (
+      <div className="w-full mb-6">
+        <div className="flex justify-between items-center mb-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+          <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-slate-200 transition-all">
+             <span className="material-symbols-outlined text-sm">chevron_left</span>
+          </button>
+          <span className="font-bold text-sm text-slate-700 uppercase tracking-widest">Tháng {month + 1}, {year}</span>
+          <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="w-8 h-8 flex items-center justify-center text-slate-500 hover:bg-white hover:shadow-sm rounded-lg border border-transparent hover:border-slate-200 transition-all">
+             <span className="material-symbols-outlined text-sm">chevron_right</span>
+          </button>
+        </div>
+        <div className="grid grid-cols-7 gap-0 border border-slate-200 rounded-xl overflow-hidden bg-white shadow-sm">
+          {weekDays.map(wd => (
+            <div key={wd} className="py-2 text-center text-[10px] font-bold text-slate-500 bg-slate-100 border-b border-slate-200 uppercase">{wd}</div>
+          ))}
+          {days}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -131,8 +257,9 @@ const LenderInventory = () => {
           </Link>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {assets.map(asset => {
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {assets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(asset => {
             const imgUrl = asset.images && asset.images.length > 0 ? asset.images[0] : 'https://placehold.co/400x300?text=No+Image';
             
             return (
@@ -213,13 +340,23 @@ const LenderInventory = () => {
 
                   {/* Actions Toggle at Bottom */}
                   <div className="mt-auto pt-3 border-t border-slate-100 flex flex-col gap-2">
-                    <Link
-                      to={`/post-asset?id=${asset._id}`}
-                      className="text-center text-xs font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 active:scale-98"
-                    >
-                      <span className="material-symbols-outlined text-sm">edit</span>
-                      Chỉnh sửa thông tin
-                    </Link>
+                    <div className="flex gap-2">
+                      <Link
+                        to={`/post-asset?id=${asset._id}`}
+                        className="flex-1 text-center text-xs font-bold text-slate-700 hover:bg-slate-50 border border-slate-200 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 active:scale-98"
+                      >
+                        <span className="material-symbols-outlined text-sm">edit</span>
+                        Chỉnh sửa
+                      </Link>
+                      
+                      <button
+                        onClick={() => handleDeleteAsset(asset._id)}
+                        className="flex-[0.7] text-center text-xs font-bold text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 py-2 rounded-lg transition-colors flex items-center justify-center gap-1 active:scale-98"
+                      >
+                        <span className="material-symbols-outlined text-sm">delete</span>
+                        Xóa
+                      </button>
+                    </div>
                     
                     <button
                       onClick={() => openBlockModal(asset)}
@@ -278,12 +415,48 @@ const LenderInventory = () => {
             );
           })}
         </div>
+
+        {/* Pagination Controls */}
+        {Math.ceil(assets.length / itemsPerPage) > 1 && (
+          <div className="flex justify-center items-center gap-2 mt-8">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <span className="material-symbols-outlined">chevron_left</span>
+            </button>
+            <div className="flex gap-1">
+              {[...Array(Math.ceil(assets.length / itemsPerPage))].map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentPage(idx + 1)}
+                  className={`w-10 h-10 flex items-center justify-center rounded-lg text-sm font-bold transition-colors ${
+                    currentPage === idx + 1
+                      ? 'bg-teal-600 text-white shadow-md'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(Math.ceil(assets.length / itemsPerPage), p + 1))}
+              disabled={currentPage === Math.ceil(assets.length / itemsPerPage)}
+              className="w-10 h-10 flex items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <span className="material-symbols-outlined">chevron_right</span>
+            </button>
+          </div>
+        )}
+        </>
       )}
 
       {/* Block Dates Modal */}
       {blockModalOpen && selectedAssetForBlock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 bg-slate-900/40 backdrop-blur-sm transition-all duration-300">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl overflow-hidden flex flex-col">
             <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-500">event_busy</span>
@@ -294,49 +467,61 @@ const LenderInventory = () => {
               </button>
             </div>
             
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
+            <div className="p-6 overflow-y-auto max-h-[80vh]">
               <p className="text-xs text-slate-500 mb-4 leading-relaxed">
-                Thiết lập các khoảng thời gian mà bạn không muốn cho thuê thiết bị <strong>{selectedAssetForBlock.name}</strong> (VD: bận việc cá nhân, đi bảo trì). Hệ thống sẽ tự động chặn Renter đặt vào những ngày này.
+                Lịch dưới đây tổng hợp thời gian khách <strong>Đang thuê (màu đỏ)</strong> và thời gian bạn tự <strong>Bảo trì/Khóa (màu xám)</strong>. Bạn có thể tự thêm ngày bảo trì vào các ngày rảnh để chặn khách đặt.
               </p>
 
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-6 flex flex-col gap-3">
-                <div className="flex gap-3 items-end">
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>
-                    <input type="date" value={blockStartDate} onChange={(e) => setBlockStartDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
+              {renderCalendar()}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Thêm khoảng bảo trì</h4>
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col gap-3">
+                    <div className="flex gap-3 items-end">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Từ ngày</label>
+                        <input type="date" value={blockStartDate} onChange={(e) => setBlockStartDate(e.target.value)} min={new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Đến ngày</label>
+                        <input type="date" value={blockEndDate} onChange={(e) => setBlockEndDate(e.target.value)} min={blockStartDate || new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
+                      </div>
+                      <button onClick={handleAddBlockDate} className="bg-amber-500 hover:bg-amber-600 text-white font-bold p-2.5 rounded-lg flex items-center justify-center transition-colors shadow-sm">
+                        <span className="material-symbols-outlined">add</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Đến ngày</label>
-                    <input type="date" value={blockEndDate} onChange={(e) => setBlockEndDate(e.target.value)} min={blockStartDate || new Date().toISOString().split('T')[0]} className="w-full text-sm p-2 border border-slate-200 rounded-lg outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400" />
-                  </div>
-                  <button onClick={handleAddBlockDate} className="bg-amber-500 hover:bg-amber-600 text-white font-bold p-2 rounded-lg flex items-center justify-center transition-colors">
-                    <span className="material-symbols-outlined">add</span>
-                  </button>
+                </div>
+
+                <div>
+                  <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Danh sách ngày tự khóa</h4>
+                  {(!selectedAssetForBlock.blockedDates || selectedAssetForBlock.blockedDates.length === 0) ? (
+                    <div className="border border-dashed border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center text-center">
+                      <span className="material-symbols-outlined text-slate-300 text-2xl mb-1">free_cancellation</span>
+                      <p className="text-xs text-slate-400 italic">Chưa có lịch bảo trì nào.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                      {selectedAssetForBlock.blockedDates.map((block, index) => (
+                        <div key={index} className="flex justify-between items-center bg-white border border-slate-200 p-2.5 rounded-lg shadow-sm">
+                          <div className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-slate-400 text-sm">calendar_month</span>
+                            {new Date(block.startDate).toLocaleDateString('vi-VN')} - {new Date(block.endDate).toLocaleDateString('vi-VN')}
+                          </div>
+                          {block.reason === 'manual' ? (
+                            <button onClick={() => handleRemoveBlockDate(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors" title="Mở khóa lịch này">
+                              <span className="material-symbols-outlined text-sm">lock_open</span>
+                            </button>
+                          ) : (
+                            <span className="text-[9px] bg-emerald-50 text-emerald-600 font-bold px-1.5 py-0.5 rounded border border-emerald-100">Đã thuê</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
-
-              <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider mb-3">Danh sách ngày đã khóa</h4>
-              {(!selectedAssetForBlock.blockedDates || selectedAssetForBlock.blockedDates.length === 0) ? (
-                <p className="text-sm text-slate-400 italic text-center py-4">Chưa có lịch khóa nào được thiết lập.</p>
-              ) : (
-                <div className="space-y-2">
-                  {selectedAssetForBlock.blockedDates.map((block, index) => (
-                    <div key={index} className="flex justify-between items-center bg-white border border-slate-200 p-3 rounded-lg shadow-sm">
-                      <div className="text-sm font-semibold text-slate-700 flex items-center gap-2">
-                        <span className="material-symbols-outlined text-slate-400 text-sm">calendar_month</span>
-                        {new Date(block.startDate).toLocaleDateString('vi-VN')} - {new Date(block.endDate).toLocaleDateString('vi-VN')}
-                      </div>
-                      {block.reason === 'manual' ? (
-                        <button onClick={() => handleRemoveBlockDate(index)} className="text-red-500 hover:text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors" title="Xóa lịch khóa">
-                          <span className="material-symbols-outlined text-sm">delete</span>
-                        </button>
-                      ) : (
-                        <span className="text-[10px] bg-emerald-50 text-emerald-600 font-bold px-2 py-1 rounded border border-emerald-100">Đã có người thuê</span>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
             
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end">

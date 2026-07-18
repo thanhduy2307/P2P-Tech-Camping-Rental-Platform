@@ -30,6 +30,8 @@ import Login from './Page/login';
 import Register from './Page/register';
 import Chat from './Page/chat';
 
+import PublicProfile from './Page/public-profile';
+
 function App() {
   return (
     <Router>
@@ -40,6 +42,7 @@ function App() {
           <Route path="/assets" element={<BrowseAssets />} />
           <Route path="/assets/:id" element={<AssetDetail />} />
           <Route path="/blogs" element={<Blogs />} />
+          <Route path="/user/:id" element={<PublicProfile />} />
         </Route>
 
         {/* Auth Routes */}

@@ -10,7 +10,8 @@ const {
   getAssetById,
   getMyAssets,
   updateAsset,
-  manageBlockedDates
+  manageBlockedDates,
+  deleteAsset
 } = require('../controllers/assetController');
 const { protect, authorize, checkLenderPermission } = require('../middleware/auth');
 
@@ -33,6 +34,9 @@ router.put('/:id/status', protect, authorize('lender'), updateAssetStatus);
 
 // Edit asset details
 router.put('/:id', protect, authorize('lender'), checkLenderPermission, updateAsset);
+
+// Delete an asset
+router.delete('/:id', protect, authorize('lender'), checkLenderPermission, deleteAsset);
 
 // Manage blocked dates
 router.put('/:id/block-dates', protect, authorize('lender'), checkLenderPermission, manageBlockedDates);

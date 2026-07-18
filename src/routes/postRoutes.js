@@ -8,7 +8,8 @@ const {
   deletePost,
   toggleLikePost,
   commentPost,
-  generateAIPostContent
+  generateAIPostContent,
+  sharePost
 } = require('../controllers/postController');
 const { protect } = require('../middleware/auth');
 
@@ -26,6 +27,7 @@ router.delete('/:id', protect, deletePost);
 
 router.post('/:id/like', protect, toggleLikePost);
 router.post('/:id/comment', protect, commentPost);
+router.post('/:id/share', protect, sharePost);
 
 router.post('/generate-ai-content', protect, generateAIPostContent);
 

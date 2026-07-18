@@ -26,7 +26,7 @@ const DashboardLayout = ({ role, children }) => {
 
   const handleSwitchRole = async () => {
     try {
-      const response = await api.put('/auth/switch-role');
+      const response = await api.put('/auth/switch-role', { targetRole: userRole === 'renter' ? 'lender' : 'renter' });
       if (response.data && response.data.success) {
         const { token: newToken, role: newRole, ...userData } = response.data.data;
         
@@ -89,22 +89,67 @@ const DashboardLayout = ({ role, children }) => {
           {role === 'admin' && (
             <>
               <Link 
-                to="/dashboard-admin" 
+                to="/dashboard-admin?tab=stats" 
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive('/dashboard-admin') ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                  (location.pathname === '/dashboard-admin' && (!location.search || location.search.includes('tab=stats'))) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]">dashboard</span>
-                Tổng quan
+                <span className="material-symbols-outlined text-[20px]">query_stats</span>
+                Tổng quan (Stats)
               </Link>
               <Link 
-                to="/profile" 
+                to="/dashboard-admin?tab=users" 
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive('/profile') ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=users')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
                 }`}
               >
                 <span className="material-symbols-outlined text-[20px]">group</span>
-                Thành viên & Vai trò
+                Thành viên (Users)
+              </Link>
+              <Link 
+                to="/dashboard-admin?tab=renters_ekyc" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=renters_ekyc')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
+                Duyệt eKYC Renter
+              </Link>
+              <Link 
+                to="/dashboard-admin?tab=lenders" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=lenders')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">assignment_ind</span>
+                Duyệt eKYC Lender
+              </Link>
+              <Link 
+                to="/dashboard-admin?tab=withdrawals" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=withdrawals')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
+                Duyệt rút tiền
+              </Link>
+              <Link 
+                to="/dashboard-admin?tab=assets" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=assets')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">category</span>
+                Quản lý thiết bị (Assets)
+              </Link>
+              <Link 
+                to="/dashboard-admin?tab=orders" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  (location.pathname === '/dashboard-admin' && location.search.includes('tab=orders')) ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">shopping_cart</span>
+                Đơn đặt thuê (Orders)
               </Link>
             </>
           )}
@@ -171,15 +216,7 @@ const DashboardLayout = ({ role, children }) => {
             </>
           )}
           
-          <div className="pt-4 mt-4 border-t border-slate-800">
-            <Link 
-              to="/" 
-              className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-all"
-            >
-              <span className="material-symbols-outlined text-[20px]">storefront</span>
-              Đến Cửa hàng
-            </Link>
-          </div>
+
         </nav>
       </aside>
 
@@ -199,15 +236,18 @@ const DashboardLayout = ({ role, children }) => {
           
           <div className="flex items-center gap-4">
             {/* Quick Switch Role inside Dashboard */}
-            <button 
-              onClick={handleSwitchRole}
-              className="text-secondary-container bg-secondary/10 hover:bg-secondary/15 transition-colors px-3 py-1.5 rounded-lg border border-secondary/20 font-semibold text-xs flex items-center gap-1.5 text-secondary"
-            >
-              <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
-              Chuyển sang Renter
-            </button>
-
-            <span className="h-4 w-px bg-slate-350"></span>
+            {role !== 'admin' && (
+              <>
+                <button 
+                  onClick={handleSwitchRole}
+                  className="text-secondary-container bg-secondary/10 hover:bg-secondary/15 transition-colors px-3 py-1.5 rounded-lg border border-secondary/20 font-semibold text-xs flex items-center gap-1.5 text-secondary"
+                >
+                  <span className="material-symbols-outlined text-[16px]">swap_horiz</span>
+                  Chuyển sang Renter
+                </button>
+                <span className="h-4 w-px bg-slate-350"></span>
+              </>
+            )}
             
             <button 
               onClick={handleLogout} 

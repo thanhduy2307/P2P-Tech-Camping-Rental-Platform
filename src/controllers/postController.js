@@ -51,6 +51,13 @@ exports.getAllPosts = async (req, res) => {
       .populate('author', 'name email role reputationScore avatar')
       .populate('taggedAssets', 'name category pricePerDay depositAmount images status')
       .populate('comments.user', 'name role avatar')
+      .populate({
+        path: 'originalPost',
+        populate: [
+          { path: 'author', select: 'name email role avatar' },
+          { path: 'taggedAssets', select: 'name category pricePerDay depositAmount images status' }
+        ]
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -72,6 +79,13 @@ exports.getUserPosts = async (req, res) => {
       .populate('author', 'name email role reputationScore avatar')
       .populate('taggedAssets', 'name category pricePerDay depositAmount images status')
       .populate('comments.user', 'name role avatar')
+      .populate({
+        path: 'originalPost',
+        populate: [
+          { path: 'author', select: 'name email role avatar' },
+          { path: 'taggedAssets', select: 'name category pricePerDay depositAmount images status' }
+        ]
+      })
       .sort({ createdAt: -1 });
 
     res.status(200).json({
@@ -272,6 +286,51 @@ exports.generateAIPostContent = async (req, res) => {
     res.status(200).json({
       success: true,
       data: aiContent
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Share a post
+// @route   POST /api/posts/:id/share
+// @access  Private
+exports.sharePost = async (req, res) => {
+  try {
+    const { sharedText } = req.body;
+    const originalPostId = req.params.id;
+
+    const originalPost = await Post.findById(originalPostId);
+    if (!originalPost) {
+      return res.status(404).json({ success: false, message: 'Bài viết gốc không tồn tại.' });
+    }
+
+    // You can't share a shared post to prevent deep nesting, share the original instead
+    const targetPostId = originalPost.isShared ? originalPost.originalPost : originalPost._id;
+
+    const sharedPost = await Post.create({
+      author: req.user._id,
+      title: 'Shared Post',
+      content: 'Shared Content',
+      isShared: true,
+      originalPost: targetPostId,
+      sharedText: sharedText || ''
+    });
+
+    const populatedPost = await Post.findById(sharedPost._id)
+      .populate('author', 'name email role avatar')
+      .populate({
+        path: 'originalPost',
+        populate: [
+          { path: 'author', select: 'name email role avatar' },
+          { path: 'taggedAssets', select: 'name category pricePerDay depositAmount images status' }
+        ]
+      });
+
+    res.status(201).json({
+      success: true,
+      message: 'Đã chia sẻ bài viết thành công.',
+      data: populatedPost
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

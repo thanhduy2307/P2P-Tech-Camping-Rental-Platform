@@ -43,27 +43,67 @@ const HomeTemplate = ({ children }) => {
     }
   };
 
+  // Notifications State
+  const [showNotificationDropdown, setShowNotificationDropdown] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
+  const notificationDropdownRef = useRef(null);
+
+  const fetchNotifications = async () => {
+    if (!token) return;
+    setLoadingNotifications(true);
+    try {
+      const response = await api.get('/notifications');
+      if (response.data?.success) {
+        setNotifications(response.data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  const handleNotificationClick = async (notification) => {
+    try {
+      if (!notification.isRead) {
+        await api.put(`/notifications/${notification._id}/read`);
+        setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n));
+      }
+      setShowNotificationDropdown(false);
+      if (notification.link) {
+        navigate(notification.link);
+      }
+    } catch (err) {
+      console.error("Error clicking notification:", err);
+    }
+  };
+
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (chatDropdownRef.current && !chatDropdownRef.current.contains(event.target)) {
         setShowChatDropdown(false);
+      }
+      if (notificationDropdownRef.current && !notificationDropdownRef.current.contains(event.target)) {
+        setShowNotificationDropdown(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Poll conversations status every 10s when logged in to update red dot
+  // Poll conversations and notifications status every 10s
   useEffect(() => {
     if (!token) return;
     const fetchUnreadStatus = async () => {
       try {
-        const response = await api.get('/chats/conversations');
-        if (response.data?.success) {
-          setConversations(response.data.data || []);
-        }
+        const chatRes = await api.get('/chats/conversations');
+        if (chatRes.data?.success) setConversations(chatRes.data.data || []);
+
+        const notifRes = await api.get('/notifications');
+        if (notifRes.data?.success) setNotifications(notifRes.data.data || []);
       } catch (err) {
-        console.error("Failed to poll conversations status:", err);
+        console.error("Failed to poll status:", err);
       }
     };
     fetchUnreadStatus();
@@ -90,7 +130,7 @@ const HomeTemplate = ({ children }) => {
 
   const handleSwitchRole = async () => {
     try {
-      const response = await api.put('/auth/switch-role');
+      const response = await api.put('/auth/switch-role', { targetRole: role === 'renter' ? 'lender' : 'renter' });
       if (response.data && response.data.success) {
         const { token: newToken, role: newRole, ...userData } = response.data.data;
         
@@ -165,12 +205,15 @@ const HomeTemplate = ({ children }) => {
             <li><Link to="/assets?category=tech" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Đồ công nghệ</Link></li>
             <li><Link to="/assets?category=camping" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Cắm trại</Link></li>
             <li><Link to="/blogs" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Blogs</Link></li>
-            {/* {token && role === 'lender' && (
-              <li><Link to="/dashboard-lender" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">List Gear</Link></li>
+            {token && role === 'admin' && (
+              <li><Link to="/dashboard-admin" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Trang Quản trị</Link></li>
             )}
-            {token && role === 'renter' && (
-              <li><Link to="/register-lender" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Become Lender</Link></li>
-            )} */}
+            {token && role === 'inspector' && (
+              <li><Link to="/dashboard-inspector" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Trang Kiểm duyệt</Link></li>
+            )}
+            {token && role === 'lender' && (
+              <li><Link to="/dashboard-lender" className="text-on-surface-variant hover:text-primary transition-colors font-title-md text-[16px] font-medium">Kênh Cho thuê</Link></li>
+            )}
           </ul>
           {/* Actions */}
           <div className="flex items-center gap-4">
@@ -180,6 +223,81 @@ const HomeTemplate = ({ children }) => {
                 <Link to="/orders" className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-container-low">
                   <span className="material-symbols-outlined">shopping_bag</span>
                 </Link>
+
+                {/* Notifications Dropdown */}
+                <div className="relative flex items-center" ref={notificationDropdownRef}>
+                  <button 
+                    onClick={() => {
+                      if (!showNotificationDropdown) {
+                        fetchNotifications();
+                      }
+                      setShowNotificationDropdown(!showNotificationDropdown);
+                      setShowChatDropdown(false);
+                    }}
+                    className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-container-low flex items-center justify-center relative cursor-pointer"
+                    title="Thông báo"
+                  >
+                    <span className="material-symbols-outlined">notifications</span>
+                    {notifications.some(n => !n.isRead) && (
+                      <span className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse border border-white"></span>
+                    )}
+                  </button>
+
+                  {showNotificationDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-80 md:w-96 bg-white border border-slate-200 rounded-2xl shadow-xl z-[9999] overflow-hidden flex flex-col max-h-[400px]">
+                      <div className="p-3.5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                        <span className="font-extrabold text-xs text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="material-symbols-outlined text-sm text-primary">notifications</span>
+                          Thông báo mới
+                        </span>
+                        <button 
+                          onClick={async () => {
+                            try {
+                              await api.put('/notifications/read-all');
+                              setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+                            } catch (err) {
+                              console.error(err);
+                            }
+                          }}
+                          className="text-[10px] font-extrabold text-teal-600 hover:text-teal-700 transition-colors uppercase tracking-wide"
+                        >
+                          Đánh dấu đã đọc
+                        </button>
+                      </div>
+
+                      <div className="flex-grow overflow-y-auto divide-y divide-slate-100 min-h-[120px] max-h-[280px]">
+                        {loadingNotifications ? (
+                          <div className="p-6 text-center text-slate-400">
+                            <span className="material-symbols-outlined animate-spin text-xl text-slate-350">autorenew</span>
+                            <p className="text-[10px] mt-1">Đang tải thông báo...</p>
+                          </div>
+                        ) : notifications.length === 0 ? (
+                          <div className="p-8 text-center text-slate-400 space-y-1">
+                            <span className="material-symbols-outlined text-2xl text-slate-300">notifications_off</span>
+                            <p className="text-[10px] font-semibold text-slate-500">Chưa có thông báo nào</p>
+                          </div>
+                        ) : (
+                          notifications.slice(0, 10).map((notif) => (
+                            <div 
+                              key={notif._id}
+                              onClick={() => handleNotificationClick(notif)}
+                              className={`p-3 flex flex-col gap-1 cursor-pointer transition-colors relative ${notif.isRead ? 'bg-white hover:bg-slate-50' : 'bg-primary/5 hover:bg-primary/10'}`}
+                            >
+                              <div className="flex justify-between items-start">
+                                <span className="font-bold text-xs text-slate-800">{notif.title}</span>
+                                {!notif.isRead && <span className="w-2 h-2 rounded-full bg-primary flex-shrink-0 mt-1"></span>}
+                              </div>
+                              <span className="text-[11px] text-slate-600">{notif.message}</span>
+                              <span className="text-[9px] text-slate-400 mt-0.5">
+                                {new Date(notif.createdAt).toLocaleString('vi-VN')}
+                              </span>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 
                 {/* Messenger-style Chats Dropdown */}
                 <div className="relative flex items-center" ref={chatDropdownRef}>
@@ -189,6 +307,7 @@ const HomeTemplate = ({ children }) => {
                         fetchConversationsDropdown();
                       }
                       setShowChatDropdown(!showChatDropdown);
+                      setShowNotificationDropdown(false);
                     }}
                     className="text-on-surface-variant hover:text-primary transition-colors p-2 rounded-full hover:bg-surface-container-low flex items-center justify-center relative cursor-pointer"
                     title="Hộp thư"

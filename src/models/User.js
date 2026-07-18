@@ -14,6 +14,14 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
+  coverImage: {
+    type: String,
+    default: ''
+  },
+  bio: {
+    type: String,
+    default: ''
+  },
   password: {
     type: String,
     required: false

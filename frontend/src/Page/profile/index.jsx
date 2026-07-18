@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import { useNavigate, Link } from 'react-router-dom';
+import axios from 'axios';
 import api from '../../configs/axios';
 import { loginSuccess, updateProfile } from '../../redux/authSlice';
 
@@ -27,6 +28,14 @@ const Profile = () => {
   const [ward, setWard] = useState('');
   const [district, setDistrict] = useState('');
   const [province, setProvince] = useState('');
+  
+  // Location API States
+  const [provincesList, setProvincesList] = useState([]);
+  const [districtsList, setDistrictsList] = useState([]);
+  const [wardsList, setWardsList] = useState([]);
+  const [selectedProvinceCode, setSelectedProvinceCode] = useState('');
+  const [selectedDistrictCode, setSelectedDistrictCode] = useState('');
+
   const [profileBankName, setProfileBankName] = useState('');
   const [profileAccountNumber, setProfileAccountNumber] = useState('');
   const [profileAccountHolder, setProfileAccountHolder] = useState('');
@@ -107,6 +116,85 @@ const Profile = () => {
     fetchFreshProfile();
   }, [token, dispatch]);
 
+  // Fetch Provinces on Edit
+  useEffect(() => {
+    if (isEditing && provincesList.length === 0) {
+      axios.get('https://provinces.open-api.vn/api/p/')
+        .then(res => setProvincesList(res.data))
+        .catch(err => console.error(err));
+    }
+  }, [isEditing]);
+
+  // Auto-select existing address when entering Edit Mode
+  useEffect(() => {
+    if (isEditing && provincesList.length > 0 && province && !selectedProvinceCode) {
+      const prov = provincesList.find(p => p.name.includes(province) || province.includes(p.name));
+      if (prov) {
+        setSelectedProvinceCode(prov.code);
+        setProvince(prov.name);
+        axios.get(`https://provinces.open-api.vn/api/p/${prov.code}?depth=2`)
+          .then(res => {
+            setDistrictsList(res.data.districts);
+            if (district) {
+              const dist = res.data.districts.find(d => d.name.includes(district) || district.includes(d.name));
+              if (dist) {
+                setSelectedDistrictCode(dist.code);
+                setDistrict(dist.name);
+                axios.get(`https://provinces.open-api.vn/api/d/${dist.code}?depth=2`)
+                  .then(res2 => {
+                    setWardsList(res2.data.wards);
+                    if (ward) {
+                      const w = res2.data.wards.find(w => w.name.includes(ward) || ward.includes(w.name));
+                      if (w) setWard(w.name);
+                    }
+                  })
+                  .catch(err => console.error(err));
+              }
+            }
+          })
+          .catch(err => console.error(err));
+      }
+    }
+  }, [isEditing, provincesList]);
+
+  const handleProvinceChange = (e) => {
+    const code = e.target.value;
+    setSelectedProvinceCode(code);
+    const selectedProv = provincesList.find(p => p.code == code);
+    setProvince(selectedProv ? selectedProv.name : '');
+    setDistrict('');
+    setWard('');
+    setSelectedDistrictCode('');
+    setDistrictsList([]);
+    setWardsList([]);
+    
+    if (code) {
+      axios.get(`https://provinces.open-api.vn/api/p/${code}?depth=2`)
+        .then(res => setDistrictsList(res.data.districts))
+        .catch(err => console.error(err));
+    }
+  };
+
+  const handleDistrictChange = (e) => {
+    const code = e.target.value;
+    setSelectedDistrictCode(code);
+    const selectedDist = districtsList.find(d => d.code == code);
+    setDistrict(selectedDist ? selectedDist.name : '');
+    setWard('');
+    setWardsList([]);
+
+    if (code) {
+      axios.get(`https://provinces.open-api.vn/api/d/${code}?depth=2`)
+        .then(res => setWardsList(res.data.wards))
+        .catch(err => console.error(err));
+    }
+  };
+
+  const handleWardChange = (e) => {
+    setWard(e.target.value);
+  };
+
+
   // Fetch wallet balance
   useEffect(() => {
     const fetchBalance = async () => {
@@ -130,7 +218,7 @@ const Profile = () => {
       setLoadingProfile(true);
       setProfileError('');
       setProfileSuccess('');
-      const response = await api.put('/auth/switch-role');
+      const response = await api.put('/auth/switch-role', { targetRole: user?.role === 'renter' ? 'lender' : 'renter' });
       if (response.data && response.data.success) {
         const { token: newToken, role: newRole, ...userData } = response.data.data;
         dispatch(loginSuccess({
@@ -822,36 +910,47 @@ const Profile = () => {
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-on-surface-variant mb-1.5">Tỉnh / Thành phố</label>
-                      <input 
-                        type="text" 
-                        value={province} 
-                        onChange={(e) => setProvince(e.target.value)}
-                        placeholder="Ví dụ: Lâm Đồng"
-                        className="w-full bg-surface border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none"
+                      <select 
+                        value={selectedProvinceCode || province} 
+                        onChange={handleProvinceChange}
+                        className="w-full bg-surface border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none font-semibold"
                         required
-                      />
+                      >
+                        <option value="">Chọn Tỉnh / Thành phố</option>
+                        {provincesList.map(p => (
+                          <option key={p.code} value={p.code}>{p.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-on-surface-variant mb-1.5">Quận / Huyện</label>
-                      <input 
-                        type="text" 
-                        value={district} 
-                        onChange={(e) => setDistrict(e.target.value)}
-                        placeholder="Ví dụ: TP. Đà Lạt"
-                        className="w-full bg-surface border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none"
+                      <select 
+                        value={selectedDistrictCode || district} 
+                        onChange={handleDistrictChange}
+                        disabled={!selectedProvinceCode && !district}
+                        className={`w-full border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none font-semibold ${(!selectedProvinceCode && !district) ? 'bg-surface-container-low text-on-surface-variant cursor-not-allowed' : 'bg-surface'}`}
                         required
-                      />
+                      >
+                        <option value="">Chọn Quận / Huyện</option>
+                        {districtsList.map(d => (
+                          <option key={d.code} value={d.code}>{d.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div>
                       <label className="block text-xs font-bold text-on-surface-variant mb-1.5">Phường / Xã</label>
-                      <input 
-                        type="text" 
+                      <select 
                         value={ward} 
-                        onChange={(e) => setWard(e.target.value)}
-                        placeholder="Ví dụ: Phường 2"
-                        className="w-full bg-surface border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none"
+                        onChange={handleWardChange}
+                        disabled={!selectedDistrictCode && !ward}
+                        className={`w-full border border-outline-variant rounded-xl px-3 py-2.5 text-sm focus:border-secondary focus:ring-1 focus:ring-secondary focus:outline-none font-semibold ${(!selectedDistrictCode && !ward) ? 'bg-surface-container-low text-on-surface-variant cursor-not-allowed' : 'bg-surface'}`}
                         required
-                      />
+                      >
+                        <option value="">Chọn Phường / Xã</option>
+                        {wardsList.map(w => (
+                          <option key={w.code} value={w.name}>{w.name}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="md:col-span-2">
                       <label className="block text-xs font-bold text-on-surface-variant mb-1.5">Số nhà, Tên đường</label>

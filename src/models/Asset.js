@@ -48,7 +48,7 @@ const assetSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['draft', 'pending_approval', 'verified', 'rented', 'rejected', 'unavailable', 'maintenance'],
+    enum: ['draft', 'pending_approval', 'verified', 'rented', 'rejected', 'unavailable', 'maintenance', 'deleted'],
     default: 'pending_approval'
   },
   images: [{
@@ -89,7 +89,8 @@ const assetSchema = new mongoose.Schema({
   },
   location: {
     lat: { type: Number, required: true },
-    lng: { type: Number, required: true }
+    lng: { type: Number, required: true },
+    addressString: { type: String, default: '' }
   },
   verifiedBy: {
     type: mongoose.Schema.Types.ObjectId,

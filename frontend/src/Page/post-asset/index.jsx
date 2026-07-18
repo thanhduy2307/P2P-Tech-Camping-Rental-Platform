@@ -2,27 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../../configs/axios';
 
-// ─── Specs templates per category ────────────────────────────────────────────
-const CATEGORY_SPECS = {
-  Camping: [
-    { key: 'material', label: 'Chất liệu vải' },
-    { key: 'waterproof_fly', label: 'Chống nước (Fly)' },
-    { key: 'waterproof_floor', label: 'Chống nước (Floor)' },
-    { key: 'frame', label: 'Khung xương' },
-    { key: 'accessories', label: 'Bộ phụ kiện đi kèm' },
-    { key: 'weight', label: 'Trọng lượng (kg)' },
-    { key: 'capacity', label: 'Số người (capacity)' },
-  ],
-  Tech: [
-    { key: 'brand', label: 'Hãng sản xuất' },
-    { key: 'model', label: 'Model / Phiên bản' },
-    { key: 'cpu', label: 'CPU / Chip xử lý' },
-    { key: 'ram', label: 'RAM' },
-    { key: 'storage', label: 'Bộ nhớ / Storage' },
-    { key: 'battery', label: 'Pin (mAh / giờ)' },
-    { key: 'accessories', label: 'Phụ kiện kèm theo' },
-  ],
-};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fileToBase64 = (file) =>
@@ -49,12 +28,7 @@ const PostAsset = () => {
   const [category, setCategory] = useState('Tech');
   const [condition, setCondition] = useState('Excellent');
 
-  // Legal fields (Chứng từ pháp lý)
-  const [serialNumber, setSerialNumber] = useState('');
-  const [invoiceFile, setInvoiceFile] = useState(null);
-  const [invoicePreview, setInvoicePreview] = useState('');
-  const [warrantyFile, setWarrantyFile] = useState(null);
-  const [warrantyPreview, setWarrantyPreview] = useState('');
+
 
   // Pricing
   const [pricePerDay, setPricePerDay] = useState('');
@@ -64,25 +38,6 @@ const PostAsset = () => {
   const [purchaseYear, setPurchaseYear] = useState(new Date().getFullYear());
   const [itemConditionRate, setItemConditionRate] = useState(95);
 
-  // ── Specs ──────────────────────────────────────────────────────────────────
-  // Fixed specs (per category)
-  const [fixedSpecs, setFixedSpecs] = useState({});
-  // Custom key-value rows
-  const [customSpecs, setCustomSpecs] = useState([{ key: '', value: '' }]);
-
-  const handleFixedSpec = (key, value) =>
-    setFixedSpecs((prev) => ({ ...prev, [key]: value }));
-
-  const handleCustomSpec = (idx, field, value) =>
-    setCustomSpecs((prev) =>
-      prev.map((row, i) => (i === idx ? { ...row, [field]: value } : row))
-    );
-
-  const addCustomRow = () =>
-    setCustomSpecs((prev) => [...prev, { key: '', value: '' }]);
-
-  const removeCustomRow = (idx) =>
-    setCustomSpecs((prev) => prev.filter((_, i) => i !== idx));
 
   // ── Images (Tối thiểu 5 ảnh bắt buộc) ──────────────────────────────────────
   const [imgFiles, setImgFiles] = useState([null, null, null, null, null]);
@@ -104,27 +59,6 @@ const PostAsset = () => {
     reader.readAsDataURL(file);
   };
 
-  const handleInvoiceFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setInvoiceFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setInvoicePreview(ev.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleWarrantyFileChange = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    setWarrantyFile(file);
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setWarrantyPreview(ev.target.result);
-    };
-    reader.readAsDataURL(file);
-  };
 
   // ── Location ───────────────────────────────────────────────────────────────
   const [lat, setLat] = useState(11.9404);
@@ -188,28 +122,8 @@ const PostAsset = () => {
             setOriginalPrice(item.originalPrice ?? '');
             setPurchaseYear(item.purchaseYear ?? new Date().getFullYear());
             setItemConditionRate(item.itemConditionRate ?? 95);
-            setSerialNumber(item.serialNumber || '');
-            setInvoicePreview(item.invoiceImage || '');
-            setWarrantyPreview(item.warrantyCardImage || '');
 
-            if (item.specs) {
-              const specsMap = item.specs;
-              const fixed = {};
-              const custom = [];
-              const allowedFixedKeys = (CATEGORY_SPECS[item.category] || []).map(s => s.key);
-              
-              Object.keys(specsMap).forEach(key => {
-                if (allowedFixedKeys.includes(key)) {
-                  fixed[key] = specsMap[key];
-                } else {
-                  custom.push({ key, value: specsMap[key] });
-                }
-              });
-              setFixedSpecs(fixed);
-              if (custom.length > 0) {
-                setCustomSpecs(custom);
-              }
-            }
+
 
             if (item.images && item.images.length > 0) {
               const previews = ['', '', '', '', ''];
@@ -222,7 +136,7 @@ const PostAsset = () => {
             if (item.location) {
               setLat(item.location.lat);
               setLng(item.location.lng);
-              setLocationLabel(`${item.location.lat.toFixed(4)}, ${item.location.lng.toFixed(4)}`);
+              setLocationLabel(item.location.addressString || `${item.location.lat.toFixed(4)}, ${item.location.lng.toFixed(4)}`);
             }
           }
         } catch (err) {
@@ -255,21 +169,6 @@ const PostAsset = () => {
       return;
     }
 
-    // Validate serial number
-    if (!serialNumber || !serialNumber.trim()) {
-      setErrorMsg('Vui lòng cung cấp số Serial Number / IMEI của thiết bị.');
-      setLoading(false);
-      return;
-    }
-
-    // Validate ownership documents (either invoice or warranty)
-    const hasInvoice = invoicePreview || invoiceFile;
-    const hasWarranty = warrantyPreview || warrantyFile;
-    if (!hasInvoice && !hasWarranty) {
-      setErrorMsg('Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).');
-      setLoading(false);
-      return;
-    }
 
     // Validate original price
     const finalOriginalPrice = parseFloat(originalPrice);
@@ -290,17 +189,7 @@ const PostAsset = () => {
         }
       }
 
-      // Convert invoice / warranty if new files uploaded
-      let finalInvoice = invoicePreview;
-      if (invoiceFile) finalInvoice = await fileToBase64(invoiceFile);
-      let finalWarranty = warrantyPreview;
-      if (warrantyFile) finalWarranty = await fileToBase64(warrantyFile);
 
-      // Build specs object: fixed + custom rows
-      const specs = { ...fixedSpecs };
-      customSpecs.forEach(({ key, value }) => {
-        if (key.trim() && value.trim()) specs[key.trim()] = value.trim();
-      });
 
       const payload = {
         name,
@@ -310,12 +199,8 @@ const PostAsset = () => {
         pricePerDay: parseFloat(pricePerDay),
         depositCalculationMode,
         originalPrice: finalOriginalPrice,
-        location: { lat: parseFloat(lat), lng: parseFloat(lng) },
+        location: { lat: parseFloat(lat), lng: parseFloat(lng), addressString: locationLabel },
         images,
-        serialNumber: serialNumber.trim(),
-        invoiceImage: finalInvoice || '',
-        warrantyCardImage: finalWarranty || '',
-        specs: Object.keys(specs).length > 0 ? specs : undefined,
       };
 
       if (depositCalculationMode === 'fixed') {
@@ -364,7 +249,6 @@ const PostAsset = () => {
     }
   };
 
-  const currentCategorySpecs = CATEGORY_SPECS[category] || [];
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -477,172 +361,9 @@ const PostAsset = () => {
           </div>
         </section>
 
-        {/* ══ Section 1.5: Legal Documents & Serial ════════════════════════ */}
-        <section className="space-y-4">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-sm text-slate-400">gavel</span>
-            1.5. Thông tin pháp lý &amp; Chứng từ sở hữu
-          </h3>
 
-          <div className="space-y-1">
-            <label className="text-xs font-semibold text-slate-700" htmlFor="asset-serial">
-              Số Serial / IMEI thiết bị <span className="text-red-500">*</span>
-            </label>
-            <input
-              id="asset-serial"
-              type="text"
-              placeholder="e.g. SN1234567890 hoặc số IMEI máy ảnh/điện thoại"
-              className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 text-sm font-mono uppercase"
-              value={serialNumber}
-              onChange={(e) => setSerialNumber(e.target.value)}
-              required
-            />
-            <p className="text-[10px] text-slate-400 mt-1">Dùng để quét trùng lặp và xác minh danh sách thiết bị mất cắp.</p>
-          </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
-            {/* Invoice upload */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-700">Hóa đơn mua hàng (Invoice)</p>
-              <div 
-                onClick={() => document.getElementById('invoice-upload').click()}
-                className={`relative w-full h-32 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
-                  invoicePreview ? 'border-teal-400 bg-teal-50/10' : 'border-slate-200 hover:border-teal-300 bg-slate-50'
-                }`}
-              >
-                {invoicePreview ? (
-                  <>
-                    <img src={invoicePreview} alt="Invoice preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
-                      Đổi hóa đơn
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center p-4">
-                    <span className="material-symbols-outlined text-slate-400 text-2xl">receipt_long</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-1">Tải ảnh hóa đơn</p>
-                  </div>
-                )}
-              </div>
-              <input 
-                id="invoice-upload" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleInvoiceFileChange} 
-              />
-              {invoiceFile && <p className="text-[9px] text-slate-400 truncate">{invoiceFile.name}</p>}
-            </div>
 
-            {/* Warranty upload */}
-            <div className="space-y-2">
-              <p className="text-xs font-semibold text-slate-700">Ảnh chụp tem/thẻ bảo hành</p>
-              <div 
-                onClick={() => document.getElementById('warranty-upload').click()}
-                className={`relative w-full h-32 rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all ${
-                  warrantyPreview ? 'border-teal-400 bg-teal-50/10' : 'border-slate-200 hover:border-teal-300 bg-slate-50'
-                }`}
-              >
-                {warrantyPreview ? (
-                  <>
-                    <img src={warrantyPreview} alt="Warranty preview" className="w-full h-full object-cover" />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
-                      Đổi ảnh bảo hành
-                    </div>
-                  </>
-                ) : (
-                  <div className="text-center p-4">
-                    <span className="material-symbols-outlined text-slate-400 text-2xl">workspace_premium</span>
-                    <p className="text-[10px] text-slate-400 font-semibold mt-1">Tải ảnh bảo hành/tem</p>
-                  </div>
-                )}
-              </div>
-              <input 
-                id="warranty-upload" 
-                type="file" 
-                accept="image/*" 
-                className="hidden" 
-                onChange={handleWarrantyFileChange} 
-              />
-              {warrantyFile && <p className="text-[9px] text-slate-400 truncate">{warrantyFile.name}</p>}
-            </div>
-          </div>
-          <p className="text-[10px] text-slate-450 italic">
-            * Bắt buộc upload ít nhất một trong hai chứng từ (Hóa đơn hoặc Tem bảo hành) làm cơ sở pháp lý.
-          </p>
-        </section>
-
-        {/* ══ Section 2: Technical Specs ════════════════════════════════════ */}
-        <section className="space-y-4">
-          <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
-            <span className="material-symbols-outlined text-sm text-slate-400">settings</span>
-            2. Thông số kỹ thuật ({category})
-          </h3>
-
-          {/* Fixed specs by category */}
-          <div className="bg-slate-50 rounded-xl border border-slate-200 p-4 space-y-3">
-            <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Thông số cố định theo danh mục</p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {currentCategorySpecs.map(({ key, label }) => (
-                <div key={key} className="space-y-1">
-                  <label className="text-xs font-semibold text-slate-600">{label}</label>
-                  <input
-                    type="text"
-                    placeholder={`Nhập ${label.toLowerCase()}...`}
-                    className="w-full border border-slate-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-teal-500 text-xs"
-                    value={fixedSpecs[key] || ''}
-                    onChange={(e) => handleFixedSpec(key, e.target.value)}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Custom key-value specs */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-[10px] text-slate-500 font-semibold uppercase tracking-wide">Thông số bổ sung tùy ý</p>
-              <button
-                type="button"
-                onClick={addCustomRow}
-                className="text-[10px] font-bold text-teal-600 hover:text-teal-700 flex items-center gap-0.5"
-              >
-                <span className="material-symbols-outlined text-sm">add_circle</span>
-                Thêm dòng
-              </button>
-            </div>
-            <div className="space-y-2">
-              {customSpecs.map((row, idx) => (
-                <div key={idx} className="flex gap-2 items-center">
-                  <input
-                    type="text"
-                    placeholder="Tên thông số (e.g. Màu sắc)"
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-teal-500 bg-white"
-                    value={row.key}
-                    onChange={(e) => handleCustomSpec(idx, 'key', e.target.value)}
-                  />
-                  <span className="text-slate-300 font-bold">:</span>
-                  <input
-                    type="text"
-                    placeholder="Giá trị (e.g. Xanh lá)"
-                    className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-teal-500 bg-white"
-                    value={row.value}
-                    onChange={(e) => handleCustomSpec(idx, 'value', e.target.value)}
-                  />
-                  {customSpecs.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeCustomRow(idx)}
-                      className="text-slate-350 hover:text-red-500 transition-colors"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">remove_circle</span>
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
 
         {/* ══ Section 3: Pricing ════════════════════════════════════════════ */}
         <section className="space-y-4">
@@ -667,7 +388,7 @@ const PostAsset = () => {
                 required
               />
               <p className="text-[10px] text-slate-400">
-                * Giá trị này quyết định luồng duyệt: Dưới 2.000.000đ duyệt Online, Từ 2.000.000đ duyệt Offline tận nơi.
+                * Giá trị này quyết định luồng duyệt: Dưới hoặc bằng 20.000.000đ duyệt Online, Trên 20.000.000đ duyệt Offline tận nơi.
               </p>
             </div>
 
@@ -858,15 +579,20 @@ const PostAsset = () => {
             </div>
 
             {/* Location result */}
-            {locationLabel && (
-              <div className="bg-white rounded-lg border border-teal-200 px-3 py-2 flex items-start gap-2 animate-in fade-in duration-250">
-                <span className="material-symbols-outlined text-teal-500 text-sm mt-0.5">place</span>
-                <div>
-                  <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide mb-0.5">Địa chỉ phát hiện</p>
-                  <p className="text-xs text-slate-700 leading-relaxed">{locationLabel}</p>
-                </div>
+            <div className="bg-white rounded-lg border border-teal-200 px-3 py-2 flex items-start gap-2 animate-in fade-in duration-250">
+              <span className="material-symbols-outlined text-teal-500 text-sm mt-0.5">place</span>
+              <div className="w-full">
+                <p className="text-[10px] font-bold text-teal-700 uppercase tracking-wide mb-0.5">Địa chỉ lấy đồ cụ thể</p>
+                <textarea 
+                  className="w-full text-xs text-slate-700 leading-relaxed border border-slate-200 rounded p-1.5 focus:outline-none focus:border-teal-400"
+                  value={locationLabel}
+                  onChange={(e) => setLocationLabel(e.target.value)}
+                  rows="2"
+                  placeholder="VD: Số nhà, Tên đường, Phường/Xã, Quận/Huyện, Tỉnh/TP..."
+                />
+                <p className="text-[9px] text-slate-400 mt-1">Bấm nút GPS ở trên để điền tự động, hoặc tự sửa tay nếu định vị chưa chuẩn.</p>
               </div>
-            )}
+            </div>
             {gpsError && (
               <p className="text-[11px] text-red-600 font-semibold flex items-center gap-1">
                 <span className="material-symbols-outlined text-sm">warning</span>

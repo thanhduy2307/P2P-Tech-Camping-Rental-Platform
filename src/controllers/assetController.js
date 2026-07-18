@@ -58,20 +58,7 @@ exports.createAsset = async (req, res) => {
       });
     }
 
-    // Validate legal fields
-    if (!serialNumber || typeof serialNumber !== 'string' || !serialNumber.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng cung cấp số Serial Number / IMEI của thiết bị.' 
-      });
-    }
 
-    if (!invoiceImage && !warrantyCardImage) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).' 
-      });
-    }
 
     // 1. Giới hạn xếp hàng (Queue Limit)
     // Một Lender mới (chưa có điểm uy tín cao) chỉ được đăng tối đa 3 thiết bị ở trạng thái chờ duyệt cùng một lúc.
@@ -86,36 +73,14 @@ exports.createAsset = async (req, res) => {
       }
     }
 
-    // 2. Check trùng Serial/IMEI
-    const cleanSerial = serialNumber.trim().toUpperCase();
-    const duplicateAsset = await Asset.findOne({ 
-      serialNumber: { $regex: new RegExp(`^${cleanSerial}$`, 'i') }
-    });
-    if (duplicateAsset) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Số Serial/IMEI này đã được đăng ký bởi một tài sản khác trên hệ thống.' 
+    // 4. AI Metadata Extraction & Content Moderation (Anti-Fraud & NSFW Check)
+    const scanResult = await aiService.scanImageForFraud(images[0]);
+    if (scanResult.isCopied) {
+      return res.status(400).json({
+        success: false,
+        message: `Đăng ký thiết bị bị từ chối do phát hiện hình ảnh không hợp lệ (Gian lận hoặc Nhạy cảm). Lý do AI: ${scanResult.reason}`
       });
     }
-
-    // 3. Blacklist Check
-    const blacklist = ['STOLEN123456', 'IMEI999999999', 'BADSERIAL789'];
-    if (blacklist.includes(cleanSerial)) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Số Serial/IMEI này nằm trong Danh sách thiết bị báo mất cắp (Blacklist) của cộng đồng. Đăng ký bị từ chối.' 
-      });
-    }
-
-    // 4. AI Metadata Extraction (Anti-Fraud Check) - BYPASSED
-    // const scanResult = await aiService.scanImageForFraud(images[0]);
-    // if (scanResult.isCopied) {
-    //   return res.status(400).json({
-    //     success: false,
-    //     message: `Đăng ký thiết bị bị từ chối do phát hiện nghi vấn gian lận từ hình ảnh sản phẩm. Lý do AI: ${scanResult.reason}`
-    //   });
-    // }
-    const scanResult = { isCopied: false, reason: 'AI check disabled by user request' };
 
     let finalDepositAmount = depositAmount;
     if (depositCalculationMode === 'auto') {
@@ -151,7 +116,7 @@ exports.createAsset = async (req, res) => {
       images: images || [],
       videos: videos || [],
       specs: specs || {},
-      serialNumber: cleanSerial,
+
       invoiceImage: invoiceImage || '',
       warrantyCardImage: warrantyCardImage || '',
       aiAntiFraudStatus: {
@@ -161,12 +126,13 @@ exports.createAsset = async (req, res) => {
       },
       location: {
         lat: location.lat,
-        lng: location.lng
+        lng: location.lng,
+        addressString: location.addressString || ''
       },
       status: 'pending_approval'
     });
 
-    let isHighValue = originalPrice >= 20000000; // 20 million VND
+    let isHighValue = originalPrice > 20000000; // > 20 million VND
     let assignedTask = null;
     let closestInspector = null;
     let feedbackMessage = '';
@@ -475,48 +441,6 @@ exports.updateAsset = async (req, res) => {
       }
     }
 
-    // Validate serial number if updated
-    let cleanSerial = asset.serialNumber;
-    if (serialNumber !== undefined) {
-      if (!serialNumber || typeof serialNumber !== 'string' || !serialNumber.trim()) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Vui lòng cung cấp số Serial Number / IMEI của thiết bị.' 
-        });
-      }
-      cleanSerial = serialNumber.trim().toUpperCase();
-      
-      // Duplicate check
-      const duplicateAsset = await Asset.findOne({ 
-        _id: { $ne: asset._id },
-        serialNumber: { $regex: new RegExp(`^${cleanSerial}$`, 'i') }
-      });
-      if (duplicateAsset) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Số Serial/IMEI này đã được đăng ký bởi một tài sản khác trên hệ thống.' 
-        });
-      }
-
-      // Blacklist check
-      const blacklist = ['STOLEN123456', 'IMEI999999999', 'BADSERIAL789'];
-      if (blacklist.includes(cleanSerial)) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Số Serial/IMEI này nằm trong Danh sách thiết bị báo mất cắp (Blacklist) của cộng đồng.' 
-        });
-      }
-    }
-
-    // Check ownership documents
-    const checkInvoice = invoiceImage !== undefined ? invoiceImage : asset.invoiceImage;
-    const checkWarranty = warrantyCardImage !== undefined ? warrantyCardImage : asset.warrantyCardImage;
-    if (!checkInvoice && !checkWarranty) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Vui lòng cung cấp ít nhất một chứng từ sở hữu pháp lý (Ảnh chụp Hóa đơn mua hàng hoặc Ảnh tem bảo hành).' 
-      });
-    }
 
     // Let's compute the new deposit amount if needed
     let finalDepositAmount = depositAmount !== undefined ? depositAmount : asset.depositAmount;
@@ -550,12 +474,11 @@ exports.updateAsset = async (req, res) => {
       const isNameChanged = name !== undefined && name !== asset.name;
       const isDepositChanged = finalDepositAmount !== asset.depositAmount;
       const isOriginalPriceChanged = originalPrice !== undefined && originalPrice !== asset.originalPrice;
-      const isSerialChanged = cleanSerial !== asset.serialNumber;
       const isPrimaryImageChanged = images && images[0] !== asset.images[0];
 
-      if (isNameChanged || isDepositChanged || isOriginalPriceChanged || isSerialChanged || isPrimaryImageChanged) {
+      if (isNameChanged || isDepositChanged || isOriginalPriceChanged || isPrimaryImageChanged) {
         triggerReInspection = true;
-        downgradeReason = 'Thiết bị bị tự động khóa và chuyển về trạng thái chờ duyệt do Lender thay đổi thông tin cốt lõi (Tên, Giá cọc, Ảnh chính hoặc Số Serial) sau khi đã kiểm định.';
+        downgradeReason = 'Thiết bị bị tự động khóa và chuyển về trạng thái chờ duyệt do Lender thay đổi thông tin cốt lõi (Tên, Giá cọc, Ảnh chính) sau khi đã kiểm định.';
       }
     } else if (asset.status === 'rejected') {
       // If previously rejected, any edits should bring it back to pending_approval for re-inspection
@@ -577,13 +500,14 @@ exports.updateAsset = async (req, res) => {
     if (images !== undefined) asset.images = images;
     if (videos !== undefined) asset.videos = videos;
     if (specs !== undefined) asset.specs = specs;
-    asset.serialNumber = cleanSerial;
+
     if (invoiceImage !== undefined) asset.invoiceImage = invoiceImage;
     if (warrantyCardImage !== undefined) asset.warrantyCardImage = warrantyCardImage;
     if (location !== undefined) {
       asset.location = {
         lat: location.lat,
-        lng: location.lng
+        lng: location.lng,
+        addressString: location.addressString || asset.location.addressString || ''
       };
     }
 
@@ -608,7 +532,7 @@ exports.updateAsset = async (req, res) => {
       let assignedTask = null;
       let closestInspector = null;
       let minDistance = Infinity;
-      let isHighValue = (originalPrice !== undefined ? originalPrice : asset.originalPrice) >= 2000000;
+      let isHighValue = (originalPrice !== undefined ? originalPrice : asset.originalPrice) > 20000000;
       const assetLat = location ? location.lat : asset.location.lat;
       const assetLng = location ? location.lng : asset.location.lng;
 
@@ -670,7 +594,42 @@ exports.updateAsset = async (req, res) => {
   }
 };
 
+// @desc    Delete an asset (Soft Delete)
+// @route   DELETE /api/assets/:id
+// @access  Private (Lender)
+exports.deleteAsset = async (req, res) => {
+  try {
+    const asset = await Asset.findById(req.params.id);
+    if (!asset) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thiết bị' });
+    }
 
+    if (asset.lender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ success: false, message: 'Bạn không có quyền xóa thiết bị này' });
+    }
+
+    // Check if asset is involved in any active/reserved orders
+    const Order = require('../models/Order');
+    const activeOrders = await Order.countDocuments({
+      asset: asset._id,
+      status: { $in: ['pending_payment', 'reserved', 'active', 'disputed'] }
+    });
+
+    if (activeOrders > 0) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Không thể xóa thiết bị đang trong quá trình thuê hoặc có tranh chấp.' 
+      });
+    }
+
+    // Soft delete using updateOne to bypass any strict schema validation
+    await Asset.updateOne({ _id: asset._id }, { $set: { status: 'deleted' } });
+
+    res.status(200).json({ success: true, message: 'Đã xóa thiết bị thành công.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 // @desc    AI-assisted Deposit & Price Estimation (Lender)
 // @route   POST /api/assets/ai-estimate-deposit
 // @access  Private (Lender)
@@ -790,7 +749,7 @@ exports.getAssetById = async (req, res) => {
 // @access  Private (Lender)
 exports.getMyAssets = async (req, res) => {
   try {
-    const assets = await Asset.find({ lender: req.user._id }).sort({ createdAt: -1 });
+    const assets = await Asset.find({ lender: req.user._id, status: { $ne: 'deleted' } }).sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: assets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
