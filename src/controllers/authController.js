@@ -117,13 +117,19 @@ exports.registerPhone = async (req, res) => {
     const smsResult = await smsService.sendSMS(cleanPhone, otp);
 
     const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
+    const isTelegram = process.env.SMS_PROVIDER === 'telegram';
     const showOtp = isMock || !smsResult.success;
+
+    let successMessage = 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.';
+    if (isTelegram) {
+        successMessage = 'Mã OTP xác thực đã được gửi về Telegram Bot của hệ thống.';
+    }
 
     res.status(201).json({
       success: true,
       message: smsResult.success 
-        ? 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.'
-        : 'Cổng Twilio bị lỗi gửi (chưa bật Geo-permissions hoặc giới hạn Trial). Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
+        ? successMessage
+        : 'Cổng gửi bị lỗi. Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
       data: {
         userId: user._id,
         phoneNumber: user.phoneNumber,

@@ -22,11 +22,27 @@ const Register = () => {
   const [otpVerificationOpen, setOtpVerificationOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [verificationUserId, setVerificationUserId] = useState('');
-  const [mockOtp, setMockOtp] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    const trimmedName = fullname.trim();
+    if (trimmedName.length < 2) {
+      setErrorMsg('Họ và tên phải có ít nhất 2 ký tự.');
+      return;
+    }
+
+    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
+    if (!/^(0|\+84)\d{8,9}$/.test(cleanPhone)) {
+      setErrorMsg('Số điện thoại không hợp lệ (Bắt đầu bằng 0 hoặc +84, dài 10-11 số).');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Mật khẩu phải có ít nhất 6 ký tự.');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setErrorMsg('Mật khẩu xác nhận không trùng khớp.');
@@ -49,9 +65,8 @@ const Register = () => {
       });
 
       if (response.data && response.data.success) {
-        const { userId, phoneNumber: uPhone, otp } = response.data.data;
+        const { userId } = response.data.data;
         setVerificationUserId(userId);
-        setMockOtp(otp);
         setOtpVerificationOpen(true);
       } else {
         setErrorMsg('Đăng ký số điện thoại thất bại.');
@@ -150,11 +165,6 @@ const Register = () => {
                 <p className="text-[10px] text-slate-450 mt-1 leading-relaxed">
                   Mã xác thực đã được gửi đến số điện thoại: <strong className="text-slate-800">{phoneNumber}</strong>
                 </p>
-                {mockOtp && (
-                  <div className="bg-teal-50 border border-teal-100 text-teal-800 text-[10px] font-bold py-1.5 px-3 rounded-lg mt-3 inline-block">
-                    Dành cho Tester: Mã OTP của bạn là: <span className="text-xs font-extrabold font-mono tracking-wider">{mockOtp}</span>
-                  </div>
-                )}
               </div>
 
               <div>
