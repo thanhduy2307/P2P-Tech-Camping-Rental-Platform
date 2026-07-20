@@ -8,6 +8,7 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const token = localStorage.getItem('token');
 
   // Fetch messages
@@ -125,29 +126,30 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
   };
 
   const handleImagePick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.click();
-    input.onchange = async () => {
-      const file = input.files[0];
-      if (!file) return;
-      
-      Swal.fire({
-        title: 'Đang tải ảnh lên...',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
-      
-      try {
-        const compressedBase64 = await compressImage(file);
-        Swal.close();
-        await handleSend(null, compressedBase64);
-      } catch (err) {
-        console.error(err);
-        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
-      }
-    };
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // reset value
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+      const compressedBase64 = await compressImage(file);
+      Swal.close();
+      await handleSend(null, compressedBase64);
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
+    }
   };
 
   const currentStoredUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -255,6 +257,13 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
 
       {/* Input Form */}
       <form onSubmit={handleSend} className="p-2 border-t border-slate-100 bg-white flex items-center gap-1.5">
+        <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*" 
+          className="hidden" 
+        />
         <button 
           type="button"
           onClick={handleImagePick}
