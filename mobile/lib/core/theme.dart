@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppTheme {
   // EquipPeer brand palette (mirrored from web frontend)
@@ -27,6 +26,9 @@ class AppTheme {
   static const double radiusLg = 8.0;
   static const double radiusXl = 12.0;
 
+  static const String fontDisplay = 'PlusJakartaSans';
+  static const String fontBody = 'Inter';
+
   static ThemeData get light {
     final base = ColorScheme(
       brightness: Brightness.light,
@@ -49,21 +51,21 @@ class AppTheme {
     );
 
     final textTheme = TextTheme(
-      displayLarge: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.bold),
-      displayMedium: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.bold),
-      displaySmall: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.bold),
-      headlineLarge: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.bold),
-      headlineMedium: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.w700),
-      headlineSmall: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.w700),
-      titleLarge: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.w700),
-      titleMedium: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.w600),
-      titleSmall: GoogleFonts.plusJakartaSans(color: onSurface, fontWeight: FontWeight.w600),
-      bodyLarge: GoogleFonts.inter(color: onSurface),
-      bodyMedium: GoogleFonts.inter(color: onSurface),
-      bodySmall: GoogleFonts.inter(color: onSurfaceVariant),
-      labelLarge: GoogleFonts.inter(color: onSurface, fontWeight: FontWeight.w600),
-      labelMedium: GoogleFonts.inter(color: onSurfaceVariant),
-      labelSmall: GoogleFonts.inter(color: onSurfaceVariant),
+      displayLarge: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.bold),
+      displayMedium: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.bold),
+      displaySmall: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.bold),
+      headlineLarge: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.bold),
+      headlineMedium: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.w700),
+      headlineSmall: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.w700),
+      titleLarge: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.w700),
+      titleMedium: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.w600),
+      titleSmall: const TextStyle(fontFamily: fontDisplay, color: onSurface, fontWeight: FontWeight.w600),
+      bodyLarge: const TextStyle(fontFamily: fontBody, color: onSurface),
+      bodyMedium: const TextStyle(fontFamily: fontBody, color: onSurface),
+      bodySmall: const TextStyle(fontFamily: fontBody, color: onSurfaceVariant),
+      labelLarge: const TextStyle(fontFamily: fontBody, color: onSurface, fontWeight: FontWeight.w600),
+      labelMedium: const TextStyle(fontFamily: fontBody, color: onSurfaceVariant),
+      labelSmall: const TextStyle(fontFamily: fontBody, color: onSurfaceVariant),
     );
 
     return ThemeData(
@@ -71,7 +73,7 @@ class AppTheme {
       colorScheme: base,
       scaffoldBackgroundColor: background,
       textTheme: textTheme,
-      fontFamily: GoogleFonts.inter().fontFamily,
+      fontFamily: fontBody,
       appBarTheme: AppBarTheme(
         backgroundColor: Colors.transparent,
         elevation: 0,
@@ -95,8 +97,8 @@ class AppTheme {
           borderRadius: BorderRadius.circular(radiusLg),
           borderSide: const BorderSide(color: secondaryContainer, width: 2),
         ),
-        hintStyle: GoogleFonts.inter(color: onSurfaceVariant),
-        labelStyle: GoogleFonts.inter(color: onSurfaceVariant),
+        hintStyle: const TextStyle(fontFamily: fontBody, color: onSurfaceVariant),
+        labelStyle: const TextStyle(fontFamily: fontBody, color: onSurfaceVariant),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
@@ -104,7 +106,7 @@ class AppTheme {
           foregroundColor: onPrimaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
+          textStyle: const TextStyle(fontFamily: fontBody, fontWeight: FontWeight.w700, fontSize: 16),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -113,13 +115,13 @@ class AppTheme {
           foregroundColor: onPrimaryContainer,
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusLg)),
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w700, fontSize: 16),
+          textStyle: const TextStyle(fontFamily: fontBody, fontWeight: FontWeight.w700, fontSize: 16),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: secondary,
-          textStyle: GoogleFonts.inter(fontWeight: FontWeight.w600),
+          textStyle: const TextStyle(fontFamily: fontBody, fontWeight: FontWeight.w600),
         ),
       ),
       cardTheme: CardThemeData(
@@ -134,7 +136,7 @@ class AppTheme {
       chipTheme: ChipThemeData(
         backgroundColor: const Color(0xFFEDF0EE),
         selectedColor: primaryFixed,
-        labelStyle: GoogleFonts.inter(color: onSurface),
+        labelStyle: const TextStyle(fontFamily: fontBody, color: onSurface),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),
