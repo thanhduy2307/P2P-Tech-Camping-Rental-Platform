@@ -110,25 +110,29 @@ exports.generateCampingRecommendation = async (query, availableAssets) => {
       description: a.description
     }));
 
-    const prompt = `
-Bạn là một chuyên gia tư vấn dã ngoại và cắm trại thông minh cho nền tảng thuê đồ P2P.
-Hãy phân tích nhu cầu cắm trại của khách hàng sau đây: "${query}"
-Dưới đây là danh sách các thiết bị hiện đang có sẵn trên sàn thuê của chúng tôi:
+    const prompt = `Bạn là một chuyên gia tư vấn cắm trại cho nền tảng thuê đồ P2P. Phong cách của bạn: THÂN THIỆN, HIỆN ĐẠI, TRỰC QUAN VÀ DỄ ĐỌC.
+Khách hàng yêu cầu: "${query}"
+Danh sách thiết bị có sẵn:
 ${JSON.stringify(assetListForAI, null, 2)}
 
 Nhiệm vụ của bạn:
-1. Đưa ra lời khuyên cắm trại hữu ích, đề xuất các loại trang bị cần thiết. YÊU CẦU ĐẶC BIỆT: Trả lời NGẮN GỌN, ĐI THẲNG VÀO TRỌNG TÂM, sử dụng gạch đầu dòng để người dùng dễ đọc lướt.
-2. Tìm và khớp (match) các thiết bị thực tế đang có sẵn ở trên để giới thiệu cho khách hàng một cách súc tích.
-   - QUAN TRỌNG: Hãy kiểm tra kỹ xem khách hàng có đưa ra giới hạn ngân sách (budget), số tiền tối đa (ví dụ: tối đa 1.000.000đ, hoặc dưới 500k,...) trong câu hỏi hay không.
-   - Nếu có giới hạn ngân sách, bạn CHỈ ĐƯỢC PHÉP khớp (match) và giới thiệu những thiết bị có giá thuê ngày (pricePerDay) HOẶC tổng giá thuê (pricePerDay * số ngày nếu xác định được) phù hợp với ngân sách đó. Hãy loại bỏ hoàn toàn các thiết bị vượt quá ngân sách ra khỏi danh sách đề xuất.
-   - Hãy giải thích nhanh gọn trong phần "recommendations" về việc các thiết bị được chọn đáp ứng tiêu chí ngân sách.
-3. Cung cấp một kế hoạch chuẩn bị (checklist) cực kỳ ngắn gọn.
+1. Gợi ý thiết bị & lời khuyên: 
+   - BẮT BUỘC phải có 1-2 câu chào hỏi hoặc nhận xét thân thiện ở ngay đầu (ví dụ: "Chào bạn, đi trekking leo núi thì quá tuyệt vời! Mình có vài gợi ý...").
+   - SAU ĐÓ bắt buộc dùng ký tự \\n\\n để xuống dòng rồi mới liệt kê thiết bị.
+   - Các gợi ý thiết bị: BẮT BUỘC mỗi gợi ý phải được xuống dòng (bằng ký tự \\n).
+   - Dùng tối đa 3-4 gạch đầu dòng, mỗi gạch đầu dòng dùng 1 emoji phù hợp (ví dụ: ⛺, 🔦). In đậm (**) tên thiết bị.
+2. Khớp (match) ngân sách:
+   - Nếu khách có ngân sách, CHỈ CHỌN đồ có giá <= ngân sách.
+   - Bỏ qua các món đồ không liên quan hoặc vượt ngân sách.
+3. Checklist chuẩn bị:
+   - BẮT BUỘC mỗi mục phải xuống dòng (ngăn cách bằng ký tự \\n).
+   - Tối đa 5 mục dạng Checkbox (✅) ngắn gọn dễ nhớ.
 
 Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
 {
-  "recommendations": "Lời khuyên NGẮN GỌN, TRỰC TIẾP VÀO TRỌNG TÂM, nên dùng gạch đầu dòng để giải thích đồ được chọn.",
-  "recommendedAssetIds": ["danh_sách_id_thiết_bị_phù_hợp_khớp_từ_database_thỏa_mãn_ngân_sách"],
-  "suggestedPlan": "Checklist ngắn gọn bằng gạch đầu dòng."
+  "recommendations": "VÍ DỤ BẮT BUỘC TUÂN THEO: 'Chào bạn, ...\\n\\n⛺ **Lều...**: Mô tả\\n🔦 **Đèn...**: Mô tả'",
+  "recommendedAssetIds": ["danh_sách_id_thiết_bị_được_chọn_từ_database"],
+  "suggestedPlan": "Checklist ngắn gọn. Bắt buộc chứa ký tự \\n để xuống dòng giữa các ý."
 }
 Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
 `;
@@ -475,6 +479,85 @@ const callGeminiWithImage = (mimeType, base64Data, textPrompt) => {
 };
 
 /**
+ * Helper to call Gemini with multiple image parts + text prompt.
+ */
+const callGeminiWithMultipleImages = (imagesData, textPrompt) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return reject(new Error('GEMINI_API_KEY is not configured in .env file'));
+    }
+
+    const parts = imagesData.map(img => ({
+      inlineData: {
+        mimeType: img.mimeType,
+        data: img.base64Data
+      }
+    }));
+    parts.push({ text: textPrompt });
+
+    const data = JSON.stringify({
+      contents: [{
+        parts: parts
+      }]
+    });
+
+    let isSettled = false;
+    const timer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        req.destroy();
+        reject(new Error('Gemini API image request global timeout (60s)'));
+      }
+    }, 60000);
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (isSettled) return;
+        clearTimeout(timer);
+        isSettled = true;
+        try {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Gemini API error (Status ${res.statusCode}): ${body}`));
+          }
+          const json = JSON.parse(body);
+          if (json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts[0]) {
+            resolve(json.candidates[0].content.parts[0].text);
+          } else {
+            reject(new Error(`Invalid response structure from Gemini API: ${body}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      if (isSettled) return;
+      clearTimeout(timer);
+      isSettled = true;
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+};
+
+/**
  * AI-powered Image Anti-Fraud Scan.
  */
 exports.scanImageForFraud = async (imageB64) => {
@@ -529,4 +612,76 @@ Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu tr
     };
   }
 };
+
+/**
+ * AI-powered eKYC Verification.
+ */
+exports.verifyEkycImages = async (frontB64, backB64, selfieB64) => {
+  const apiKey = process.env.GEMINI_API_KEY;
+
+  if (!apiKey || !frontB64 || !backB64 || !selfieB64) {
+    return {
+      status: 'pending',
+      confidenceScore: 0,
+      reason: '[Dự phòng] Hệ thống không có API Key, tự động chuyển hồ sơ sang chế độ chờ Admin kiểm duyệt thủ công.',
+      aiSource: 'Local Fallback Simulation'
+    };
+  }
+
+  try {
+    const parseBase64 = (b64) => {
+      let mimeType = 'image/jpeg';
+      let base64Data = b64;
+      if (b64.startsWith('data:')) {
+        const parts = b64.split(';base64,');
+        if (parts.length === 2) {
+          mimeType = parts[0].replace('data:', '');
+          base64Data = parts[1];
+        }
+      }
+      return { mimeType, base64Data };
+    };
+
+    const imagesData = [
+      parseBase64(frontB64),
+      parseBase64(backB64),
+      parseBase64(selfieB64)
+    ];
+
+    const prompt = `
+Bạn là một hệ thống AI chuyên duyệt hồ sơ eKYC (Nhận biết khách hàng điện tử).
+Tôi cung cấp cho bạn 3 hình ảnh theo thứ tự:
+1. Ảnh Mặt trước Căn Cước Công Dân (CCCD/CMND).
+2. Ảnh Mặt sau CCCD.
+3. Ảnh chân dung (Selfie) của người dùng.
+
+Nhiệm vụ của bạn là kiểm duyệt 3 ảnh này và trả về kết quả quyết định:
+- 'approved': Chấp nhận nếu ảnh CCCD rõ nét, không có dấu hiệu chỉnh sửa giả mạo (như cắt ghép, đổi số), và ảnh chân dung hoàn toàn khớp với khuôn mặt trên CCCD. (Tỉ lệ tự tin >= 90%).
+- 'pending': Cần con người xem xét lại nếu ảnh hơi mờ, lóa sáng, khó xác định chắc chắn độ khớp khuôn mặt hoặc có yếu tố nghi ngờ nhẹ.
+- 'rejected': Từ chối ngay nếu là ảnh sai (không phải CCCD), chụp màn hình máy tính/điện thoại, cắt ghép thô thiển, hoặc khuôn mặt selfie hoàn toàn khác với khuôn mặt trên CCCD.
+
+Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
+{
+  "status": "approved" | "pending" | "rejected",
+  "confidenceScore": số_từ_0_đến_100,
+  "reason": "Giải thích chi tiết bằng tiếng Việt lý do bạn đưa ra quyết định này."
+}
+Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
+`;
+
+    const aiResponse = await callGeminiWithMultipleImages(imagesData, prompt);
+    const parsed = cleanAndParseJSON(aiResponse);
+    parsed.aiSource = "Gemini AI";
+    return parsed;
+  } catch (error) {
+    console.error('Error in verifyEkycImages with AI, falling back to local:', error.message);
+    return {
+      status: 'pending',
+      confidenceScore: 0,
+      reason: `[Dự phòng - Lỗi API] Lỗi trong quá trình kiểm duyệt AI: ${error.message}. Chuyển sang chờ Admin duyệt.`,
+      aiSource: 'Local Fallback Simulation'
+    };
+  }
+};
+
 

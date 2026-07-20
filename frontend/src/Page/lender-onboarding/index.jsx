@@ -164,7 +164,7 @@ const LenderOnboarding = () => {
         const freshUser = response.data.data;
         setUser(freshUser);
         dispatch(updateProfile(freshUser));
-        setSuccessMessage('Nộp đơn đăng ký làm Người cho thuê (Lender) thành công! Đơn đang chờ Admin duyệt.');
+        setSuccessMessage(response.data.message || 'Hồ sơ đã được gửi để xử lý.');
         setActiveStep(1); // Reset step counter
         setCccdFrontFile(null);
         setCccdBackFile(null);

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
 const { notifyUser, notifyUsersByRole } = require('../utils/notificationHelper');
+const aiService = require('../services/aiService');
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -481,7 +482,12 @@ exports.applyLender = async (req, res) => {
     let finalCccdBack = cccdBack;
     let finalCccdSelfie = cccdSelfie;
 
+    let isReusingApprovedImages = false;
+
     if (user.renterStatus === 'approved') {
+      if (!cccdFront && !cccdBack && !cccdSelfie) {
+        isReusingApprovedImages = true;
+      }
       finalCccdFront = finalCccdFront || user.renterOnboarding.cccdFront;
       finalCccdBack = finalCccdBack || user.renterOnboarding.cccdBack;
       finalCccdSelfie = finalCccdSelfie || user.renterOnboarding.cccdSelfie;
@@ -491,7 +497,14 @@ exports.applyLender = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ ảnh CCCD (Mặt trước, mặt sau và ảnh Selfie)' });
     }
 
-    user.lenderStatus = 'pending';
+    let aiResult = { status: 'pending', confidenceScore: 100, reason: 'Tái sử dụng ảnh đã duyệt.' };
+    
+    if (isReusingApprovedImages) {
+      aiResult.status = 'approved';
+    } else {
+      aiResult = await aiService.verifyEkycImages(finalCccdFront, finalCccdBack, finalCccdSelfie);
+    }
+
     user.lenderOnboarding = {
       cccdFront: finalCccdFront,
       cccdBack: finalCccdBack,
@@ -501,23 +514,51 @@ exports.applyLender = async (req, res) => {
         bankName: bankAccount.bankName,
         accountHolder: bankAccount.accountHolder
       },
-      rejectReason: ''
+      rejectReason: aiResult.status === 'rejected' ? aiResult.reason : ''
     };
+    user.lenderStatus = aiResult.status;
+
+    if (aiResult.status === 'approved') {
+      user.role = 'lender';
+    }
 
     await user.save();
 
-    // Send notification to inspector
-    await notifyUsersByRole(
-      'inspector',
-      'EKYC',
-      'Yêu cầu duyệt Lender mới',
-      `Người dùng ${user.name} vừa nộp hồ sơ đăng ký trở thành Người cho thuê (Lender).`,
-      '/dashboard-inspector'
-    );
+    let message = '';
+    
+    if (aiResult.status === 'approved') {
+      message = 'Đăng ký Lender thành công! Tài khoản của bạn đã được duyệt tự động.';
+      await notifyUser(
+        user._id,
+        'EKYC',
+        'Hồ sơ Lender được duyệt',
+        'Chúc mừng! Hồ sơ đăng ký Người cho thuê của bạn đã được phê duyệt tự động. Bạn có thể bắt đầu đăng thiết bị.',
+        '/profile'
+      );
+    } else if (aiResult.status === 'rejected') {
+      message = 'Hồ sơ bị từ chối tự động. Vui lòng chụp lại ảnh rõ nét hơn.';
+      await notifyUser(
+        user._id,
+        'EKYC',
+        'Hồ sơ Lender bị từ chối',
+        `Hệ thống từ chối hồ sơ của bạn. Lý do: ${aiResult.reason}`,
+        '/profile'
+      );
+    } else {
+      // Pending
+      message = 'Nộp hồ sơ eKYC đăng ký Lender thành công. Vui lòng chờ Admin phê duyệt.';
+      await notifyUsersByRole(
+        'inspector',
+        'EKYC',
+        'Yêu cầu duyệt Lender mới (Cần duyệt tay)',
+        `Người dùng ${user.name} nộp hồ sơ Lender (AI tự tin: ${aiResult.confidenceScore || 0}%). Lý do: ${aiResult.reason}`,
+        '/dashboard-inspector'
+      );
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Nộp hồ sơ eKYC đăng ký Lender thành công. Vui lòng quay lại sau khi hồ sơ được phê duyệt.',
+      message,
       data: {
         _id: user._id,
         name: user.name,
@@ -527,7 +568,8 @@ exports.applyLender = async (req, res) => {
         renterStatus: user.renterStatus,
         renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
-        lenderOnboarding: user.lenderOnboarding
+        lenderOnboarding: user.lenderOnboarding,
+        aiScore: aiResult.confidenceScore
       }
     });
   } catch (error) {
@@ -908,28 +950,54 @@ exports.applyRenterEkyc = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Hồ sơ của bạn đang trong quá trình xét duyệt. Không thể nộp đơn mới.' });
     }
 
-    user.renterStatus = 'pending';
+    // Call AI Service to verify images
+    const aiResult = await aiService.verifyEkycImages(cccdFront, cccdBack, cccdSelfie);
+
     user.renterOnboarding = {
       cccdFront,
       cccdBack,
       cccdSelfie,
-      rejectReason: ''
+      rejectReason: aiResult.status === 'rejected' ? aiResult.reason : ''
     };
+    user.renterStatus = aiResult.status;
 
     await user.save();
 
-    // Send notification to inspector
-    await notifyUsersByRole(
-      'inspector',
-      'EKYC',
-      'Yêu cầu xác thực Renter mới',
-      `Người dùng ${user.name} vừa nộp hồ sơ eKYC xác thực Người đi thuê (Renter).`,
-      '/dashboard-inspector'
-    );
+    let message = '';
+    
+    if (aiResult.status === 'approved') {
+      message = 'Xác thực tự động thành công! Bạn đã có quyền đặt thuê.';
+      await notifyUser(
+        user._id,
+        'EKYC',
+        'Xác thực Renter thành công',
+        'Chúc mừng! Hồ sơ xác minh danh tính của bạn đã được AI hệ thống duyệt tự động thành công.',
+        '/profile'
+      );
+    } else if (aiResult.status === 'rejected') {
+      message = 'Hồ sơ bị từ chối tự động. Vui lòng chụp lại ảnh rõ nét hơn.';
+      await notifyUser(
+        user._id,
+        'EKYC',
+        'Hồ sơ Renter bị từ chối',
+        `Hệ thống từ chối hồ sơ của bạn. Lý do: ${aiResult.reason}`,
+        '/profile'
+      );
+    } else {
+      // Pending
+      message = 'Nộp hồ sơ eKYC xác thực Renter thành công. Vui lòng chờ Admin xét duyệt.';
+      await notifyUsersByRole(
+        'inspector',
+        'EKYC',
+        'Yêu cầu xác thực Renter mới (Cần duyệt tay)',
+        `Người dùng ${user.name} nộp hồ sơ eKYC (AI tự tin: ${aiResult.confidenceScore || 0}%). Lý do: ${aiResult.reason}`,
+        '/dashboard-inspector'
+      );
+    }
 
     res.status(200).json({
       success: true,
-      message: 'Nộp hồ sơ eKYC xác thực Renter thành công. Vui lòng chờ Admin xét duyệt.',
+      message,
       data: {
         _id: user._id,
         name: user.name,
@@ -937,7 +1005,8 @@ exports.applyRenterEkyc = async (req, res) => {
         role: user.role,
         renterStatus: user.renterStatus,
         renterOnboarding: user.renterOnboarding,
-        isProfileCompleted: user.isProfileCompleted
+        isProfileCompleted: user.isProfileCompleted,
+        aiScore: aiResult.confidenceScore
       }
     });
   } catch (error) {
