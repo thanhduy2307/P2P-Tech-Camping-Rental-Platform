@@ -1,5 +1,6 @@
 const User = require('../models/User');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
+const Transaction = require('../models/Transaction');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
@@ -1081,3 +1082,15 @@ exports.verifyRenterApplication = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+exports.getMyTransactions = async (req, res) => {
+  try {
+    const transactions = await Transaction.find({ user: req.user._id })
+      .populate('order', 'startDate endDate totalRent deposit')
+      .sort({ createdAt: -1 });
+    res.status(200).json({ success: true, data: transactions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

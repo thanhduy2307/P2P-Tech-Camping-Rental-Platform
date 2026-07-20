@@ -21,7 +21,8 @@ const {
   applyRenterEkyc,
   getRenterApplications,
   verifyRenterApplication,
-  updatePublicProfileInfo
+  updatePublicProfileInfo,
+  getMyTransactions
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -57,6 +58,7 @@ router.put('/lender-applications/:id/verify', protect, authorize('admin'), verif
 // Wallet & Withdrawals
 router.post('/withdraw', protect, authorize('renter', 'lender'), createWithdrawal);
 router.get('/my-withdrawals', protect, authorize('renter', 'lender'), getMyWithdrawals);
+router.get('/my-transactions', protect, authorize('renter', 'lender'), getMyTransactions);
 router.get('/withdrawals', protect, authorize('admin'), getWithdrawals);
 router.put('/withdrawals/:id/verify', protect, authorize('admin'), verifyWithdrawal);
 
