@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/services/auth_service.dart';
+import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
 
 class LenderDashboardScreen extends StatelessWidget {
@@ -10,8 +11,9 @@ class LenderDashboardScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final auth = Provider.of<AuthProvider>(context);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Dashboard Lender')),
+    return MainScaffold(
+      showBottomNav: false,
+      showDrawer: true,
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -56,3 +58,4 @@ class LenderDashboardScreen extends StatelessWidget {
     );
   }
 }
+

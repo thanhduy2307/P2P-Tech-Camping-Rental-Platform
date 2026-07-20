@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:velox_mobile/services/asset_service.dart';
+import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
 
 class PostAssetScreen extends StatefulWidget {
@@ -87,8 +88,9 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Đăng thiết bị')),
+    return MainScaffold(
+      showBottomNav: false,
+      showDrawer: true,
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(

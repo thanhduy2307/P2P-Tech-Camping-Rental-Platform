@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:velox_mobile/core/storage.dart';
+import 'package:velox_mobile/providers/auth_provider.dart';
+import 'package:velox_mobile/main.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -15,9 +18,10 @@ class _SplashScreenState extends State<SplashScreen> {
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
       if (Storage.isLoggedIn()) {
-        Navigator.pushReplacementNamed(context, '/browse');
+        final role = Provider.of<AuthProvider>(context, listen: false).role;
+        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(role));
       } else {
-        Navigator.pushReplacementNamed(context, '/login');
+        Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     });
   }
@@ -29,10 +33,10 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.terrain, size: 80, color: Colors.blue),
+            Icon(Icons.explore, size: 80, color: Color(0xFF006C49)),
             SizedBox(height: 16),
-            Text('VeloX',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold)),
+            Text('EquipPeer',
+                style: TextStyle(fontFamily: 'PlusJakartaSans', fontSize: 32, fontWeight: FontWeight.bold)),
             SizedBox(height: 8),
             Text('Thuê đồ cắm trại & công nghệ P2P'),
           ],

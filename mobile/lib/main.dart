@@ -18,7 +18,10 @@ import 'package:velox_mobile/screens/profile/profile_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_dashboard_screen.dart';
 import 'package:velox_mobile/screens/lender/post_asset_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
+import 'package:velox_mobile/screens/inspector/inspector_dashboard_screen.dart';
+import 'package:velox_mobile/screens/admin/admin_dashboard_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
+import 'package:velox_mobile/core/constants.dart';
 import 'package:velox_mobile/core/theme.dart';
 
 class AppRoutes {
@@ -38,7 +41,23 @@ class AppRoutes {
   static const lenderDashboard = '/lender/dashboard';
   static const postAsset = '/lender/post-asset';
   static const lenderInventory = '/lender/inventory';
+  static const inspectorDashboard = '/inspector/dashboard';
+  static const adminDashboard = '/admin/dashboard';
   static const notifications = '/notifications';
+
+  static String homeForRole(String? role) {
+    switch (role) {
+      case 'lender':
+        return lenderDashboard;
+      case 'inspector':
+        return inspectorDashboard;
+      case 'admin':
+        return adminDashboard;
+      case 'renter':
+      default:
+        return browse;
+    }
+  }
 }
 
 void main() async {
@@ -84,6 +103,8 @@ class MyApp extends StatelessWidget {
           AppRoutes.lenderDashboard: (_) => const LenderDashboardScreen(),
           AppRoutes.postAsset: (_) => const PostAssetScreen(),
           AppRoutes.lenderInventory: (_) => const LenderInventoryScreen(),
+          AppRoutes.inspectorDashboard: (_) => const InspectorDashboardScreen(),
+          AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
           AppRoutes.notifications: (_) => const NotificationsScreen(),
         },
       ),

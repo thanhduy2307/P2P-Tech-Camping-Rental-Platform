@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:velox_mobile/main.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/services/auth_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
@@ -82,7 +83,9 @@ class ProfileScreen extends StatelessWidget {
               try {
                 await auth.switchRole();
                 if (!context.mounted) return;
-                UiHelper.showSuccess(context, 'Đã chuyển vai trò.');
+                UiHelper.showSuccess(
+                    context, 'Đã chuyển sang ${auth.role == 'lender' ? 'Người cho thuê' : 'Người thuê'}.');
+                Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
               } catch (e) {
                 UiHelper.showError(context, e);
               }

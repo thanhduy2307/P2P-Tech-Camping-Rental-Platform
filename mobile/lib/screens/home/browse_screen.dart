@@ -174,7 +174,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             decoration: BoxDecoration(
-                              color: active ? const Color(0xFF10B981).withOpacity(0.12) : const Color(0xFFEDF0EE),
+                              color: active ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFEDF0EE),
                               borderRadius: BorderRadius.circular(999),
                               border: active
                                   ? Border.all(color: const Color(0xFF10B981))
