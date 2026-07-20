@@ -230,6 +230,41 @@ const Orders = () => {
     fetchOrders();
   }, [token]);
 
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality JPEG
+        };
+      };
+    });
+  };
+
   const handlePickSingleImage = (orderId, type, index) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -238,53 +273,90 @@ const Orders = () => {
     input.onchange = async () => {
       const file = input.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      
+      Swal.fire({
+        title: 'Đang xử lý ảnh...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      try {
+        const compressedBase64 = await compressImage(file);
+        
         if (type === 'handover') {
           setHandoverDrafts(prev => {
             const current = prev[orderId] || ['', '', ''];
             const next = [...current];
-            next[index] = reader.result;
+            next[index] = compressedBase64;
             return { ...prev, [orderId]: next };
           });
         } else {
           setReturnDrafts(prev => {
             const current = prev[orderId] || ['', '', ''];
             const next = [...current];
-            next[index] = reader.result;
+            next[index] = compressedBase64;
             return { ...prev, [orderId]: next };
           });
         }
-      };
-      reader.readAsDataURL(file);
+        Swal.close();
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
+      }
     };
   };
 
   const handleSubmitHandoverImages = async (orderId) => {
     const images = handoverDrafts[orderId] || [];
     if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      text: 'Vui lòng không đóng trang này',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       const res = await api.put(`/orders/${orderId}/renter-handover-images`, { images });
       if (res.data?.success) {
-        Swal.fire('Tải ảnh thành công! Bạn có thể xem mã OTP.');
-        window.location.reload();
+        Swal.fire('Thành công!', 'Tải ảnh thành công! Bạn có thể xem mã OTP.', 'success').then(() => {
+          window.location.reload();
+        });
       }
     } catch (err) {
-      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+      console.error(err);
+      Swal.fire('Lỗi', err.response?.data?.message || 'Có lỗi xảy ra hoặc timeout. Vui lòng tải lại trang.', 'error');
     }
   };
 
   const handleSubmitReturnImages = async (orderId) => {
     const images = returnDrafts[orderId] || [];
     if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      text: 'Vui lòng không đóng trang này',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       const res = await api.put(`/orders/${orderId}/renter-return-images`, { images });
       if (res.data?.success) {
-        Swal.fire('Tải ảnh trả đồ thành công! Bạn có thể xem mã OTP.');
-        window.location.reload();
+        Swal.fire('Thành công!', 'Tải ảnh trả đồ thành công! Bạn có thể xem mã OTP.', 'success').then(() => {
+          window.location.reload();
+        });
       }
     } catch (err) {
-      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+      console.error(err);
+      Swal.fire('Lỗi', err.response?.data?.message || 'Có lỗi xảy ra hoặc timeout. Vui lòng tải lại trang.', 'error');
     }
   };
 
