@@ -24,9 +24,6 @@ jobs:
             if [ -n "$ENV_FILE" ]; then
               printf '%s\n' "$ENV_FILE" > .env
             fi
-            echo "== .env line count =="
-            wc -l < .env
-            echo "== FRONTEND_URL present? =="
-            grep -c "FRONTEND_URL" .env || echo "NOT FOUND"
+            grep -q "FRONTEND_URL" .env || printf 'FRONTEND_URL=https://p2-p-tech-camping-rental-platform.vercel.app\n' >> .env
             pm2 restart equippeer --update-env
             pm2 save
