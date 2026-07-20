@@ -378,8 +378,15 @@ exports.completeProfile = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide phone number' });
     }
 
-    if (!address || !address.province || !address.district || !address.ward || !address.street) {
-      return res.status(400).json({ success: false, message: 'Please provide complete address (province, district, ward, street)' });
+    const hasCoordinates = address && address.coordinates &&
+      (address.coordinates.lat !== undefined || address.coordinates.lng !== undefined);
+    const hasFullAddress = address && address.province && address.district && address.ward && address.street;
+
+    if (!address || (!hasCoordinates && !hasFullAddress)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide complete address (province, district, ward, street) or coordinates (lat, lng).'
+      });
     }
 
     const user = await User.findById(req.user._id);
@@ -399,14 +406,17 @@ exports.completeProfile = async (req, res) => {
     }
 
     user.phoneNumber = phoneNumber;
+    const currentAddr = user.address || {};
+    const currentCoords = currentAddr.coordinates || {};
+    const reqCoords = address.coordinates || {};
     user.address = {
-      province: address.province,
-      district: address.district,
-      ward: address.ward,
-      street: address.street,
+      province: address.province !== undefined ? address.province : (currentAddr.province || ''),
+      district: address.district !== undefined ? address.district : (currentAddr.district || ''),
+      ward: address.ward !== undefined ? address.ward : (currentAddr.ward || ''),
+      street: address.street !== undefined ? address.street : (currentAddr.street || ''),
       coordinates: {
-        lat: address.coordinates && address.coordinates.lat ? address.coordinates.lat : 0,
-        lng: address.coordinates && address.coordinates.lng ? address.coordinates.lng : 0
+        lat: reqCoords.lat !== undefined ? Number(reqCoords.lat) : (currentCoords.lat || 0),
+        lng: reqCoords.lng !== undefined ? Number(reqCoords.lng) : (currentCoords.lng || 0)
       }
     };
 
@@ -858,8 +868,8 @@ exports.updateAvatar = async (req, res) => {
 
 exports.updatePublicProfileInfo = async (req, res) => {
   try {
-    const { bio, coverImage, name } = req.body;
-    
+    const { bio, coverImage, name, address } = req.body;
+
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
@@ -868,6 +878,22 @@ exports.updatePublicProfileInfo = async (req, res) => {
     if (bio !== undefined) user.bio = bio;
     if (coverImage !== undefined) user.coverImage = coverImage;
     if (name !== undefined) user.name = name;
+
+    // Cho phép cập nhật địa chỉ / tọa độ (dùng cho Inspector để nhận task kiểm định).
+    if (address !== undefined) {
+      const current = user.address || {};
+      const coords = address.coordinates || {};
+      user.address = {
+        province: address.province !== undefined ? address.province : (current.province || ''),
+        district: address.district !== undefined ? address.district : (current.district || ''),
+        ward: address.ward !== undefined ? address.ward : (current.ward || ''),
+        street: address.street !== undefined ? address.street : (current.street || ''),
+        coordinates: {
+          lat: coords.lat !== undefined ? Number(coords.lat) : (current.coordinates ? current.coordinates.lat : 0),
+          lng: coords.lng !== undefined ? Number(coords.lng) : (current.coordinates ? current.coordinates.lng : 0)
+        }
+      };
+    }
 
     await user.save();
 
@@ -878,7 +904,8 @@ exports.updatePublicProfileInfo = async (req, res) => {
         _id: user._id,
         name: user.name,
         bio: user.bio,
-        coverImage: user.coverImage
+        coverImage: user.coverImage,
+        address: user.address
       }
     });
   } catch (error) {
