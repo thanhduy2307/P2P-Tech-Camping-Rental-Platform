@@ -45,5 +45,8 @@ jobs:
             echo "== .env keys present =="
             grep -o '^[^=]*' .env | sort | tr '\n' ' '
             echo ""
-            pm2 restart equippeer --update-env
+            pm2 delete equippeer 2>/dev/null || true
+            pm2 cleardump 2>/dev/null || true
+            rm -f ~/.pm2/dump.pm2 2>/dev/null || true
+            pm2 start src/index.js --name equippeer
             pm2 save
