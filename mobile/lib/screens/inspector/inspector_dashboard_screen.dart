@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/inspector_service.dart';
@@ -57,13 +57,13 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text('Dashboard Kiá»ƒm Ä‘á»‹nh viÃªn',
+            const Text('Dashboard Kiểm định viên',
                 style: TextStyle(
                     fontFamily: 'PlusJakartaSans',
                     fontWeight: FontWeight.w800,
                     fontSize: 22)),
             const SizedBox(height: 4),
-            Text('Danh sÃ¡ch yÃªu cáº§u kiá»ƒm Ä‘á»‹nh Ä‘Æ°á»£c gÃ¡n cho báº¡n.',
+            Text('Danh sách yêu cầu kiểm định được gán cho bạn.',
                 style: TextStyle(color: AppTheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             if (_loading)
@@ -80,7 +80,7 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen> {
                         style: TextStyle(color: AppTheme.error)),
                     const SizedBox(height: 12),
                     ElevatedButton(
-                        onPressed: _load, child: const Text('Thá»­ láº¡i')),
+                        onPressed: _load, child: const Text('Thử lại')),
                   ],
                 ),
               )
@@ -89,9 +89,9 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen> {
                 child: ListTile(
                   leading: Icon(Icons.verified_user,
                       color: AppTheme.primary),
-                  title: Text('ChÆ°a cÃ³ task kiá»ƒm Ä‘á»‹nh'),
-                  subtitle: Text(
-                      'Há»‡ thá»‘ng sáº½ Ä‘áº©y task khi cÃ³ Ä‘Æ¡n cáº§n duyá»‡t'),
+                  title: const Text('Chưa có task kiểm định'),
+                  subtitle: const Text(
+                      'Hệ thống sẽ đẩy task khi có đơn cần duyệt'),
                 ),
               )
             else
@@ -109,12 +109,13 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen> {
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${asset.category} â€¢ ${_formatMoney(asset.pricePerDay)}/ngÃ y'),
+                        Text(
+                            '${asset.category} • ${_formatMoney(asset.pricePerDay)}/ngày'),
                         const SizedBox(height: 2),
                         Text(
                           isRemote
-                              ? 'Kiá»ƒm Ä‘á»‹nh tá»« xa'
-                              : 'Kiá»ƒm Ä‘á»‹nh táº­n nÆ¡i${taskDetails['distance'] != null ? ' â€¢ ${taskDetails['distance']} km' : ''}',
+                              ? 'Kiểm định từ xa'
+                              : 'Kiểm định tận nơi${taskDetails['distance'] != null ? ' • ${taskDetails['distance']} km' : ''}',
                           style: TextStyle(
                               fontSize: 12,
                               color: isRemote
@@ -136,7 +137,7 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen> {
   }
 
   String _formatMoney(double v) =>
-      '${v.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} Ä‘';
+      '${v.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ';
 }
 
 class InspectorVerifyScreen extends StatefulWidget {
@@ -152,7 +153,6 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _saving = false;
 
-  // Checklist fields
   bool? _c1;
   bool? _c2;
   bool? _c3;
@@ -171,19 +171,20 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
   }
 
   List<String> get _checklistLabels {
-    // Dá»±a vÃ o category tá»« BE: Tech / Camping (hoáº·c cÃ¡c category khÃ¡c).
     final cat = _asset.category.toLowerCase();
-    if (cat.contains('tech') || cat.contains('camera') || cat.contains('mÃ¡y')) {
+    if (cat.contains('tech') ||
+        cat.contains('camera') ||
+        cat.contains('máy')) {
       return [
-        'Sá»‘ shutter / sá»‘ láº§n chá»¥p',
-        'Kiá»ƒm tra cháº¿t pixel cáº£m biáº¿n',
-        'Kiá»ƒm tra má»‘c / rá»… tre trÃªn lens',
+        'Số shutter / số lần chụp',
+        'Kiểm tra chết pixel cảm biến',
+        'Kiểm tra mốc / rễ tre trên lens',
       ];
     }
     return [
-      'Äá»™ mÃ²n khÃ³a kÃ©o',
-      'ÄÃ n há»“i khung nhÃ´m',
-      'Lá»— thá»§ng mÃ ng chá»‘ng muá»—i',
+      'Độ mòn khóa kéo',
+      'Đàn hồi khung nhôm',
+      'Lỗ thủng màng chống muỗi',
     ];
   }
 
@@ -192,7 +193,7 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
       if (!_formKey.currentState!.validate()) return;
       if (_c1 == null || _c2 == null || _c3 == null) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Vui lÃ²ng hoÃ n thÃ nh biÃªn báº£n kiá»ƒm Ä‘á»‹nh.')));
+            content: Text('Vui lòng hoàn thành biên bản kiểm định.')));
         return;
       }
     }
@@ -217,8 +218,8 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(
             content: Text(status == 'verified'
-                ? 'ÄÃ£ duyá»‡t thiáº¿t bá»‹ thÃ nh cÃ´ng'
-                : 'ÄÃ£ tá»« chá»‘i thiáº¿t bá»‹')));
+                ? 'Đã duyệt thiết bị thành công'
+                : 'Đã từ chối thiết bị')));
         Navigator.pop(context);
       }
     } catch (e) {
@@ -264,11 +265,11 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
               Text(_asset.description,
                   style: const TextStyle(color: AppTheme.onSurfaceVariant)),
               const SizedBox(height: 12),
-              Text('GiÃ¡: ${_formatMoney(_asset.pricePerDay)}/ngÃ y',
+              Text('Giá: ${_formatMoney(_asset.pricePerDay)}/ngày',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               const SizedBox(height: 24),
               if (!_isRemote) ...[
-                Text('BiÃªn báº£n kiá»ƒm Ä‘á»‹nh thá»±c táº¿',
+                Text('Biên bản kiểm định thực tế',
                     style: Theme.of(context)
                         .textTheme
                         .titleMedium
@@ -282,7 +283,7 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
               TextFormField(
                 controller: _notesCtrl,
                 decoration: const InputDecoration(
-                  labelText: 'Ghi chÃº kiá»ƒm Ä‘á»‹nh (tuá»³ chá»n)',
+                  labelText: 'Ghi chú kiểm định (tuỳ chọn)',
                   border: OutlineInputBorder(),
                 ),
                 maxLines: 3,
@@ -298,7 +299,7 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
                         onPressed: () => _submit('rejected'),
                         style: OutlinedButton.styleFrom(
                             foregroundColor: AppTheme.error),
-                        child: const Text('Tá»« chá»‘i'),
+                        child: const Text('Từ chối'),
                       ),
                     ),
                     const SizedBox(width: 12),
@@ -307,7 +308,7 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
                         onPressed: () => _submit('verified'),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primary),
-                        child: const Text('Duyá»‡t'),
+                        child: const Text('Duyệt'),
                       ),
                     ),
                   ],
@@ -331,7 +332,5 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
   }
 
   String _formatMoney(double v) =>
-      '${v.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} Ä‘';
+      '${v.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (m) => '${m[1]}.')} đ';
 }
-
-
