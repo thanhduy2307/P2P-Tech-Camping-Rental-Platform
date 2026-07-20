@@ -5,15 +5,19 @@ class InspectorService {
   /// Mỗi item là một Asset kèm `taskDetails` (taskId, isRemote, distance, assignedAt).
   static Future<List<Map<String, dynamic>>> getPendingTasks() async {
     final res = await ApiClient.get('/assets/pending');
-    final list = res['data'] as List;
-    return list.map((e) => e as Map<String, dynamic>).toList();
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Lấy danh sách đơn hàng đang có khiếu nại (disputed).
   static Future<List<Map<String, dynamic>>> getDisputedOrders() async {
     final res = await ApiClient.get('/orders/disputed');
-    final list = res['data'] as List;
-    return list.map((e) => e as Map<String, dynamic>).toList();
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .toList();
   }
 
   /// Duyệt/từ chối một tài sản.

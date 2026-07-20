@@ -1,4 +1,4 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/order.dart';
 
 class OrderService {
@@ -20,13 +20,13 @@ class OrderService {
 
   static Future<List<Order>> getMyRentals() async {
     final res = await ApiClient.get('/orders/my-rentals');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Order.fromJson(e)).toList();
   }
 
   static Future<List<Order>> getIncoming() async {
     final res = await ApiClient.get('/orders/incoming');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Order.fromJson(e)).toList();
   }
 
@@ -77,3 +77,4 @@ class OrderService {
     return res;
   }
 }
+

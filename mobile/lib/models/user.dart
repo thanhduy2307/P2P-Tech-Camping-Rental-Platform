@@ -38,7 +38,7 @@ class User {
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
-    final address = json['address'] as Map<String, dynamic>?;
+    final address = _asMap(json['address']);
     return User(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
@@ -77,4 +77,7 @@ class User {
         'balance': balance,
         'isBanned': isBanned,
       };
+
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map<String, dynamic>) ? v : null;
 }

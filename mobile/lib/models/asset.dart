@@ -42,8 +42,8 @@ class Asset {
   });
 
   factory Asset.fromJson(Map<String, dynamic> json) {
-    final location = json['location'] as Map<String, dynamic>?;
-    final lender = json['lender'] as Map<String, dynamic>?;
+    final location = _asMap(json['location']);
+    final lender = _asMap(json['lender']);
     return Asset(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
@@ -73,6 +73,9 @@ class Asset {
 
   static double _toDouble(dynamic v) =>
       (v is num) ? v.toDouble() : 0.0;
+
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map<String, dynamic>) ? v : null;
 
   static List<String> _toStringList(dynamic v) {
     if (v is List) return v.map((e) => e.toString()).toList();

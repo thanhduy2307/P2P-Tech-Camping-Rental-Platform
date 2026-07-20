@@ -1,4 +1,4 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/models/order.dart';
 import 'package:velox_mobile/models/user.dart';
@@ -14,10 +14,16 @@ class AdminService {
   static Future<List<User>> getUsers({String? role, String? search}) async {
     final query = <String, String>{};
     if (role != null && role != 'all') query['role'] = role;
-    if (search != null && search.trim().isNotEmpty) query['search'] = search.trim();
-    final res = await ApiClient.get('/admin/users', query: query.isEmpty ? null : query);
-    final list = res['data'] as List;
-    return list.map((e) => User.fromJson(e as Map<String, dynamic>)).toList();
+    if (search != null && search.trim().isNotEmpty) {
+      query['search'] = search.trim();
+    }
+    final res = await ApiClient.get(
+        '/admin/users', query: query.isEmpty ? null : query);
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => User.fromJson(e))
+        .toList();
   }
 
   /// PUT /api/admin/users/:id/role
@@ -36,18 +42,26 @@ class AdminService {
   static Future<List<Asset>> getAssets({String? status}) async {
     final query = <String, String>{};
     if (status != null && status != 'all') query['status'] = status;
-    final res = await ApiClient.get('/admin/assets', query: query.isEmpty ? null : query);
-    final list = res['data'] as List;
-    return list.map((e) => Asset.fromJson(e as Map<String, dynamic>)).toList();
+    final res = await ApiClient.get(
+        '/admin/assets', query: query.isEmpty ? null : query);
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => Asset.fromJson(e))
+        .toList();
   }
 
   /// GET /api/admin/orders?status=
   static Future<List<Order>> getOrders({String? status}) async {
     final query = <String, String>{};
     if (status != null && status != 'all') query['status'] = status;
-    final res = await ApiClient.get('/admin/orders', query: query.isEmpty ? null : query);
-    final list = res['data'] as List;
-    return list.map((e) => Order.fromJson(e as Map<String, dynamic>)).toList();
+    final res = await ApiClient.get(
+        '/admin/orders', query: query.isEmpty ? null : query);
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => Order.fromJson(e))
+        .toList();
   }
 
   // ===== eKYC & Withdrawal (located under /api/auth, admin-only) =====
@@ -55,37 +69,47 @@ class AdminService {
   /// GET /api/auth/renter-applications  (pending renter eKYC)
   static Future<List<User>> getRenterApplications() async {
     final res = await ApiClient.get('/auth/renter-applications');
-    final list = res['data'] as List;
-    return list.map((e) => User.fromJson(e as Map<String, dynamic>)).toList();
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => User.fromJson(e))
+        .toList();
   }
 
   /// GET /api/auth/lender-applications  (pending lender eKYC)
   static Future<List<User>> getLenderApplications() async {
     final res = await ApiClient.get('/auth/lender-applications');
-    final list = res['data'] as List;
-    return list.map((e) => User.fromJson(e as Map<String, dynamic>)).toList();
+    final list = res['data'] as List? ?? [];
+    return list
+        .whereType<Map<String, dynamic>>()
+        .map((e) => User.fromJson(e))
+        .toList();
   }
 
   /// PUT /api/auth/renter-applications/:id/verify  {status, rejectReason?}
-  static Future<void> verifyRenterApplication(String id, String status, {String? rejectReason}) async {
+  static Future<void> verifyRenterApplication(String id, String status,
+      {String? rejectReason}) async {
     await ApiClient.put('/auth/renter-applications/$id/verify',
         {'status': status, if (rejectReason != null) 'rejectReason': rejectReason});
   }
 
   /// PUT /api/auth/lender-applications/:id/verify  {status, rejectReason?}
-  static Future<void> verifyLenderApplication(String id, String status, {String? rejectReason}) async {
+  static Future<void> verifyLenderApplication(String id, String status,
+      {String? rejectReason}) async {
     await ApiClient.put('/auth/lender-applications/$id/verify',
         {'status': status, if (rejectReason != null) 'rejectReason': rejectReason});
   }
 
   /// GET /api/auth/withdrawals
-  static Future<List<dynamic>> getWithdrawals() async {
+  static Future<List<Map<String, dynamic>>> getWithdrawals() async {
     final res = await ApiClient.get('/auth/withdrawals');
-    return (res['data'] as List).cast<Map<String, dynamic>>();
+    final list = res['data'] as List? ?? [];
+    return list.whereType<Map<String, dynamic>>().toList();
   }
 
   /// PUT /api/auth/withdrawals/:id/verify  {status, rejectReason?}
-  static Future<void> verifyWithdrawal(String id, String status, {String? rejectReason}) async {
+  static Future<void> verifyWithdrawal(String id, String status,
+      {String? rejectReason}) async {
     await ApiClient.put('/auth/withdrawals/$id/verify',
         {'status': status, if (rejectReason != null) 'rejectReason': rejectReason});
   }

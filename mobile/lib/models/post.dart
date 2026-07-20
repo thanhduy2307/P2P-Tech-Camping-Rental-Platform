@@ -26,7 +26,7 @@ class Post {
   });
 
   factory Post.fromJson(Map<String, dynamic> json) {
-    final author = json['author'] as Map<String, dynamic>?;
+    final author = _asMap(json['author']);
     final likes = json['likes'];
     final comments = json['comments'];
     return Post(
@@ -49,4 +49,7 @@ class Post {
     if (v is List) return v.map((e) => e.toString()).toList();
     return [];
   }
+
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map<String, dynamic>) ? v : null;
 }

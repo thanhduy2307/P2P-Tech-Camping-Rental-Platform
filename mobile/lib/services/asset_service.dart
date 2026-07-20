@@ -1,4 +1,4 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/asset.dart';
 
 class AssetService {
@@ -9,7 +9,7 @@ class AssetService {
     if (lat != null) query['lat'] = lat.toString();
     if (lng != null) query['lng'] = lng.toString();
     final res = await ApiClient.get('/assets', query: query);
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Asset.fromJson(e)).toList();
   }
 
@@ -21,7 +21,7 @@ class AssetService {
   /// Lender: list own assets.
   static Future<List<Asset>> getMyAssets() async {
     final res = await ApiClient.get('/assets/my');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Asset.fromJson(e)).toList();
   }
 
@@ -45,3 +45,4 @@ class AssetService {
     return res['data'];
   }
 }
+

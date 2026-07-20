@@ -1,11 +1,11 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/notification.dart';
 import 'package:velox_mobile/models/post.dart';
 
 class PostService {
   static Future<List<Post>> getAllPosts() async {
     final res = await ApiClient.get('/posts');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Post.fromJson(e)).toList();
   }
 
@@ -37,7 +37,7 @@ class PostService {
 class NotificationService {
   static Future<List<AppNotification>> getNotifications() async {
     final res = await ApiClient.get('/notifications');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => AppNotification.fromJson(e)).toList();
   }
 
@@ -49,3 +49,4 @@ class NotificationService {
     await ApiClient.put('/notifications/read-all', {});
   }
 }
+
