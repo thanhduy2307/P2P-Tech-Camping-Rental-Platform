@@ -20,6 +20,7 @@ const Chat = () => {
   const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Auto-scroll helper
   const scrollToBottom = () => {
@@ -245,29 +246,30 @@ const Chat = () => {
   };
 
   const handleImagePick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.click();
-    input.onchange = async () => {
-      const file = input.files[0];
-      if (!file) return;
-      
-      Swal.fire({
-        title: 'Đang tải ảnh lên...',
-        allowOutsideClick: false,
-        didOpen: () => Swal.showLoading()
-      });
-      
-      try {
-        const compressedBase64 = await compressImage(file);
-        Swal.close();
-        await handleSendMessage(null, compressedBase64);
-      } catch (err) {
-        console.error(err);
-        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
-      }
-    };
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // reset value
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+      const compressedBase64 = await compressImage(file);
+      Swal.close();
+      await handleSendMessage(null, compressedBase64);
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
+    }
   };
 
   if (!token) {
@@ -449,6 +451,13 @@ const Chat = () => {
 
               {/* Message Input Box */}
               <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-150 bg-white flex items-center gap-3">
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
                 <button 
                   type="button"
                   onClick={handleImagePick}
