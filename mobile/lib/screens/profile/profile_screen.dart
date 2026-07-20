@@ -76,21 +76,22 @@ class ProfileScreen extends StatelessWidget {
                   Navigator.pushNamed(context, '/lender/dashboard'),
             ),
           const Divider(),
-          ListTile(
-            leading: const Icon(Icons.swap_horiz, color: Color(0xFF006C49)),
-            title: const Text('Đổi vai trò (Renter/Lender)'),
-            onTap: () async {
-              try {
-                await auth.switchRole();
-                if (!context.mounted) return;
-                UiHelper.showSuccess(
-                    context, 'Đã chuyển sang ${auth.role == 'lender' ? 'Người cho thuê' : 'Người thuê'}.');
-                Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
-              } catch (e) {
-                UiHelper.showError(context, e);
-              }
-            },
-          ),
+          if (u?.role == 'renter' || u?.role == 'lender')
+            ListTile(
+              leading: const Icon(Icons.swap_horiz, color: Color(0xFF006C49)),
+              title: const Text('Đổi vai trò (Renter/Lender)'),
+              onTap: () async {
+                try {
+                  await auth.switchRole();
+                  if (!context.mounted) return;
+                  UiHelper.showSuccess(
+                      context, 'Đã chuyển sang ${auth.role == 'lender' ? 'Người cho thuê' : 'Người thuê'}.');
+                  Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+                } catch (e) {
+                  UiHelper.showError(context, e);
+                }
+              },
+            ),
           ListTile(
             leading: const Icon(Icons.logout, color: Color(0xFFBA1A1A)),
             title: const Text('Đăng xuất'),
