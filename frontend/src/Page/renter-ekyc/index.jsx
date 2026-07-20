@@ -127,7 +127,7 @@ const RenterEkyc = () => {
         const freshUser = response.data.data;
         setUser(freshUser);
         dispatch(updateProfile(freshUser));
-        setSuccessMessage('Nộp đơn xác thực Renter eKYC thành công! Đang chờ Admin duyệt.');
+        setSuccessMessage(response.data.message || 'Hồ sơ đã được gửi để xử lý.');
         setCccdFrontFile(null);
         setCccdBackFile(null);
         setCccdSelfieFile(null);
