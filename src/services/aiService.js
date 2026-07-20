@@ -117,18 +117,18 @@ Dưới đây là danh sách các thiết bị hiện đang có sẵn trên sàn
 ${JSON.stringify(assetListForAI, null, 2)}
 
 Nhiệm vụ của bạn:
-1. Đưa ra lời khuyên cắm trại hữu ích, đề xuất các loại trang bị cần thiết cho chuyến đi này (ví dụ: cần lều kích thước bao nhiêu, túi ngủ loại nào, có cần mang bếp hay thiết bị gì khác không).
-2. Tìm và khớp (match) các thiết bị thực tế đang có sẵn ở trên để giới thiệu cho khách hàng.
+1. Đưa ra lời khuyên cắm trại hữu ích, đề xuất các loại trang bị cần thiết. YÊU CẦU ĐẶC BIỆT: Trả lời NGẮN GỌN, ĐI THẲNG VÀO TRỌNG TÂM, sử dụng gạch đầu dòng để người dùng dễ đọc lướt.
+2. Tìm và khớp (match) các thiết bị thực tế đang có sẵn ở trên để giới thiệu cho khách hàng một cách súc tích.
    - QUAN TRỌNG: Hãy kiểm tra kỹ xem khách hàng có đưa ra giới hạn ngân sách (budget), số tiền tối đa (ví dụ: tối đa 1.000.000đ, hoặc dưới 500k,...) trong câu hỏi hay không.
    - Nếu có giới hạn ngân sách, bạn CHỈ ĐƯỢC PHÉP khớp (match) và giới thiệu những thiết bị có giá thuê ngày (pricePerDay) HOẶC tổng giá thuê (pricePerDay * số ngày nếu xác định được) phù hợp với ngân sách đó. Hãy loại bỏ hoàn toàn các thiết bị vượt quá ngân sách ra khỏi danh sách đề xuất.
-   - Hãy giải thích rõ ràng trong phần "recommendations" về việc các thiết bị được chọn đáp ứng tiêu chí ngân sách của khách hàng như thế nào.
-3. Cung cấp một kế hoạch chuẩn bị (checklist) ngắn gọn cho chuyến đi dã ngoại này.
+   - Hãy giải thích nhanh gọn trong phần "recommendations" về việc các thiết bị được chọn đáp ứng tiêu chí ngân sách.
+3. Cung cấp một kế hoạch chuẩn bị (checklist) cực kỳ ngắn gọn.
 
 Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
 {
-  "recommendations": "Lời khuyên chi tiết, giải thích lý do nên chọn các loại đồ đó và cách chúng thỏa mãn giới hạn ngân sách của khách bằng tiếng Việt (viết lưu loát, thân thiện).",
+  "recommendations": "Lời khuyên NGẮN GỌN, TRỰC TIẾP VÀO TRỌNG TÂM, nên dùng gạch đầu dòng để giải thích đồ được chọn.",
   "recommendedAssetIds": ["danh_sách_id_thiết_bị_phù_hợp_khớp_từ_database_thỏa_mãn_ngân_sách"],
-  "suggestedPlan": "Danh sách các lưu ý chuẩn bị hoặc checklist chuyến đi dã ngoại ngắn gọn."
+  "suggestedPlan": "Checklist ngắn gọn bằng gạch đầu dòng."
 }
 Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
 `;
