@@ -48,8 +48,8 @@ class Conversation {
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
     return Conversation(
-      peerId: json['peer']?['_id']?.toString() ?? json['peerId']?.toString() ?? '',
-      peerName: json['peer']?['name'] ?? json['peerName'] ?? 'Người dùng',
+      peerId: json['user']?['_id']?.toString() ?? json['peerId']?.toString() ?? '',
+      peerName: json['user']?['name'] ?? json['peerName'] ?? 'Người dùng',
       lastMessage: json['lastMessage'] ?? '',
       unreadCount: json['unreadCount'] ?? 0,
       updatedAt: json['updatedAt']?.toString() ?? '',

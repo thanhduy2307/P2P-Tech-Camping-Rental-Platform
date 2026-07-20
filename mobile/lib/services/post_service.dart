@@ -25,10 +25,9 @@ class PostService {
   }
 
   static Future<Map<String, dynamic>> generateAiContent(
-      String assetName, String assetDesc, String request) async {
+      String assetId, String request) async {
     final res = await ApiClient.post('/posts/generate-ai-content', {
-      'assetName': assetName,
-      'assetDesc': assetDesc,
+      'assetId': assetId,
       'userRequest': request,
     });
     return res['data'];

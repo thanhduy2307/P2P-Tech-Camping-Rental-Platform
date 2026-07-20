@@ -7,7 +7,7 @@ class ChatService {
     required String content,
   }) async {
     final res = await ApiClient.post('/chats', {
-      'receiver': receiverId,
+      'receiverId': receiverId,
       'content': content,
     });
     return Message.fromJson(res['data']);
