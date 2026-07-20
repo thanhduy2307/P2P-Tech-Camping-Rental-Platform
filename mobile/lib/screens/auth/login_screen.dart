@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
+import 'package:velox_mobile/main.dart';
 import 'package:velox_mobile/widgets/common.dart';
 import 'package:velox_mobile/widgets/brand_logo.dart';
 import 'package:velox_mobile/widgets/velox_button.dart';
@@ -23,7 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await auth.login(_emailController.text.trim(), _passwordController.text);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/browse');
+      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
     } catch (e) {
       UiHelper.showError(context, e);
     }
@@ -45,7 +46,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
-                  BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 24, offset: const Offset(0, 8)),
+                  BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 24, offset: const Offset(0, 8)),
                 ],
               ),
               child: Column(

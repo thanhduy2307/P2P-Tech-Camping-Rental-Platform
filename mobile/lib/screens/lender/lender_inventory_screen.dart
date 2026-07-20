@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
+import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/asset_card.dart';
 import 'package:velox_mobile/widgets/common.dart';
 
@@ -34,8 +35,13 @@ class _LenderInventoryScreenState extends State<LenderInventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Thiết bị của tôi')),
+    return MainScaffold(
+      showBottomNav: false,
+      showDrawer: true,
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => Navigator.pushNamed(context, '/lender/post-asset'),
+        child: const Icon(Icons.add),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _assets.isEmpty
@@ -50,10 +56,6 @@ class _LenderInventoryScreenState extends State<LenderInventoryScreen> {
                     ),
                   ),
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.pushNamed(context, '/lender/post-asset'),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }

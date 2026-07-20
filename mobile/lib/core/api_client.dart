@@ -28,7 +28,7 @@ class ApiClient {
     return headers;
   }
 
-  static dynamic _parse(http.Response res) {
+  static Future<dynamic> _parse(http.Response res) async {
     dynamic body;
     try {
       body = res.body.isNotEmpty ? jsonDecode(res.body) : null;
@@ -43,9 +43,18 @@ class ApiClient {
     // Normalize error message from common backend shapes.
     String message = 'Có lỗi xảy ra (${res.statusCode})';
     if (body is Map) {
-      if (body['message'] != null) message = body['message'].toString();
-      else if (body['error'] != null) message = body['error'].toString();
+      if (body['message'] != null) {
+        message = body['message'].toString();
+      } else if (body['error'] != null) {
+        message = body['error'].toString();
+      }
     }
+
+    // Token hết hạn hoặc bị khóa -> xoá session để buộc đăng nhập lại.
+    if (res.statusCode == 401 || res.statusCode == 403) {
+      await Storage.clear();
+    }
+
     throw ApiException(res.statusCode, message, body);
   }
 

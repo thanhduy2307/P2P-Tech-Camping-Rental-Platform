@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../core/theme.dart';
+import '../providers/auth_provider.dart';
 import 'brand_logo.dart';
+import 'app_drawer.dart';
 
 class _NavItem {
   final IconData icon;
@@ -29,7 +32,7 @@ class VeloxBottomNav extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         border: const Border(top: BorderSide(color: Color(0x140B1C30))),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, -2))],
+        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 12, offset: const Offset(0, -2))],
       ),
       child: SafeArea(
         child: Padding(
@@ -49,7 +52,7 @@ class VeloxBottomNav extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: active ? AppTheme.primaryContainer.withOpacity(0.12) : Colors.transparent,
+                          color: active ? AppTheme.primaryContainer.withValues(alpha: 0.12) : Colors.transparent,
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
@@ -87,6 +90,8 @@ class MainScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final bool showBottomNav;
 
+  final bool showDrawer;
+
   const MainScaffold({
     super.key,
     required this.body,
@@ -94,6 +99,7 @@ class MainScaffold extends StatelessWidget {
     this.showTopBar = true,
     this.floatingActionButton,
     this.showBottomNav = true,
+    this.showDrawer = true,
   });
 
   void _onNavTap(BuildContext context, int index) {
@@ -109,12 +115,14 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final role = Provider.of<AuthProvider>(context).role ?? 'renter';
+    final showBottom = showBottomNav && role == 'renter';
     final appBar = showTopBar
         ? PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
               decoration: BoxDecoration(
-                color: AppTheme.surface.withOpacity(0.85),
+                color: AppTheme.surface.withValues(alpha: 0.85),
                 border: const Border(bottom: BorderSide(color: Color(0x140B1C30))),
               ),
               child: SafeArea(
@@ -122,6 +130,13 @@ class MainScaffold extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
+                      if (showDrawer)
+                        IconButton(
+                          icon: const Icon(Icons.menu),
+                          color: AppTheme.onSurface,
+                          onPressed: () => Scaffold.of(context).openDrawer(),
+                          tooltip: 'Menu',
+                        ),
                       const BrandLogo(size: 26),
                       const Spacer(),
                       IconButton(
@@ -156,9 +171,10 @@ class MainScaffold extends StatelessWidget {
     return Scaffold(
       backgroundColor: AppTheme.background,
       appBar: appBar,
+      drawer: showDrawer ? const AppDrawer() : null,
       body: body,
       floatingActionButton: floatingActionButton,
-      bottomNavigationBar: showBottomNav
+      bottomNavigationBar: showBottom
           ? VeloxBottomNav(currentIndex: currentIndex, onTap: (i) => _onNavTap(context, i))
           : null,
     );

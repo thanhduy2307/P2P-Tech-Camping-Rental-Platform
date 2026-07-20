@@ -12,6 +12,10 @@ class User {
   final String? bio;
   final String? coverImage;
   final int ratingsCount;
+  final double balance;
+  final bool isBanned;
+  final String? createdAt;
+  final String? addressString;
 
   User({
     required this.id,
@@ -27,9 +31,14 @@ class User {
     this.bio,
     this.coverImage,
     this.ratingsCount = 0,
+    this.balance = 0.0,
+    this.isBanned = false,
+    this.createdAt,
+    this.addressString,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
+    final address = json['address'] as Map<String, dynamic>?;
     return User(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
@@ -45,6 +54,12 @@ class User {
       bio: json['bio'],
       coverImage: json['coverImage'],
       ratingsCount: json['ratingsCount'] ?? 0,
+      balance: (json['balance'] is num) ? (json['balance'] as num).toDouble() : 0.0,
+      isBanned: json['isBanned'] == true,
+      createdAt: json['createdAt']?.toString(),
+      addressString: address != null
+          ? '${address['street'] ?? ''}, ${address['ward'] ?? ''}'.trim()
+          : null,
     );
   }
 
@@ -59,5 +74,7 @@ class User {
         'renterStatus': renterStatus,
         'lenderStatus': lenderStatus,
         'reputationScore': reputationScore,
+        'balance': balance,
+        'isBanned': isBanned,
       };
 }

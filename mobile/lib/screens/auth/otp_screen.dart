@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:velox_mobile/main.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/widgets/common.dart';
 
@@ -18,7 +19,7 @@ class _OtpScreenState extends State<OtpScreen> {
     try {
       await auth.verifyOtp(userId, _otp.text.trim());
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, '/browse');
+      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
     } catch (e) {
       UiHelper.showError(context, e);
     }

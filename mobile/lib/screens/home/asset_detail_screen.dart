@@ -113,7 +113,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF10B981).withOpacity(0.12),
+                      color: const Color(0xFF10B981).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(a.category,
@@ -145,7 +145,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                         children: a.badges
                             .map((b) => Chip(
                                 label: Text(b),
-                                backgroundColor: const Color(0xFF10B981).withOpacity(0.12),
+                                backgroundColor: const Color(0xFF10B981).withValues(alpha: 0.12),
                                 labelStyle: const TextStyle(color: Color(0xFF006C49))))
                             .toList(),
                       ),
