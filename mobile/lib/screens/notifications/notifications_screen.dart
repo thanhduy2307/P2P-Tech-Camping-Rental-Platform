@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:velox_mobile/models/notification.dart';
 import 'package:velox_mobile/services/post_service.dart';
+import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/widgets/common.dart';
+import 'package:velox_mobile/widgets/equip_dialog.dart';
 
 class NotificationsScreen extends StatefulWidget {
   const NotificationsScreen({super.key});
@@ -25,7 +27,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     try {
       _items = await NotificationService.getNotifications();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -43,8 +45,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
               try {
                 await NotificationService.markAllRead();
                 _load();
+                UiHelper.showSuccessToast(context, 'Đã đánh dấu tất cả là đã đọc');
               } catch (e) {
-                UiHelper.showError(context, e);
+                UiHelper.showErrorToast(context, e);
               }
             },
           ),
@@ -53,28 +56,51 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _items.isEmpty
-              ? const Center(child: Text('Chưa có thông báo.'))
+              ? const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.notifications_off_rounded, size: 64, color: Colors.grey),
+                      SizedBox(height: 16),
+                      Text('Chưa có thông báo nào'),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView.builder(
                     itemCount: _items.length,
                     itemBuilder: (_, i) {
                       final n = _items[i];
-                      return ListTile(
-                        leading: Icon(
-                          n.isRead ? Icons.notifications_none : Icons.notifications_active,
-                          color: n.isRead ? Colors.grey : Colors.blue,
+                      return Card(
+                        margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            border: Border(
+                              left: BorderSide(
+                                color: n.isRead ? Colors.grey : const Color(0xFF10B981),
+                                width: 4,
+                              ),
+                            ),
+                          ),
+                          child: ListTile(
+                            leading: Icon(
+                              n.isRead ? Icons.notifications_none : Icons.notifications_active,
+                              color: n.isRead ? Colors.grey : const Color(0xFF10B981),
+                            ),
+                            title: Text(n.title),
+                            subtitle: Text(n.message),
+                            onTap: () async {
+                              try {
+                                await NotificationService.markRead(n.id);
+                                _load();
+                              } catch (e) {
+                                UiHelper.showErrorToast(context, e);
+                              }
+                            },
+                          ),
                         ),
-                        title: Text(n.title),
-                        subtitle: Text(n.message),
-                        onTap: () async {
-                          try {
-                            await NotificationService.markRead(n.id);
-                            _load();
-                          } catch (e) {
-                            UiHelper.showError(context, e);
-                          }
-                        },
                       );
                     },
                   ),

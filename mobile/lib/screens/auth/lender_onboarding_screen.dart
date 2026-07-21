@@ -23,7 +23,7 @@ class _LenderOnboardingScreenState extends State<LenderOnboardingScreen> {
     if (_accNumber.text.isEmpty ||
         _bankName.text.isEmpty ||
         _accHolder.text.isEmpty) {
-      UiHelper.showError(context, 'Vui lòng điền đầy đủ thông tin ngân hàng.');
+      UiHelper.showErrorToast(context, 'Vui lòng điền đầy đủ thông tin ngân hàng.');
       return;
     }
     setState(() => _loading = true);
@@ -39,10 +39,10 @@ class _LenderOnboardingScreenState extends State<LenderOnboardingScreen> {
         },
       );
       if (!mounted) return;
-      UiHelper.showSuccess(context, 'Đã gửi hồ sơ Lender. Chờ Admin duyệt.');
+      UiHelper.showSuccessToast(context, 'Đã gửi hồ sơ Lender. Chờ Admin duyệt.');
       Navigator.pop(context);
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

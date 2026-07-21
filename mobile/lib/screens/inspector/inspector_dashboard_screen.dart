@@ -3,6 +3,8 @@ import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/inspector_service.dart';
 import 'package:velox_mobile/widgets/app_shell.dart';
+import 'package:velox_mobile/widgets/common.dart';
+import 'package:velox_mobile/widgets/equip_dialog.dart';
 
 class InspectorDashboardScreen extends StatefulWidget {
   const InspectorDashboardScreen({super.key});
@@ -192,11 +194,15 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
     if (status == 'verified' && !_isRemote) {
       if (!_formKey.currentState!.validate()) return;
       if (_c1 == null || _c2 == null || _c3 == null) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text('Vui lòng hoàn thành biên bản kiểm định.')));
+        UiHelper.showErrorToast(context, 'Vui lòng hoàn thành biên bản kiểm định.');
         return;
       }
     }
+    final message = status == 'verified'
+        ? 'Bạn có chắc muốn duyệt thiết bị này?'
+        : 'Bạn có chắc muốn từ chối thiết bị này?';
+    final confirmed = await EquipDialog.confirm(context, 'Xác nhận', message);
+    if (confirmed != true) return;
     setState(() => _saving = true);
     try {
       Map<String, dynamic>? checklist;
@@ -216,16 +222,15 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
         checklist: checklist,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text(status == 'verified'
-                ? 'Đã duyệt thiết bị thành công'
-                : 'Đã từ chối thiết bị')));
+        final msg = status == 'verified'
+            ? 'Đã duyệt thiết bị thành công'
+            : 'Đã từ chối thiết bị';
+        EquipDialog.success(context, msg);
         Navigator.pop(context);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(e.toString())));
+        UiHelper.showErrorToast(context, e);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -263,7 +268,7 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
                 ),
               const SizedBox(height: 16),
               Text(_asset.description,
-                  style: const TextStyle(color: AppTheme.onSurfaceVariant)),
+                  style: TextStyle(color: AppTheme.onSurfaceVariant)),
               const SizedBox(height: 12),
               Text('Giá: ${_formatMoney(_asset.pricePerDay)}/ngày',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
@@ -282,9 +287,9 @@ class _InspectorVerifyScreenState extends State<InspectorVerifyScreen> {
               ],
               TextFormField(
                 controller: _notesCtrl,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'Ghi chú kiểm định (tuỳ chọn)',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
                 ),
                 maxLines: 3,
               ),

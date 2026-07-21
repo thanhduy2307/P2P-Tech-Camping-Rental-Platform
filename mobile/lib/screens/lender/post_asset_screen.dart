@@ -83,13 +83,13 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
         ),
       );
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     }
   }
 
   Future<void> _submit() async {
     if (_selectedImages.length < 5) {
-      UiHelper.showError(context, 'Vui lòng chọn ít nhất 5 ảnh');
+      UiHelper.showErrorToast(context, 'Vui lòng chọn ít nhất 5 ảnh');
       return;
     }
     setState(() => _loading = true);
@@ -109,10 +109,10 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
         'itemConditionRate': double.tryParse(_conditionRate.text),
       });
       if (!mounted) return;
-      UiHelper.showSuccess(context, 'Đăng thiết bị thành công!');
+      UiHelper.showSuccessToast(context, 'Đăng thiết bị thành công!');
       Navigator.pop(context);
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -21,7 +21,7 @@ class _OtpScreenState extends State<OtpScreen> {
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     }
   }
 

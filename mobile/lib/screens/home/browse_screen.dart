@@ -62,7 +62,7 @@ class BrowseScreen extends StatelessWidget {
                   ),
                 );
               } catch (e) {
-                UiHelper.showError(context, e);
+                UiHelper.showErrorToast(context, e);
               }
             },
             child: const Text('Gợi ý'),
@@ -101,7 +101,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
     try {
       _assets = await AssetService.getVerifiedAssets();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

@@ -34,7 +34,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
     try {
       _asset = await AssetService.getAssetById(id);
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -54,7 +54,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   Future<void> _book() async {
     if (_asset == null || _start.text.isEmpty || _end.text.isEmpty) {
-      UiHelper.showError(context, 'Chọn ngày bắt đầu và kết thúc.');
+      UiHelper.showErrorToast(context, 'Chọn ngày bắt đầu và kết thúc.');
       return;
     }
     try {
@@ -71,7 +71,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
         builder: (_) => AlertRequestPayment(url: url),
       );
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     }
   }
 

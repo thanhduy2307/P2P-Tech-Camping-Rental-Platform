@@ -24,10 +24,10 @@ class _RenterEkycScreenState extends State<RenterEkycScreen> {
         cccdSelfie: _selfie.text.trim(),
       );
       if (!mounted) return;
-      UiHelper.showSuccess(context, 'Đã gửi hồ sơ eKYC. Chờ Admin duyệt.');
+      UiHelper.showSuccessToast(context, 'Đã gửi hồ sơ eKYC. Chờ Admin duyệt.');
       Navigator.pop(context);
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
