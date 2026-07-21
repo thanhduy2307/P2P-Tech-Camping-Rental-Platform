@@ -31,8 +31,8 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(
-      imageQuality: 85,
-      maxWidth: 1200,
+      imageQuality: 75,
+      maxWidth: 1024,
     );
     if (picked.isNotEmpty) {
       setState(() => _selectedImages.addAll(picked));

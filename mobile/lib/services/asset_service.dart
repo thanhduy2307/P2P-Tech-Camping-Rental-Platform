@@ -28,7 +28,7 @@ class AssetService {
   /// Create a new asset listing.
   static Future<Map<String, dynamic>> createAsset(
       Map<String, dynamic> body) async {
-    final res = await ApiClient.post('/assets', body);
+    final res = await ApiClient.post('/assets', body, longRunning: true);
     return res;
   }
 
