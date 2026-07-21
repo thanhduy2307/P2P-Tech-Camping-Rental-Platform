@@ -34,7 +34,8 @@ class OrderService {
   static Future<Map<String, dynamic>> confirmHandover(
       String id, String otp, List<String> images) async {
     final res = await ApiClient.put('/orders/$id/handover',
-        {'otp': otp, 'handoverImages': images});
+        {'otp': otp, 'handoverImages': images},
+        longRunning: true);
     return res;
   }
 
@@ -52,7 +53,8 @@ class OrderService {
     if (cashDepositDeductionReason != null) {
       body['cashDepositDeductionReason'] = cashDepositDeductionReason;
     }
-    final res = await ApiClient.put('/orders/$id/return', body);
+    final res = await ApiClient.put('/orders/$id/return', body,
+        longRunning: true);
     return res;
   }
 

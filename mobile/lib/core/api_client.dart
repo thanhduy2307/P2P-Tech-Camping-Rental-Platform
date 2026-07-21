@@ -77,11 +77,14 @@ class ApiClient {
     return _parse(res);
   }
 
-  static Future<dynamic> put(String path, Map<String, dynamic>? body) async {
+  static Future<dynamic> put(String path, Map<String, dynamic>? body,
+      {Duration? timeout, bool longRunning = false}) async {
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$path');
+    final effectiveTimeout =
+        timeout ?? (longRunning ? _longTimeout : _defaultTimeout);
     final res = await http
         .put(uri, headers: _headers(), body: jsonEncode(body ?? {}))
-        .timeout(_defaultTimeout);
+        .timeout(effectiveTimeout);
     return _parse(res);
   }
 

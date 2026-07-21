@@ -91,7 +91,7 @@ class AuthService {
       'cccdFront': cccdFront,
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
-    });
+    }, longRunning: true);
     return res['data'];
   }
 
@@ -106,7 +106,7 @@ class AuthService {
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
       'bankAccount': bankAccount,
-    });
+    }, longRunning: true);
     return res['data'];
   }
 
