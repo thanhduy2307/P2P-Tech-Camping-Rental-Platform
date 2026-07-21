@@ -53,7 +53,7 @@ class User {
           (json['reputationScore'] is num) ? json['reputationScore'].toDouble() : 5.0,
       bio: json['bio'],
       coverImage: json['coverImage'],
-      ratingsCount: json['ratingsCount'] ?? 0,
+      ratingsCount: json['ratingsCount'] ?? (json['ratingsReceived'] is List ? (json['ratingsReceived'] as List).length : 0),
       balance: (json['balance'] is num) ? (json['balance'] as num).toDouble() : 0.0,
       isBanned: json['isBanned'] == true,
       createdAt: json['createdAt']?.toString(),

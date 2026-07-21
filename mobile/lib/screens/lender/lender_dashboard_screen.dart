@@ -34,7 +34,9 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
         _assetCount = assets.length;
         _activeRentals = assets.where((a) => a.status == 'rented').length;
       });
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) UiHelper.showErrorToast(context, 'Không thể tải thống kê');
+    }
   }
 
   @override

@@ -66,7 +66,7 @@ class _LenderInventoryScreenState extends State<LenderInventoryScreen> {
       padding: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () => Navigator.pushNamed(context, '/asset-detail',
-            arguments: {'id': asset.id}),
+            arguments: asset.id),
         borderRadius: BorderRadius.circular(16),
         child: Container(
           decoration: BoxDecoration(

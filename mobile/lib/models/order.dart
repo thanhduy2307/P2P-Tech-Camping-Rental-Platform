@@ -34,7 +34,7 @@ class Order {
   factory Order.fromJson(Map<String, dynamic> json) {
     final asset = _asMap(json['asset']);
     final renter = _asMap(json['renter']);
-    final lender = _asMap(json['lender']);
+    final assetLender = _asMap(asset?['lender']);
     return Order(
       id: json['_id'] ?? json['id'] ?? '',
       assetId: asset?['_id'] ?? asset?['id'] ?? json['asset']?.toString() ?? '',
@@ -44,7 +44,7 @@ class Order {
           : null,
       renterId: renter?['_id'] ?? renter?['id'] ?? json['renter']?.toString() ?? '',
       lenderId:
-          lender?['_id'] ?? lender?['id'] ?? json['lender']?.toString() ?? '',
+          assetLender?['_id'] ?? assetLender?['id'] ?? asset?['lender']?.toString() ?? '',
       startDate: json['startDate']?.toString() ?? '',
       endDate: json['endDate']?.toString() ?? '',
       rentalDays: json['rentalDays'] ?? 0,

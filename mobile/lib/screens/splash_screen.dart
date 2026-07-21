@@ -17,10 +17,14 @@ class _SplashScreenState extends State<SplashScreen> {
     super.initState();
     Future.delayed(const Duration(milliseconds: 800), () {
       if (!mounted) return;
-      if (Storage.isLoggedIn()) {
-        final role = Provider.of<AuthProvider>(context, listen: false).role;
-        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(role));
-      } else {
+      try {
+        if (Storage.isLoggedIn()) {
+          final role = Provider.of<AuthProvider>(context, listen: false).role;
+          Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(role ?? 'renter'));
+        } else {
+          Navigator.pushReplacementNamed(context, AppRoutes.login);
+        }
+      } catch (_) {
         Navigator.pushReplacementNamed(context, AppRoutes.login);
       }
     });

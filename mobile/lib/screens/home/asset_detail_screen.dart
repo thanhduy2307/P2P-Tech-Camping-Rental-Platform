@@ -82,6 +82,21 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           appBar: AppBar(),
           body: const Center(child: CircularProgressIndicator()));
     }
+    if (_asset == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Không thể tải thông tin thiết bị'),
+              const SizedBox(height: 12),
+              TextButton(onPressed: () => Navigator.pop(context), child: const Text('Quay lại')),
+            ],
+          ),
+        ),
+      );
+    }
     final a = _asset!;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),

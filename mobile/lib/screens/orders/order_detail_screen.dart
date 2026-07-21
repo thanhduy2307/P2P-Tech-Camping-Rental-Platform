@@ -57,6 +57,11 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _reload() async {
+    final id = _order?.id;
+    if (id != null) _load(id);
+  }
+
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(imageQuality: 75, maxWidth: 1024);
     if (picked.isNotEmpty) setState(() => _selectedImages.addAll(picked));
@@ -110,6 +115,21 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     if (_loading) {
       return Scaffold(
           appBar: AppBar(), body: const Center(child: CircularProgressIndicator()));
+    }
+    if (_order == null) {
+      return Scaffold(
+        appBar: AppBar(),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('Không thể tải đơn hàng'),
+              const SizedBox(height: 12),
+              TextButton(onPressed: _reload, child: const Text('Thử lại')),
+            ],
+          ),
+        ),
+      );
     }
     final o = _order!;
     return Scaffold(

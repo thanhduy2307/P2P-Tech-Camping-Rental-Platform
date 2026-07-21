@@ -42,12 +42,14 @@ class InspectorService {
   /// Xử lý (giải quyết) một khiếu nại đơn hàng.
   static Future<Map<String, dynamic>> resolveDispute(
     String orderId, {
-    required String resolution,
-    double? deductionAmount,
+    required String action,
+    double? lenderCompensation,
+    double? renterRefund,
   }) async {
     final body = <String, dynamic>{
-      'resolution': resolution,
-      if (deductionAmount != null) 'deductionAmount': deductionAmount,
+      'action': action,
+      if (lenderCompensation != null) 'lenderCompensation': lenderCompensation,
+      if (renterRefund != null) 'renterRefund': renterRefund,
     };
     final res =
         await ApiClient.put('/orders/$orderId/resolve-dispute', body);

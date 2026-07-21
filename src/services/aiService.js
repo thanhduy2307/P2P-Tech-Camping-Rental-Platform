@@ -16,6 +16,8 @@ const cleanAndParseJSON = (text) => {
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
     cleaned = cleaned.substring(firstBrace, lastBrace + 1);
   }
+  // Sanitize control characters (except \t, \n, \r) that break JSON.parse
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   return JSON.parse(cleaned);
 };
 

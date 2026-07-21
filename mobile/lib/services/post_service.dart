@@ -16,7 +16,7 @@ class PostService {
 
   static Future<Map<String, dynamic>> toggleLike(String id) async {
     final res = await ApiClient.post('/posts/$id/like', {});
-    return res['data'];
+    return res;
   }
 
   static Future<Map<String, dynamic>> comment(String id, String content) async {

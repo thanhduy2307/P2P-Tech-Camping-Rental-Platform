@@ -45,10 +45,16 @@ class BrowseScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           TextButton(
             onPressed: () async {
+              if (ctrl.text.trim().isEmpty) {
+                UiHelper.showErrorToast(context, 'Vui lòng nhập nhu cầu của bạn');
+                return;
+              }
               Navigator.pop(context);
+              UiHelper.showLoading(context);
               try {
                 final data = await AssetService.recommend(ctrl.text);
                 if (!context.mounted) return;
+                UiHelper.hideLoading(context);
                 showDialog(
                   context: context,
                   builder: (_) => AlertDialog(
@@ -62,7 +68,10 @@ class BrowseScreen extends StatelessWidget {
                   ),
                 );
               } catch (e) {
-                UiHelper.showErrorToast(context, e);
+                if (context.mounted) {
+                  UiHelper.hideLoading(context);
+                  UiHelper.showErrorToast(context, e);
+                }
               }
             },
             child: const Text('Gợi ý'),

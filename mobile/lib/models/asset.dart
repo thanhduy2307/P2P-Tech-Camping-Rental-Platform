@@ -43,7 +43,8 @@ class Asset {
 
   factory Asset.fromJson(Map<String, dynamic> json) {
     final location = _asMap(json['location']);
-    final lender = _asMap(json['lender']);
+    final lenderMap = _asMap(json['lender']);
+    final lenderIsMap = lenderMap != null;
     return Asset(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
@@ -57,9 +58,9 @@ class Asset {
       lat: location != null ? _toDouble(location['lat']) : null,
       lng: location != null ? _toDouble(location['lng']) : null,
       addressString: location?['addressString'],
-      lenderId: lender?['_id']?.toString(),
-      lenderName: lender?['name'],
-      lenderAvatar: lender?['avatar'],
+      lenderId: lenderIsMap ? lenderMap!['_id']?.toString() : json['lender']?.toString(),
+      lenderName: lenderIsMap ? lenderMap!['name'] : null,
+      lenderAvatar: lenderIsMap ? lenderMap!['avatar'] : null,
       distance: json['distance'] != null
           ? (json['distance'] as num).toDouble()
           : null,

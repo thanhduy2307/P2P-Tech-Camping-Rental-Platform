@@ -4,7 +4,7 @@ import 'package:velox_mobile/services/chat_service.dart';
 import 'package:velox_mobile/core/storage.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/widgets/common.dart';
-import 'package:velox_mobile/widgets/equip_dialog.dart';
+
 
 class ChatThreadScreen extends StatefulWidget {
   const ChatThreadScreen({super.key});

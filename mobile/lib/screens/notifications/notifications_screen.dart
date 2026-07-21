@@ -44,10 +44,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             onPressed: () async {
               try {
                 await NotificationService.markAllRead();
+                if (!mounted) return;
                 _load();
                 UiHelper.showSuccessToast(context, 'Đã đánh dấu tất cả là đã đọc');
               } catch (e) {
-                UiHelper.showErrorToast(context, e);
+                if (mounted) UiHelper.showErrorToast(context, e);
               }
             },
           ),
@@ -94,9 +95,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                             onTap: () async {
                               try {
                                 await NotificationService.markRead(n.id);
+                                if (!mounted) return;
                                 _load();
                               } catch (e) {
-                                UiHelper.showErrorToast(context, e);
+                                if (mounted) UiHelper.showErrorToast(context, e);
                               }
                             },
                           ),
