@@ -115,6 +115,10 @@ class AuthService {
     return (res['data']['balance'] as num).toDouble();
   }
 
+  static Future<void> updateAvatar(String base64DataUri) async {
+    await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
+  }
+
   /// Persist token + user after a successful auth response.
   static Future<void> persistSession(Map<String, dynamic> data) async {
     if (data['token'] != null) await Storage.setToken(data['token']);

@@ -1,4 +1,8 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/main.dart';
@@ -21,11 +25,38 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const SizedBox(height: 8),
-          CircleAvatar(
-            radius: 44,
-            backgroundColor: AppTheme.primaryContainer.withValues(alpha: 0.15),
-            child: Text(UiHelper.initials(u?.name ?? '?'),
-                style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryContainer)),
+          GestureDetector(
+            onTap: () => _pickAvatar(context),
+            child: Stack(
+              children: [
+                CircleAvatar(
+                  radius: 44,
+                  backgroundColor: AppTheme.primaryContainer.withValues(alpha: 0.15),
+                  backgroundImage: (u?.avatar != null && u!.avatar!.isNotEmpty)
+                      ? (u!.avatar!.startsWith('http')
+                          ? NetworkImage(u!.avatar!)
+                          : FileImage(File(u!.avatar!)) as ImageProvider)
+                      : null,
+                  child: (u?.avatar == null || u!.avatar!.isEmpty)
+                      ? Text(UiHelper.initials(u?.name ?? '?'),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppTheme.primaryContainer))
+                      : null,
+                ),
+                Positioned(
+                  bottom: 0,
+                  right: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primaryContainer,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                    child: const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           Center(
@@ -188,6 +219,28 @@ class ProfileScreen extends StatelessWidget {
         }),
       ),
     );
+  }
+
+  Future<void> _pickAvatar(BuildContext context) async {
+    final picker = ImagePicker();
+    final picked = await picker.pickImage(source: ImageSource.gallery, imageQuality: 80, maxWidth: 512);
+    if (picked == null) return;
+    UiHelper.showLoading(context);
+    try {
+      final bytes = await picked.readAsBytes();
+      final ext = picked.path.split('.').last.toLowerCase();
+      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+      final b64 = 'data:$mime;base64,${base64Encode(bytes)}';
+      await AuthService.updateAvatar(b64);
+      final auth = Provider.of<AuthProvider>(context, listen: false);
+      await auth.refresh();
+      if (!context.mounted) return;
+      UiHelper.hideLoading(context);
+      EquipDialog.success(context, 'Đã cập nhật ảnh đại diện');
+    } catch (e) {
+      if (context.mounted) UiHelper.hideLoading(context);
+      UiHelper.showErrorToast(context, e);
+    }
   }
 
   static String _roleLabel(String? role) {

@@ -1,4 +1,7 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/models/order.dart';
 import 'package:velox_mobile/services/order_service.dart';
@@ -16,7 +19,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   Order? _order;
   bool _loading = true;
   final _otp = TextEditingController();
-  final _images = TextEditingController();
+  final _picker = ImagePicker();
+  final List<XFile> _selectedImages = [];
   int _rating = 5;
   final _comment = TextEditingController();
 
@@ -53,17 +57,39 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _pickImages() async {
+    final picked = await _picker.pickMultiImage(imageQuality: 75, maxWidth: 1024);
+    if (picked.isNotEmpty) setState(() => _selectedImages.addAll(picked));
+  }
+
+  void _removeImage(int index) {
+    setState(() => _selectedImages.removeAt(index));
+  }
+
   Future<void> _confirmHandover() async {
     if (_order == null) return;
+    if (_selectedImages.length < 3) {
+      UiHelper.showErrorToast(context, 'Vui lòng chọn ít nhất 3 ảnh bàn giao');
+      return;
+    }
     final confirmed = await EquipDialog.confirm(context, 'Xác nhận bàn giao', 'Xác nhận đã bàn giao thiết bị cho người thuê?');
     if (confirmed != true) return;
+    UiHelper.showLoading(context);
     try {
-      await OrderService.confirmHandover(
-          _order!.id, _otp.text.trim(), _images.text.split(',').map((e) => e.trim()).toList());
-      if (!mounted) return;
+      final imagesB64 = <String>[];
+      for (final img in _selectedImages) {
+        final bytes = await img.readAsBytes();
+        final ext = img.path.split('.').last.toLowerCase();
+        final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+        imagesB64.add('data:$mime;base64,${base64Encode(bytes)}');
+      }
+      await OrderService.confirmHandover(_order!.id, _otp.text.trim(), imagesB64);
+      if (!context.mounted) return;
+      UiHelper.hideLoading(context);
       EquipDialog.success(context, 'Đã xác nhận bàn giao.');
       _load(_order!.id);
     } catch (e) {
+      if (context.mounted) UiHelper.hideLoading(context);
       UiHelper.showErrorToast(context, e);
     }
   }
@@ -160,12 +186,42 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
                           labelText: 'Mã OTP',
                           prefixIcon: Icon(Icons.pin))),
                   const SizedBox(height: 8),
-                  TextField(
-                      controller: _images,
-                      decoration: const InputDecoration(
-                          labelText: 'URL ảnh (cách nhau bởi dấu phẩy)',
-                          hintText: 'https://.../1.jpg, https://.../2.jpg',
-                          prefixIcon: Icon(Icons.image))),
+                  if (_selectedImages.isNotEmpty)
+                    SizedBox(
+                      height: 80,
+                      child: ListView.separated(
+                        scrollDirection: Axis.horizontal,
+                        itemCount: _selectedImages.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 8),
+                        itemBuilder: (ctx, i) => Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(File(_selectedImages[i].path),
+                                  width: 80, height: 80, fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              right: 0, top: 0,
+                              child: GestureDetector(
+                                onTap: () => _removeImage(i),
+                                child: Container(
+                                  decoration: const BoxDecoration(
+                                    color: Colors.black54, shape: BoxShape.circle),
+                                  padding: const EdgeInsets.all(2),
+                                  child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickImages,
+                    icon: const Icon(Icons.photo_library_outlined, size: 20),
+                    label: Text('Chọn ảnh bàn giao (${_selectedImages.length}/3)'),
+                  ),
                   const SizedBox(height: 12),
                   SizedBox(
                     width: double.infinity,
