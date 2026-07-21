@@ -302,18 +302,40 @@ exports.confirmReturn = async (req, res) => {
 
     // Settle funds in wallet
     const lender = await User.findById(order.asset.lender);
+    let lenderTransactionAmount = 0;
     if (order.depositMethod === 'online') {
-      lender.balance += (lenderPayout + lateFee);
+      lenderTransactionAmount = lenderPayout + lateFee;
+      lender.balance += lenderTransactionAmount;
     } else {
       // Cash deposit: Lender holds cash, so late fee is handled physically.
-      lender.balance += lenderPayout;
+      lenderTransactionAmount = lenderPayout;
+      lender.balance += lenderTransactionAmount;
     }
     await lender.save();
+    
+    await Transaction.create({
+      user: lender._id,
+      order: order._id,
+      amount: lenderTransactionAmount,
+      type: 'addition',
+      reason: 'Nhận tiền thuê đồ từ đơn hàng' + (lateFee > 0 ? ' (bao gồm phí phạt trả muộn)' : '')
+    });
 
     if (order.depositMethod === 'online') {
       const renter = await User.findById(order.renter);
       renter.balance += (order.deposit - lateFee); // Deduct late fee from deposit
       await renter.save();
+      
+      const renterRefundAmount = order.deposit - lateFee;
+      if (renterRefundAmount !== 0) {
+        await Transaction.create({
+          user: renter._id,
+          order: order._id,
+          amount: renterRefundAmount > 0 ? renterRefundAmount : renterRefundAmount,
+          type: renterRefundAmount > 0 ? 'addition' : 'deduction',
+          reason: 'Hoàn trả tiền cọc' + (lateFee > 0 ? ` (đã trừ ${lateFee.toLocaleString('vi-VN')} đ phí trả muộn)` : '')
+        });
+      }
     }
 
     res.status(200).json({
@@ -352,11 +374,25 @@ exports.settleOrder = async (req, res) => {
     const lender = await User.findById(order.asset.lender);
     lender.balance += lenderPayout;
     await lender.save();
+    await Transaction.create({
+      user: lender._id,
+      order: order._id,
+      amount: lenderPayout,
+      type: 'addition',
+      reason: 'Admin quyết toán nhận tiền thuê đồ'
+    });
 
     if (order.depositMethod === 'online') {
       const renter = await User.findById(order.renter);
       renter.balance += order.deposit; // Returning deposit
       await renter.save();
+      await Transaction.create({
+        user: renter._id,
+        order: order._id,
+        amount: order.deposit,
+        type: 'addition',
+        reason: 'Admin quyết toán hoàn trả tiền cọc'
+      });
     }
 
     res.status(200).json({ success: true, message: 'Order settled successfully', data: order });
