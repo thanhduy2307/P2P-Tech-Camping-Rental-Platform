@@ -74,6 +74,8 @@ exports.createAsset = async (req, res) => {
     }
 
     // 4. AI Metadata Extraction & Content Moderation (Anti-Fraud & NSFW Check)
+    // Tạm thời tắt tính năng AI check khi up sản phẩm của lender theo yêu cầu
+    /*
     const scanResult = await aiService.scanImageForFraud(images[0]);
     if (scanResult.isCopied) {
       return res.status(400).json({
@@ -81,6 +83,8 @@ exports.createAsset = async (req, res) => {
         message: `Đăng ký thiết bị bị từ chối do phát hiện hình ảnh không hợp lệ (Gian lận hoặc Nhạy cảm). Lý do AI: ${scanResult.reason}`
       });
     }
+    */
+    const scanResult = { isCopied: false, reason: 'AI Check Disabled' };
 
     let finalDepositAmount = depositAmount;
     if (depositCalculationMode === 'auto') {
