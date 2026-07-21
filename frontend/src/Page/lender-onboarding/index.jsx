@@ -101,7 +101,7 @@ const LenderOnboarding = () => {
     } else if (activeStep === 2) {
       const isRenterApproved = user && user.renterStatus === 'approved';
       if (!isRenterApproved && (!cccdFrontPreview || !cccdBackPreview || !cccdSelfiePreview)) {
-        setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chụp selfie.');
+        setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chân dung.');
         return;
       }
       setErrorMessage('');
@@ -145,7 +145,7 @@ const LenderOnboarding = () => {
 
       const isRenterApproved = user && user.renterStatus === 'approved';
       if (!isRenterApproved && (!frontBase64 || !backBase64 || !selfieBase64)) {
-        setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chụp selfie.');
+        setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chân dung.');
         setLoading(false);
         return;
       }
@@ -559,7 +559,7 @@ const LenderOnboarding = () => {
 
                 {/* Selfie Card */}
                 <div className="flex flex-col items-center">
-                  <span className="text-[11px] font-bold text-on-surface-variant mb-2">Ảnh chụp chân dung cầm CCCD</span>
+                  <span className="text-[11px] font-bold text-on-surface-variant mb-2">Ảnh chân dung</span>
                   <div className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-outline-variant bg-surface hover:border-primary transition-all relative overflow-hidden flex flex-col items-center justify-center cursor-pointer group">
                     {cccdSelfiePreview ? (
                       <img src={cccdSelfiePreview} alt="CCCD Selfie Preview" className="w-full h-full object-cover" />
@@ -625,7 +625,7 @@ const LenderOnboarding = () => {
                           <span className="material-symbols-outlined text-xs">{cccdBackPreview ? 'done' : 'error'}</span> CCCD Mặt sau {cccdBackPreview ? '(Đã tải lên)' : '(Chưa có)'}
                         </span>
                         <span className={`flex items-center gap-1 ${cccdSelfiePreview ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-amber-600 bg-amber-50 border-amber-100'} px-2.5 py-1 rounded-full border font-bold text-[10px]`}>
-                          <span className="material-symbols-outlined text-xs">{cccdSelfiePreview ? 'done' : 'error'}</span> Ảnh chân dung Selfie {cccdSelfiePreview ? '(Đã tải lên)' : '(Chưa có)'}
+                          <span className="material-symbols-outlined text-xs">{cccdSelfiePreview ? 'done' : 'error'}</span> Ảnh chân dung {cccdSelfiePreview ? '(Đã tải lên)' : '(Chưa có)'}
                         </span>
                       </>
                     )}

@@ -161,10 +161,10 @@ const PostAsset = () => {
     setAssignedTaskInfo(null);
     setLoading(true);
 
-    // Validate images count (at least 5 images)
+    // Validate images count (at least 1 image)
     const activeImagesCount = imgPreviews.filter(p => p !== '').length;
-    if (activeImagesCount < 5) {
-      setErrorMsg('Vui lòng cung cấp đầy đủ 5 hình ảnh sản phẩm (4 ảnh các góc + 1 ảnh chụp rõ số Serial trên thân máy hoặc ảnh bung lều thực tế).');
+    if (activeImagesCount < 1) {
+      setErrorMsg('Vui lòng cung cấp ít nhất 1 hình ảnh sản phẩm.');
       setLoading(false);
       return;
     }
@@ -380,11 +380,11 @@ const PostAsset = () => {
               </label>
               <input
                 id="asset-orig-price"
-                type="number"
-                placeholder="e.g. 12000000"
+                type="text"
+                placeholder="e.g. 12.000.000"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm"
-                value={originalPrice}
-                onChange={(e) => setOriginalPrice(e.target.value)}
+                value={originalPrice ? new Intl.NumberFormat('vi-VN').format(originalPrice) : ''}
+                onChange={(e) => setOriginalPrice(e.target.value.replace(/\D/g, ''))}
                 required
               />
               <p className="text-[10px] text-slate-400">
@@ -399,11 +399,11 @@ const PostAsset = () => {
                 </label>
                 <input
                   id="asset-price"
-                  type="number"
-                  placeholder="e.g. 150000"
+                  type="text"
+                  placeholder="e.g. 150.000"
                   className="w-full border border-slate-200 rounded-lg px-3 py-2.5 focus:outline-none focus:border-teal-500 text-sm"
-                  value={pricePerDay}
-                  onChange={(e) => setPricePerDay(e.target.value)}
+                  value={pricePerDay ? new Intl.NumberFormat('vi-VN').format(pricePerDay) : ''}
+                  onChange={(e) => setPricePerDay(e.target.value.replace(/\D/g, ''))}
                   required
                 />
               </div>
@@ -430,11 +430,11 @@ const PostAsset = () => {
               </label>
               <input
                 id="asset-deposit"
-                type="number"
-                placeholder="e.g. 1500000"
+                type="text"
+                placeholder="e.g. 1.500.000"
                 className="w-full border border-slate-200 rounded-lg px-3 py-2.5 bg-white focus:outline-none focus:border-teal-500 text-sm"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
+                value={depositAmount ? new Intl.NumberFormat('vi-VN').format(depositAmount) : ''}
+                onChange={(e) => setDepositAmount(e.target.value.replace(/\D/g, ''))}
                 required={depositCalculationMode === 'fixed'}
               />
               <p className="text-[10px] text-slate-400 mt-1">Khoản tiền cọc renter cần đặt trước khi thuê thiết bị này.</p>
@@ -478,22 +478,22 @@ const PostAsset = () => {
         <section className="space-y-4">
           <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex items-center gap-1.5">
             <span className="material-symbols-outlined text-sm text-slate-400">photo_library</span>
-            4. Hình ảnh thiết bị (Bắt buộc đủ 5 ảnh các góc cạnh)
+            4. Hình ảnh thiết bị (Tối đa 5 ảnh)
           </h3>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[0, 1, 2, 3, 4].map((idx) => {
               const labels = [
-                'Góc mặt trước', 
-                'Góc mặt sau', 
-                'Góc bên trái', 
-                'Góc bên phải', 
-                category === 'Tech' ? 'Tem mã vạch / Serial' : 'Bung lều thực tế'
+                'Ảnh 1', 
+                'Ảnh 2', 
+                'Ảnh 3', 
+                'Ảnh 4', 
+                'Ảnh 5'
               ];
               return (
                 <div key={idx} className="space-y-2">
                   <p className="text-[10px] font-semibold text-slate-600 text-center truncate">
-                    {labels[idx]} <span className="text-red-500">*</span>
+                    {labels[idx]} {idx === 0 && <span className="text-red-500">*</span>}
                   </p>
                   <div
                     className={`relative w-full aspect-square rounded-xl border-2 border-dashed flex items-center justify-center overflow-hidden cursor-pointer transition-all group ${
@@ -537,7 +537,7 @@ const PostAsset = () => {
             })}
           </div>
           <p className="text-[10px] text-slate-400">
-            * Yêu cầu chụp đủ 4 góc cạnh sản phẩm rõ nét kèm ảnh Serial thân máy (Tech) hoặc ảnh dựng lều thực tế (Camping) để AI thực hiện trích xuất và chống giả mạo.
+            * Yêu cầu chụp rõ nét sản phẩm thực tế để khách hàng tham khảo.
           </p>
         </section>
 
