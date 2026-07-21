@@ -714,6 +714,13 @@ exports.createWithdrawal = async (req, res) => {
     user.balance -= amount;
     await user.save();
 
+    await Transaction.create({
+      user: user._id,
+      amount: -amount,
+      type: 'deduction',
+      reason: 'Yêu cầu rút tiền. Số dư bị đóng băng chờ duyệt.'
+    });
+
     const request = await WithdrawalRequest.create({
       lender: user._id,
       amount,
@@ -788,6 +795,13 @@ exports.verifyWithdrawal = async (req, res) => {
       if (lender) {
         lender.balance += request.amount;
         await lender.save();
+        
+        await Transaction.create({
+          user: lender._id,
+          amount: request.amount,
+          type: 'addition',
+          reason: `Yêu cầu rút tiền bị từ chối. Lý do: ${rejectReason}`
+        });
       }
     }
 
