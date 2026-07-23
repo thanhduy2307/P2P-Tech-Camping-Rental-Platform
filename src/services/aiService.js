@@ -112,33 +112,50 @@ exports.generateCampingRecommendation = async (query, availableAssets) => {
       description: a.description
     }));
 
-    const prompt = `
-Bạn là chuyên gia tư vấn dã ngoại và cắm trại của nền tảng thuê đồ EquipPeer, chỉ được trả lời các câu hỏi liên quan đến cắm trại, dã ngoại, leo núi, trekking, và thuê thiết bị ngoài trời.
-Tuyệt đối KHÔNG trả lời bất kỳ câu hỏi nào khác ngoài chủ đề trên (như toán học, lịch sử, văn học, công nghệ, sức khỏe, tin tức, giải trí, v.v.).
-Nếu câu hỏi không liên quan đến cắm trại/dã ngoại/thiết bị ngoài trời, hãy trả về JSON:
-{"recommendations": "Xin lỗi, tôi chỉ có thể tư vấn về các chủ đề cắm trại, dã ngoại và thuê thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!", "recommendedAssetIds": [], "suggestedPlan": ""}
+    // Pre-check: if query has NO camping/outdoor keywords, refuse immediately
+    const campingKeywords = /cắm trại|camping|dã ngoại|trekking|leo núi|đi bộ|túi ngủ|lều|bếp|nướng|thuê|thiết bị|đồ|đèn|pin|balo|tent|outdoor|sleeping|backpack|cook|hike|trail|ngủ|ngồi|ghế|bàn|sạc|solar|máy ảnh|vlog|quay|chụp|du lịch|phượt|giày|gậy|mũ|áo khoác|gió|mưa|lạnh|ấm|chống|nước|ngân sách|budget|giá|rẻ|tiết kiệm|mang vác|nhẹ|gọn/i;
+    const isCampingQuery = campingKeywords.test(query);
 
-Phân tích nhu cầu của khách hàng: "${query}"
-Danh sách thiết bị hiện có trên sàn:
+    const prompt = `
+Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P. Bạn CHỈ được phép trả lời câu hỏi về cắm trại, dã ngoại, leo núi, trekking và thiết bị ngoài trời.
+
+QUY TẮC NGHIÊM NGẶT:
+- Nếu câu hỏi KHÔNG liên quan đến cắm trại/dã ngoại/thiết bị ngoài trời, bạn PHẢI trả về JSON:
+{"recommendations": "Xin lỗi, tôi chỉ tư vấn về cắm trại, dã ngoại và thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!", "recommendedAssetIds": [], "suggestedPlan": ""}
+- TUYỆT ĐỐI KHÔNG bịa đặt, suy diễn, hoặc cố gắng biến câu hỏi không liên quan thành chủ đề cắm trại.
+- KHÔNG được đề xuất thiết bị nếu câu hỏi không thực sự về nhu cầu cắm trại.
+- Chỉ sử dụng danh sách thiết bị bên dưới để match. Nếu không có thiết bị phù hợp, trả về mảng rỗng.
+
+Câu hỏi khách hàng: "${query}"
+
+Danh sách thiết bị hiện có:
 ${JSON.stringify(assetListForAI, null, 2)}
 
-Nếu câu hỏi thuộc chủ đề cắm trại/dã ngoại, hãy thực hiện:
-1. Đưa ra lời khuyên hữu ích, đề xuất trang bị cần thiết.
-2. Tìm thiết bị phù hợp từ danh sách trên để giới thiệu.
-   - Nếu có ngân sách, CHỈ khớp thiết bị có giá phù hợp, loại bỏ thiết bị vượt ngân sách.
-3. Cung cấp kế hoạch chuẩn bị (checklist) ngắn gọn.
+${isCampingQuery ? `
+Nếu câu hỏi thuộc chủ đề cắm trại/dã ngoại, hãy:
+1. Tư vấn trang bị cần thiết cho chuyến đi.
+2. Chọn thiết bị phù hợp từ danh sách. Nếu có ngân sách, CHỈ chọn thiết bị trong ngân sách.
+3. Đưa checklist ngắn gọn.
+` : `Câu hỏi này KHÔNG thuộc chủ đề cắm trại. Hãy trả về JSON từ chối như quy tắc.`}
 
-Trả về JSON thuần túy (không markdown):
+Trả về JSON thuần túy (không markdown, không giải thích thêm):
 {
-  "recommendations": "Lời khuyên chi tiết bằng tiếng Việt.",
-  "recommendedAssetIds": ["danh_sách_id_phù_hợp"],
-  "suggestedPlan": "Checklist ngắn gọn."
+  "recommendations": "Nội dung tư vấn hoặc lời từ chối.",
+  "recommendedAssetIds": [],
+  "suggestedPlan": ""
 }
 `;
 
     const aiResponse = await callGeminiAPI(prompt);
     const parsed = cleanAndParseJSON(aiResponse);
     parsed.aiSource = "Gemini AI";
+
+    // Backend safety net: force refusal if query has no camping keywords
+    if (!isCampingQuery && parsed.recommendations && parsed.recommendedAssetIds && parsed.recommendedAssetIds.length > 0) {
+      parsed.recommendations = "Xin lỗi, tôi chỉ tư vấn về cắm trại, dã ngoại và thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!";
+      parsed.recommendedAssetIds = [];
+      parsed.suggestedPlan = "";
+    }
     return parsed;
   } catch (error) {
     console.error('Error generating AI recommendation, falling back to local:', error.message);
