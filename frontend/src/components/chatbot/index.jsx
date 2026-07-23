@@ -14,15 +14,20 @@ const AIChatbot = () => {
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState(null);
+  const locationRef = useRef(null);
   
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        pos => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-        () => {}, // user denied, just skip
-        { timeout: 5000 }
+        pos => {
+          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+          setLocation(loc);
+          locationRef.current = loc;
+        },
+        () => {},
+        { timeout: 5000, enableHighAccuracy: true }
       );
     }
   }, []);
@@ -46,7 +51,10 @@ const AIChatbot = () => {
     const query = textToSend || inputValue;
     if (!query.trim()) return;
 
-    // Add user message
+    // Try to extract location from text (e.g. "gần Hà Nội", "ở Đà Lạt")
+    const placeMatch = query.match(/(?:gần|ở|tại|khu vực)\s+(\S+)/i);
+    const loc = locationRef.current;
+
     setMessages(prev => [...prev, {
       sender: 'user',
       text: query,
@@ -57,7 +65,9 @@ const AIChatbot = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/assets/recommend', { query, ...(location || {}) });
+      const body = { query };
+      if (loc) Object.assign(body, loc);
+      const res = await api.post('/assets/recommend', body);
       
       if (res.data && res.data.success) {
         const { recommendations, suggestedPlan, assets } = res.data.data;
