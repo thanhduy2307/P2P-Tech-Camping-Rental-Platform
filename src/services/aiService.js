@@ -94,11 +94,10 @@ const callGeminiAPI = (prompt) => {
 /**
  * AI Feature 1: Camping Consultant / Gear Recommendation
  */
-exports.generateCampingRecommendation = async (query, availableAssets) => {
+exports.generateCampingRecommendation = async (query, availableAssets, location) => {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    // FALLBACK: Smart rule-based matching
     return getLocalCampingRecommendation(query, availableAssets);
   }
 
@@ -112,12 +111,14 @@ exports.generateCampingRecommendation = async (query, availableAssets) => {
       description: a.description
     }));
 
-    // Pre-check: if query has NO camping/outdoor keywords, refuse immediately
-    const campingKeywords = /cắm trại|camping|dã ngoại|trekking|leo núi|đi bộ|túi ngủ|lều|bếp|nướng|thuê|thiết bị|đồ|đèn|pin|balo|tent|outdoor|sleeping|backpack|cook|hike|trail|ngủ|ngồi|ghế|bàn|sạc|solar|máy ảnh|vlog|quay|chụp|du lịch|phượt|giày|gậy|mũ|áo khoác|gió|mưa|lạnh|ấm|chống|nước|ngân sách|budget|giá|rẻ|tiết kiệm|mang vác|nhẹ|gọn/i;
+    const campingKeywords = /cắm trại|camping|dã ngoại|trekking|leo núi|đi bộ|túi ngủ|lều|bếp|nướng|thuê|thiết bị|đồ|đèn|pin|balo|tent|outdoor|sleeping|backpack|cook|hike|trail|ngủ|ngồi|ghế|bàn|sạc|solar|máy ảnh|vlog|quay|chụp|du lịch|phượt|giày|gậy|mũ|áo khoác|gió|mưa|lạnh|ấm|chống|nước|ngân sách|budget|giá|rẻ|tiết kiệm|mang vác|nhẹ|gọn|địa điểm|chỗ|ở đâu|gần/i;
     const isCampingQuery = campingKeywords.test(query);
 
-    const prompt = `
-Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P. Bạn CHỈ được phép trả lời câu hỏi về cắm trại, dã ngoại, leo núi, trekking và thiết bị ngoài trời.
+    const locationInfo = location
+      ? `Vị trí hiện tại của người dùng: ${location.lat}, ${location.lng} (latitude, longitude). Hãy gợi ý các địa điểm cắm trại nổi tiếng gần khu vực này nếu có thể.`
+      : '';
+
+    const prompt = `Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P. Bạn CHỈ được phép trả lời câu hỏi về cắm trại, dã ngoại, leo núi, trekking và thiết bị ngoài trời.
 
 QUY TẮC NGHIÊM NGẶT:
 - Nếu câu hỏi KHÔNG liên quan đến cắm trại/dã ngoại/thiết bị ngoài trời, bạn PHẢI trả về JSON:
@@ -126,6 +127,8 @@ QUY TẮC NGHIÊM NGẶT:
 - KHÔNG được đề xuất thiết bị nếu câu hỏi không thực sự về nhu cầu cắm trại.
 - Chỉ sử dụng danh sách thiết bị bên dưới để match. Nếu không có thiết bị phù hợp, trả về mảng rỗng.
 
+${locationInfo}
+
 Câu hỏi khách hàng: "${query}"
 
 Danh sách thiết bị hiện có:
@@ -133,7 +136,7 @@ ${JSON.stringify(assetListForAI, null, 2)}
 
 ${isCampingQuery ? `
 Nếu câu hỏi thuộc chủ đề cắm trại/dã ngoại, hãy:
-1. Tư vấn trang bị cần thiết cho chuyến đi.
+1. Tư vấn trang bị cần thiết cho chuyến đi, gợi ý địa điểm cắm trại gần vị trí người dùng nếu có thông tin.
 2. Chọn thiết bị phù hợp từ danh sách. Nếu có ngân sách, CHỈ chọn thiết bị trong ngân sách.
 3. Đưa checklist ngắn gọn.
 ` : `Câu hỏi này KHÔNG thuộc chủ đề cắm trại. Hãy trả về JSON từ chối như quy tắc.`}
@@ -143,8 +146,7 @@ Trả về JSON thuần túy (không markdown, không giải thích thêm):
   "recommendations": "Nội dung tư vấn hoặc lời từ chối.",
   "recommendedAssetIds": [],
   "suggestedPlan": ""
-}
-`;
+}`;
 
     const aiResponse = await callGeminiAPI(prompt);
     const parsed = cleanAndParseJSON(aiResponse);

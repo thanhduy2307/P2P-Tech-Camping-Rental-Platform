@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/widgets/asset_card.dart';
@@ -52,7 +53,21 @@ class BrowseScreen extends StatelessWidget {
               Navigator.pop(context);
               UiHelper.showLoading(context);
               try {
-                final data = await AssetService.recommend(ctrl.text);
+                double? lat, lng;
+                final perm = await Geolocator.checkPermission();
+                if (perm == LocationPermission.denied) {
+                  final req = await Geolocator.requestPermission();
+                  if (req == LocationPermission.whileInUse || req == LocationPermission.always) {
+                    final pos = await Geolocator.getCurrentPosition();
+                    lat = pos.latitude;
+                    lng = pos.longitude;
+                  }
+                } else if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
+                  final pos = await Geolocator.getCurrentPosition();
+                  lat = pos.latitude;
+                  lng = pos.longitude;
+                }
+                final data = await AssetService.recommend(ctrl.text, lat: lat, lng: lng);
                 if (!context.mounted) return;
                 UiHelper.hideLoading(context);
                 showDialog(
