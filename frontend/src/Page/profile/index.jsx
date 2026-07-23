@@ -51,9 +51,13 @@ const Profile = () => {
   const [withdrawSuccess, setWithdrawSuccess] = useState('');
   const [withdrawError, setWithdrawError] = useState('');
 
-  // Withdrawal history state
   const [withdrawals, setWithdrawals] = useState([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+  const [receiptLightbox, setReceiptLightbox] = useState({ open: false, url: '' });
+
+  // Transactions history state
+  const [transactions, setTransactions] = useState([]);
+  const [loadingTransactions, setLoadingTransactions] = useState(false);
 
   const fetchWithdrawals = async () => {
     if (!token) return;
@@ -72,7 +76,23 @@ const Profile = () => {
 
   useEffect(() => {
     fetchWithdrawals();
+    fetchTransactions();
   }, [token]);
+
+  const fetchTransactions = async () => {
+    if (!token) return;
+    setLoadingTransactions(true);
+    try {
+      const response = await api.get('/auth/my-transactions');
+      if (response.data && response.data.success) {
+        setTransactions(response.data.data || []);
+      }
+    } catch (err) {
+      console.error('Error fetching transactions:', err);
+    } finally {
+      setLoadingTransactions(false);
+    }
+  };
 
   // Fetch full fresh profile on load
   useEffect(() => {
@@ -746,7 +766,7 @@ const Profile = () => {
                           <th className="pb-2">Số tiền</th>
                           <th className="pb-2">Ngân hàng nhận</th>
                           <th className="pb-2">Trạng thái</th>
-                          <th className="pb-2">Ghi chú</th>
+                          <th className="pb-2">Chi tiết / Ghi chú</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant/20">
@@ -784,8 +804,78 @@ const Profile = () => {
                                 </span>
                               )}
                             </td>
-                            <td className="py-2.5 text-red-600 font-medium max-w-[150px] truncate" title={req.rejectReason}>
-                              {req.status === 'rejected' ? req.rejectReason : '-'}
+                            <td className="py-2.5 text-on-surface-variant max-w-[150px]">
+                              {req.status === 'rejected' && req.rejectReason && (
+                                <span className="italic text-red-500">{req.rejectReason}</span>
+                              )}
+                              {req.status === 'approved' && (
+                                <span className="font-semibold text-emerald-600 text-xs">Đã thanh toán từ Vietcombank-CTY CO PHAN EQUIPPEER</span>
+                              )}
+                              {req.status === 'pending' && <span className="italic text-on-surface-variant/50">-</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Transactions History */}
+            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6">
+              <h3 className="font-title-md text-base font-bold text-on-surface mb-4 flex items-center">
+                <span className="material-symbols-outlined text-primary mr-1.5">receipt_long</span>
+                Lịch sử giao dịch ví
+              </h3>
+              
+              <div className="bg-surface-container-low rounded-xl border border-outline-variant overflow-hidden">
+                {loadingTransactions ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <span className="material-symbols-outlined animate-spin text-2xl mb-2 text-slate-300">autorenew</span>
+                    <p className="text-xs font-medium">Đang tải lịch sử giao dịch...</p>
+                  </div>
+                ) : transactions.length === 0 ? (
+                  <div className="p-8 text-center text-slate-400">
+                    <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">history</span>
+                    <p className="text-xs font-medium">Chưa có giao dịch nào.</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm whitespace-nowrap">
+                      <thead className="bg-slate-100/50 text-slate-600 text-[11px] uppercase font-bold tracking-wider border-b border-outline-variant">
+                        <tr>
+                          <th className="py-3 px-4">Thời gian</th>
+                          <th className="py-3 px-4">Loại GD</th>
+                          <th className="py-3 px-4 text-right">Số tiền</th>
+                          <th className="py-3 px-4">Lý do</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-outline-variant text-xs text-slate-700">
+                        {transactions.map((txn) => (
+                          <tr key={txn._id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="py-2.5 px-4 font-medium text-slate-500">
+                              {new Date(txn.createdAt).toLocaleString('vi-VN', {
+                                day: '2-digit', month: '2-digit', year: 'numeric',
+                                hour: '2-digit', minute: '2-digit'
+                              })}
+                            </td>
+                            <td className="py-2.5 px-4">
+                              {txn.type === 'addition' ? (
+                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                  Cộng tiền
+                                </span>
+                              ) : (
+                                <span className="bg-red-50 text-red-700 border border-red-200 px-2 py-0.5 rounded-full font-bold text-[10px]">
+                                  Trừ tiền
+                                </span>
+                              )}
+                            </td>
+                            <td className={`py-2.5 px-4 font-extrabold text-right ${txn.type === 'addition' ? 'text-emerald-600' : 'text-red-600'}`}>
+                              {txn.type === 'addition' ? '+' : '-'}{txn.amount.toLocaleString('vi-VN')} đ
+                            </td>
+                            <td className="py-2.5 px-4 text-slate-600 truncate max-w-[200px]" title={txn.reason}>
+                              {txn.reason}
                             </td>
                           </tr>
                         ))}
@@ -1175,6 +1265,17 @@ const Profile = () => {
         </div>
 
       </div>
+      {/* Receipt Lightbox Modal */}
+      {receiptLightbox.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setReceiptLightbox({ open: false, url: '' })}>
+          <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setReceiptLightbox({ open: false, url: '' })} className="absolute -top-10 right-0 md:-right-10 text-white hover:text-gray-300 bg-gray-800/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <img src={receiptLightbox.url} alt="Receipt" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

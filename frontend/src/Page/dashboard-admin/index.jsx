@@ -2,6 +2,7 @@ import Swal from 'sweetalert2';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../configs/axios';
+import WithdrawalApprovalModal from './WithdrawalApprovalModal';
 
 const DashboardAdmin = () => {
   // Navigation & UI States
@@ -29,6 +30,7 @@ const DashboardAdmin = () => {
 
   // Modal / Interaction States
   const [rejectionModal, setRejectionModal] = useState({ open: false, type: null, id: null });
+  const [withdrawalApproveModal, setWithdrawalApproveModal] = useState({ open: false, req: null });
   const [rejectReason, setRejectReason] = useState('');
   const [lightbox, setLightbox] = useState({ open: false, imgUrl: '', title: '' });
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
@@ -319,19 +321,10 @@ const DashboardAdmin = () => {
   };
 
   // Withdrawal verification approvals
-  const handleVerifyWithdrawal = async (id, status) => {
+  const handleVerifyWithdrawal = async (id, status, req = null) => {
     if (status === 'approved') {
-      const _swalRes = await Swal.fire({title: 'Xác nhận duyệt yêu cầu rút tiền này? Số dư ví người dùng đã được trừ.', showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
-    if (!_swalRes.isConfirmed) return;
-      try {
-        const res = await api.put(`/auth/withdrawals/${id}/verify`, { status });
-        if (res.data && res.data.success) {
-          showToast('Duyệt yêu cầu rút tiền thành công.');
-          fetchWithdrawals();
-          fetchStats();
-        }
-      } catch (err) {
-        showToast(err.response?.data?.message || 'Thao tác thất bại.', 'error');
+      if (req) {
+        setWithdrawalApproveModal({ open: true, req });
       }
     } else {
       // open rejection modal
@@ -1198,7 +1191,7 @@ const DashboardAdmin = () => {
                         {req.status === 'pending' ? (
                           <div className="flex gap-2 justify-end">
                             <button
-                              onClick={() => handleVerifyWithdrawal(req._id, 'approved')}
+                              onClick={() => handleVerifyWithdrawal(req._id, 'approved', req)}
                               className="px-2.5 py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-0.5"
                             >
                               <span className="material-symbols-outlined text-[15px]">check_circle</span> Duyệt
@@ -1839,6 +1832,13 @@ const DashboardAdmin = () => {
           </div>
         </div>
       )}
+      {/* Render Modal Duyệt Rút Tiền */}
+      <WithdrawalApprovalModal 
+        open={withdrawalApproveModal.open} 
+        req={withdrawalApproveModal.req} 
+        onClose={() => setWithdrawalApproveModal({ open: false, req: null })} 
+        onRefresh={() => { fetchWithdrawals(); fetchStats(); }} 
+      />
     </div>
   );
 };
