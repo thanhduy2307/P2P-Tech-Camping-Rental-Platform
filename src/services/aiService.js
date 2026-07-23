@@ -1,4 +1,5 @@
 const https = require('https');
+const http = require('http');
 
 /**
  * Call Gemini API using native https module to avoid external dependency issues.
@@ -497,12 +498,34 @@ const callGeminiWithImage = (mimeType, base64Data, textPrompt) => {
 };
 
 /**
- * AI-powered Image Anti-Fraud Scan.
+ * Download image from URL and return base64 + mimeType.
  */
-exports.scanImageForFraud = async (imageB64) => {
+const urlToBase64 = (url) => {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, { timeout: 15000 }, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return reject(new Error(`Failed to download image: HTTP ${res.statusCode}`));
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        const mimeType = res.headers['content-type'] || 'image/jpeg';
+        resolve({ mimeType, base64: buffer.toString('base64') });
+      });
+    }).on('error', reject).on('timeout', function () { this.destroy(); reject(new Error('Image download timeout')); });
+  });
+};
+
+/**
+ * AI-powered Image Anti-Fraud Scan.
+ * Accepts either a URL string or a base64 string.
+ */
+exports.scanImageForFraud = async (imageInput) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey || !imageB64) {
+  if (!apiKey || !imageInput) {
     return {
       isCopied: false,
       reason: "[Dự phòng] Mô phỏng quét ảnh chống giả: Ảnh chụp thực tế của sản phẩm không phát hiện watermark hoặc nguồn sao chép trực tuyến.",
@@ -512,9 +535,14 @@ exports.scanImageForFraud = async (imageB64) => {
 
   try {
     let mimeType = 'image/jpeg';
-    let base64Data = imageB64;
+    let base64Data = imageInput;
 
-    if (imageB64.startsWith('data:')) {
+    // If input is a URL, download and convert to base64
+    if (typeof imageInput === 'string' && imageInput.startsWith('http')) {
+      const result = await urlToBase64(imageInput);
+      mimeType = result.mimeType;
+      base64Data = result.base64;
+    } else if (imageInput.startsWith('data:')) {
       const parts = imageB64.split(';base64,');
       if (parts.length === 2) {
         mimeType = parts[0].replace('data:', '');
