@@ -21,22 +21,6 @@ const AIChatbot = () => {
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-          setLocation(loc);
-          locationRef.current = loc;
-        },
-        (err) => {
-          console.warn('Chatbot geolocation failed:', err.message);
-        },
-        { timeout: 10000, enableHighAccuracy: false }
-      );
-    }
-  }, []);
-
-  useEffect(() => {
     const handler = (e) => {
       if (e.detail) {
         const { lat, lng, addressLabel } = e.detail;
@@ -50,6 +34,23 @@ const AIChatbot = () => {
     window.addEventListener('location-updated', handler);
     return () => window.removeEventListener('location-updated', handler);
   }, []);
+
+  const ensureLocation = async () => {
+    if (locationRef.current) return locationRef.current;
+    if (!navigator.geolocation) return null;
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject,
+          { timeout: 5000, enableHighAccuracy: false })
+      );
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(loc);
+      locationRef.current = loc;
+      return loc;
+    } catch {
+      return null;
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -70,8 +71,6 @@ const AIChatbot = () => {
     const query = textToSend || inputValue;
     if (!query.trim()) return;
 
-    const loc = locationRef.current;
-
     setMessages(prev => [...prev, {
       sender: 'user',
       text: query,
@@ -80,6 +79,8 @@ const AIChatbot = () => {
 
     if (!textToSend) setInputValue('');
     setLoading(true);
+
+    const loc = await ensureLocation();
 
     try {
       const body = { query };
