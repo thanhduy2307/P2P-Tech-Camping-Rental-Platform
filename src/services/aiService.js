@@ -113,7 +113,7 @@ exports.generateCampingRecommendation = async (query, availableAssets, location)
     }));
 
     const locationInfo = location
-      ? `Vị trí hiện tại của người dùng: ${location.addressString ? location.addressString + ' (' : ''}${location.lat}, ${location.lng}${location.addressString ? ')' : ''}. Hãy gợi ý các địa điểm cắm trại nổi tiếng gần khu vực này nếu có thể.`
+      ? `Vị trí hiện tại của người dùng: ${location.addressString ? location.addressString + ' (' : ''}${location.lat}, ${location.lng}${location.addressString ? ')' : ''}.`
       : '';
 
     const prompt = `Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P.
@@ -122,17 +122,28 @@ Xác định chủ đề: hãy tự đánh giá xem câu hỏi của khách hàn
 - Nếu CÓ liên quan: hãy tư vấn tận tình như hướng dẫn bên dưới.
 - Nếu KHÔNG liên quan (ví dụ: toán học, chính trị, văn học, giải trí thuần túy): hãy trả về JSON từ chối.
 
-QUY TẮC:
+${locationInfo}
+
+QUAN TRỌNG: Xác định ý định của khách hàng từ câu hỏi:
+
+1. Nếu khách hỏi về ĐỊA ĐIỂM cắm trại (ví dụ: "gần đây có chỗ cắm trại nào không", "địa điểm cắm trại gần tôi", "camping spot near me", "nên đi đâu cắm trại"):
+   - Trong "recommendations": gợi ý các địa điểm cắm trại nổi tiếng GẦN vị trí của người dùng. Bạn có thể dùng kiến thức thực tế về các khu du lịch sinh thái, công viên quốc gia, khu cắm trại nổi tiếng gần khu vực đó. Nếu có tọa độ, hãy ưu tiên gợi ý địa điểm gần nhất.
+   - Mô tả ngắn gọn từng địa điểm (khoảng cách, đặc điểm, phù hợp với ai).
+   - "recommendedAssetIds": có thể để mảng rỗng nếu không cần thiết bị cụ thể.
+   - "suggestedPlan": gợi ý đồ nên mang theo nếu đi đến địa điểm đó (từ danh sách bên dưới).
+
+2. Nếu khách hỏi về THIẾT BỊ/ĐỒ DÙNG (ví dụ: "cần thuê lều", "nên mang gì", "cho thuê bếp"):
+   - Tư vấn trang bị cần thiết cho chuyến đi.
+   - Chọn thiết bị phù hợp từ danh sách bên dưới. Nếu có ngân sách, CHỈ chọn thiết bị trong ngân sách.
+   - Đưa checklist ngắn gọn vào "suggestedPlan".
+
+3. Nếu khách hỏi CẢ HAI (địa điểm + thiết bị): ưu tiên gợi ý địa điểm TRƯỚC, sau đó gợi ý thiết bị.
+
+QUY TẮC CHUNG:
 - Nếu từ chối, trả về:
 {"recommendations": "Xin lỗi, tôi chỉ tư vấn về cắm trại, dã ngoại và thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!", "recommendedAssetIds": [], "suggestedPlan": ""}
-- Nếu tư vấn, hãy:
-  1. Tư vấn trang bị cần thiết cho chuyến đi, gợi ý địa điểm cắm trại gần vị trí người dùng nếu có thông tin.
-  2. Chọn thiết bị phù hợp từ danh sách. Nếu có ngân sách, CHỈ chọn thiết bị trong ngân sách.
-  3. Đưa checklist ngắn gọn.
 - Chỉ sử dụng danh sách thiết bị bên dưới để match. Nếu không có thiết bị phù hợp, trả về mảng rỗng.
 - TUYỆT ĐỐI KHÔNG bịa đặt thiết bị không có trong danh sách.
-
-${locationInfo}
 
 Câu hỏi khách hàng: "${query}"
 
