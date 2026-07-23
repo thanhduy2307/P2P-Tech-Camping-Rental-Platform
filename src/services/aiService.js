@@ -113,26 +113,27 @@ exports.generateCampingRecommendation = async (query, availableAssets) => {
     }));
 
     const prompt = `
-Bạn là một chuyên gia tư vấn dã ngoại và cắm trại thông minh cho nền tảng thuê đồ P2P.
-Hãy phân tích nhu cầu cắm trại của khách hàng sau đây: "${query}"
-Dưới đây là danh sách các thiết bị hiện đang có sẵn trên sàn thuê của chúng tôi:
+Bạn là chuyên gia tư vấn dã ngoại và cắm trại của nền tảng thuê đồ EquipPeer, chỉ được trả lời các câu hỏi liên quan đến cắm trại, dã ngoại, leo núi, trekking, và thuê thiết bị ngoài trời.
+Tuyệt đối KHÔNG trả lời bất kỳ câu hỏi nào khác ngoài chủ đề trên (như toán học, lịch sử, văn học, công nghệ, sức khỏe, tin tức, giải trí, v.v.).
+Nếu câu hỏi không liên quan đến cắm trại/dã ngoại/thiết bị ngoài trời, hãy trả về JSON:
+{"recommendations": "Xin lỗi, tôi chỉ có thể tư vấn về các chủ đề cắm trại, dã ngoại và thuê thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!", "recommendedAssetIds": [], "suggestedPlan": ""}
+
+Phân tích nhu cầu của khách hàng: "${query}"
+Danh sách thiết bị hiện có trên sàn:
 ${JSON.stringify(assetListForAI, null, 2)}
 
-Nhiệm vụ của bạn:
-1. Đưa ra lời khuyên cắm trại hữu ích, đề xuất các loại trang bị cần thiết cho chuyến đi này (ví dụ: cần lều kích thước bao nhiêu, túi ngủ loại nào, có cần mang bếp hay thiết bị gì khác không).
-2. Tìm và khớp (match) các thiết bị thực tế đang có sẵn ở trên để giới thiệu cho khách hàng.
-   - QUAN TRỌNG: Hãy kiểm tra kỹ xem khách hàng có đưa ra giới hạn ngân sách (budget), số tiền tối đa (ví dụ: tối đa 1.000.000đ, hoặc dưới 500k,...) trong câu hỏi hay không.
-   - Nếu có giới hạn ngân sách, bạn CHỈ ĐƯỢC PHÉP khớp (match) và giới thiệu những thiết bị có giá thuê ngày (pricePerDay) HOẶC tổng giá thuê (pricePerDay * số ngày nếu xác định được) phù hợp với ngân sách đó. Hãy loại bỏ hoàn toàn các thiết bị vượt quá ngân sách ra khỏi danh sách đề xuất.
-   - Hãy giải thích rõ ràng trong phần "recommendations" về việc các thiết bị được chọn đáp ứng tiêu chí ngân sách của khách hàng như thế nào.
-3. Cung cấp một kế hoạch chuẩn bị (checklist) ngắn gọn cho chuyến đi dã ngoại này.
+Nếu câu hỏi thuộc chủ đề cắm trại/dã ngoại, hãy thực hiện:
+1. Đưa ra lời khuyên hữu ích, đề xuất trang bị cần thiết.
+2. Tìm thiết bị phù hợp từ danh sách trên để giới thiệu.
+   - Nếu có ngân sách, CHỈ khớp thiết bị có giá phù hợp, loại bỏ thiết bị vượt ngân sách.
+3. Cung cấp kế hoạch chuẩn bị (checklist) ngắn gọn.
 
-Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
+Trả về JSON thuần túy (không markdown):
 {
-  "recommendations": "Lời khuyên chi tiết, giải thích lý do nên chọn các loại đồ đó và cách chúng thỏa mãn giới hạn ngân sách của khách bằng tiếng Việt (viết lưu loát, thân thiện).",
-  "recommendedAssetIds": ["danh_sách_id_thiết_bị_phù_hợp_khớp_từ_database_thỏa_mãn_ngân_sách"],
-  "suggestedPlan": "Danh sách các lưu ý chuẩn bị hoặc checklist chuyến đi dã ngoại ngắn gọn."
+  "recommendations": "Lời khuyên chi tiết bằng tiếng Việt.",
+  "recommendedAssetIds": ["danh_sách_id_phù_hợp"],
+  "suggestedPlan": "Checklist ngắn gọn."
 }
-Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
 `;
 
     const aiResponse = await callGeminiAPI(prompt);
