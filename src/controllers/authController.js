@@ -765,7 +765,7 @@ exports.getWithdrawals = async (req, res) => {
 
 exports.verifyWithdrawal = async (req, res) => {
   try {
-    const { status, rejectReason } = req.body;
+    const { status, rejectReason, adminTransferInfo, transferReceiptImage, transactionReference } = req.body;
 
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Trạng thái kiểm duyệt không hợp lệ. Phải là "approved" hoặc "rejected".' });
@@ -774,6 +774,10 @@ exports.verifyWithdrawal = async (req, res) => {
     if (status === 'rejected' && !rejectReason) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp lý do từ chối yêu cầu rút tiền.' });
     }
+    
+    // if (status === 'approved' && (!adminTransferInfo || !transferReceiptImage || !transactionReference)) {
+      // return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ: Thông tin STK Admin, Mã giao dịch và Ảnh biên lai chuyển tiền.' });
+    // }
 
     const request = await WithdrawalRequest.findById(req.params.id);
     if (!request) {
@@ -786,6 +790,10 @@ exports.verifyWithdrawal = async (req, res) => {
 
     if (status === 'approved') {
       request.status = 'approved';
+      request.adminTransferInfo = adminTransferInfo;
+      request.transactionReference = transactionReference;
+      request.transferReceiptImage = transferReceiptImage;
+      request.transferredAt = new Date();
     } else {
       request.status = 'rejected';
       request.rejectReason = rejectReason;
@@ -813,7 +821,7 @@ exports.verifyWithdrawal = async (req, res) => {
       'WITHDRAWAL',
       status === 'approved' ? 'Yêu cầu rút tiền thành công' : 'Yêu cầu rút tiền bị từ chối',
       status === 'approved'
-        ? `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn đã được phê duyệt và chuyển khoản.`
+        ? `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn đã được phê duyệt. Tiền được chuyển từ STK Admin: ${adminTransferInfo}. Mã GD: ${transactionReference}.`
         : `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn bị từ chối. Lý do: ${rejectReason}. Số tiền đã được hoàn lại vào ví.`,
       '/profile'
     );
