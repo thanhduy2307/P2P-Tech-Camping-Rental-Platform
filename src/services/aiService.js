@@ -146,7 +146,6 @@ Trả về JSON thuần túy (không markdown, không giải thích thêm):
   "suggestedPlan": ""
 }`;
 
-
     const aiResponse = await callGeminiAPI(prompt);
     const parsed = cleanAndParseJSON(aiResponse);
     parsed.aiSource = "Gemini AI";
@@ -525,6 +524,85 @@ const callGeminiWithMultipleImages = (imagesData, textPrompt) => {
       hostname: 'generativelanguage.googleapis.com',
       port: 443,
       path: `/v1/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (isSettled) return;
+        clearTimeout(timer);
+        isSettled = true;
+        try {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Gemini API error (Status ${res.statusCode}): ${body}`));
+          }
+          const json = JSON.parse(body);
+          if (json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts[0]) {
+            resolve(json.candidates[0].content.parts[0].text);
+          } else {
+            reject(new Error(`Invalid response structure from Gemini API: ${body}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      if (isSettled) return;
+      clearTimeout(timer);
+      isSettled = true;
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+};
+
+/**
+ * Helper to call Gemini with multiple image parts + text prompt.
+ */
+const callGeminiWithMultipleImages = (imagesData, textPrompt) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return reject(new Error('GEMINI_API_KEY is not configured in .env file'));
+    }
+
+    const parts = imagesData.map(img => ({
+      inlineData: {
+        mimeType: img.mimeType,
+        data: img.base64Data
+      }
+    }));
+    parts.push({ text: textPrompt });
+
+    const data = JSON.stringify({
+      contents: [{
+        parts: parts
+      }]
+    });
+
+    let isSettled = false;
+    const timer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        req.destroy();
+        reject(new Error('Gemini API image request global timeout (60s)'));
+      }
+    }, 60000);
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
