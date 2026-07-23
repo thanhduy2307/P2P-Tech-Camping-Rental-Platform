@@ -13,8 +13,19 @@ const AIChatbot = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [location, setLocation] = useState(null);
   
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => setLocation({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        () => {}, // user denied, just skip
+        { timeout: 5000 }
+      );
+    }
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -46,7 +57,7 @@ const AIChatbot = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/assets/recommend', { query });
+      const res = await api.post('/assets/recommend', { query, ...(location || {}) });
       
       if (res.data && res.data.success) {
         const { recommendations, suggestedPlan, assets } = res.data.data;
