@@ -28,8 +28,10 @@ const AIChatbot = () => {
           setLocation(loc);
           locationRef.current = loc;
         },
-        () => {},
-        { timeout: 5000, enableHighAccuracy: true }
+        (err) => {
+          console.warn('Chatbot geolocation failed:', err.message);
+        },
+        { timeout: 10000, enableHighAccuracy: false }
       );
     }
   }, []);
