@@ -99,7 +99,7 @@ exports.generateCampingRecommendation = async (query, availableAssets, location)
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    return getLocalCampingRecommendation(query, availableAssets);
+    return getLocalCampingRecommendation(query, availableAssets, location);
   }
 
   try {
@@ -163,7 +163,7 @@ Trả về JSON thuần túy (không markdown, không giải thích thêm):
     return parsed;
   } catch (error) {
     console.error('Error generating AI recommendation, falling back to local:', error.message);
-    return getLocalCampingRecommendation(query, availableAssets);
+    return getLocalCampingRecommendation(query, availableAssets, location);
   }
 };
 
@@ -259,9 +259,32 @@ Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu tr
 
 // ==================== LOCAL FALLBACK IMPLEMENTATIONS ====================
 
-function getLocalCampingRecommendation(query, availableAssets) {
+function getLocalCampingRecommendation(query, availableAssets, location) {
   const normalizedQuery = query.toLowerCase();
-  
+
+  // Detect if user is asking about camping SPOTS vs gear
+  const locationKeywords = ['chỗ', 'địa điểm', 'chỗ nào', 'nơi', 'khu', 'camping spot', 'đi đâu', 'gần', 'bán kính', 'km', 'cách'];
+  const askingAboutSpots = locationKeywords.some(k => normalizedQuery.includes(k))
+    && !normalizedQuery.includes('thuê') && !normalizedQuery.includes('mua') && !normalizedQuery.includes('giá');
+
+  if (askingAboutSpots) {
+    const locationName = (location && location.addressString) || 'khu vực của bạn';
+    const recommendations = `Hiện tại mình chưa có dữ liệu về các địa điểm cắm trại cụ thể gần ${locationName}. Tuy nhiên, mình có thể gợi ý bạn tham khảo một số khu vực nổi tiếng gần đó như:
+• Các khu du lịch sinh thái, công viên văn hóa
+• Khu cắm trại dọc sông/hồ gần trung tâm
+• Các homestay có sân vườn tổ chức cắm trại
+
+Bạn có thể lên Google Maps tìm "địa điểm cắm trại gần đây" để xem đánh giá và khoảng cách chính xác hơn.
+
+Ngoài ra, nếu bạn cần thuê đồ cắm trại cho chuyến đi, mình sẵn sàng tư vấn thiết bị phù hợp!`;
+    return {
+      recommendations,
+      recommendedAssetIds: [],
+      suggestedPlan: '',
+      aiSource: 'Local'
+    };
+  }
+
   // Parse numbers from query
   let peopleCount = 2; // default
   const peopleMatch = normalizedQuery.match(/(\d+)\s*(người|ng|chỗ|nhân)/);
@@ -294,13 +317,13 @@ function getLocalCampingRecommendation(query, availableAssets) {
   }
 
   let recommendations = `Dựa trên phân tích nhu cầu của bạn cho chuyến đi dã ngoại ${peopleCount} người trong ${daysCount} ngày, chúng tôi đề xuất các trang bị cơ bản sau: `;
-  
+
   if (maxBudget) {
     recommendations += `Chúng tôi đã chọn lọc các thiết bị có giá thuê ngày phù hợp với ngân sách tối đa ${maxBudget.toLocaleString('vi-VN')} đ của bạn. `;
   }
 
   const suggestedChecklist = [];
-  
+
   // Decide basic needs based on query analysis
   if (normalizedQuery.includes('trekking') || normalizedQuery.includes('đi bộ') || normalizedQuery.includes('leo núi')) {
     recommendations += `Vì bạn đi leo núi/trekking dã ngoại, hãy ưu tiên các thiết bị siêu nhẹ, balo trợ lực tốt, lều gọn nhẹ chống gió và túi ngủ giữ ấm tốt. `;
@@ -312,7 +335,7 @@ function getLocalCampingRecommendation(query, availableAssets) {
 
   // Filter available assets that match keywords
   const recommendedAssetIds = [];
-  
+
   availableAssets.forEach(asset => {
     // Skip if daily price exceeds specified budget
     if (maxBudget && asset.pricePerDay > maxBudget) {
