@@ -15,6 +15,8 @@ const AIChatbot = () => {
   const [loading, setLoading] = useState(false);
   const [location, setLocation] = useState(null);
   const locationRef = useRef(null);
+  const [addressString, setAddressString] = useState('');
+  const addressStringRef = useRef('');
   
   const messagesEndRef = useRef(null);
 
@@ -30,6 +32,21 @@ const AIChatbot = () => {
         { timeout: 5000, enableHighAccuracy: true }
       );
     }
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail) {
+        const { lat, lng, addressLabel } = e.detail;
+        const loc = { lat, lng };
+        setLocation(loc);
+        locationRef.current = loc;
+        setAddressString(addressLabel);
+        addressStringRef.current = addressLabel;
+      }
+    };
+    window.addEventListener('location-updated', handler);
+    return () => window.removeEventListener('location-updated', handler);
   }, []);
 
   const scrollToBottom = () => {
@@ -51,8 +68,6 @@ const AIChatbot = () => {
     const query = textToSend || inputValue;
     if (!query.trim()) return;
 
-    // Try to extract location from text (e.g. "gần Hà Nội", "ở Đà Lạt")
-    const placeMatch = query.match(/(?:gần|ở|tại|khu vực)\s+(\S+)/i);
     const loc = locationRef.current;
 
     setMessages(prev => [...prev, {
@@ -67,6 +82,7 @@ const AIChatbot = () => {
     try {
       const body = { query };
       if (loc) Object.assign(body, loc);
+      if (addressStringRef.current) body.addressString = addressStringRef.current;
       const res = await api.post('/assets/recommend', body);
       
       if (res.data && res.data.success) {

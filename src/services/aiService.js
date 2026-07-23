@@ -113,7 +113,7 @@ exports.generateCampingRecommendation = async (query, availableAssets, location)
     }));
 
     const locationInfo = location
-      ? `Vị trí hiện tại của người dùng: ${location.lat}, ${location.lng} (latitude, longitude). Hãy gợi ý các địa điểm cắm trại nổi tiếng gần khu vực này nếu có thể.`
+      ? `Vị trí hiện tại của người dùng: ${location.addressString ? location.addressString + ' (' : ''}${location.lat}, ${location.lng}${location.addressString ? ')' : ''}. Hãy gợi ý các địa điểm cắm trại nổi tiếng gần khu vực này nếu có thể.`
       : '';
 
     const prompt = `Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P.
