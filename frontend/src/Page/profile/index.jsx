@@ -53,6 +53,7 @@ const Profile = () => {
 
   const [withdrawals, setWithdrawals] = useState([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+  const [receiptLightbox, setReceiptLightbox] = useState({ open: false, url: '' });
 
   // Transactions history state
   const [transactions, setTransactions] = useState([]);
@@ -765,7 +766,7 @@ const Profile = () => {
                           <th className="pb-2">Số tiền</th>
                           <th className="pb-2">Ngân hàng nhận</th>
                           <th className="pb-2">Trạng thái</th>
-                          <th className="pb-2">Ghi chú</th>
+                          <th className="pb-2">Chi tiết / Ghi chú</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant/20">
@@ -803,8 +804,14 @@ const Profile = () => {
                                 </span>
                               )}
                             </td>
-                            <td className="py-2.5 text-red-600 font-medium max-w-[150px] truncate" title={req.rejectReason}>
-                              {req.status === 'rejected' ? req.rejectReason : '-'}
+                            <td className="py-2.5 text-on-surface-variant max-w-[150px]">
+                              {req.status === 'rejected' && req.rejectReason && (
+                                <span className="italic text-red-500">{req.rejectReason}</span>
+                              )}
+                              {req.status === 'approved' && (
+                                <span className="font-semibold text-emerald-600 text-xs">Đã thanh toán từ Vietcombank-CTY CO PHAN EQUIPPEER</span>
+                              )}
+                              {req.status === 'pending' && <span className="italic text-on-surface-variant/50">-</span>}
                             </td>
                           </tr>
                         ))}
@@ -1258,6 +1265,17 @@ const Profile = () => {
         </div>
 
       </div>
+      {/* Receipt Lightbox Modal */}
+      {receiptLightbox.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setReceiptLightbox({ open: false, url: '' })}>
+          <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setReceiptLightbox({ open: false, url: '' })} className="absolute -top-10 right-0 md:-right-10 text-white hover:text-gray-300 bg-gray-800/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <img src={receiptLightbox.url} alt="Receipt" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

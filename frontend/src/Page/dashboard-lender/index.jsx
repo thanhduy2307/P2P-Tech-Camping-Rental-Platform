@@ -21,6 +21,7 @@ const DashboardLender = () => {
   // Withdrawal history state
   const [withdrawals, setWithdrawals] = useState([]);
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
+  const [receiptLightbox, setReceiptLightbox] = useState({ open: false, url: '' });
 
   const fetchWithdrawals = async () => {
     setLoadingWithdrawals(true);
@@ -320,7 +321,7 @@ const DashboardLender = () => {
                   <th className="px-6 py-3">Số tiền</th>
                   <th className="px-6 py-3">Tài khoản nhận</th>
                   <th className="px-6 py-3 text-center">Trạng thái</th>
-                  <th className="px-6 py-3">Ghi chú từ Admin</th>
+                  <th className="px-6 py-3">Chi tiết / Ghi chú</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-slate-700">
@@ -359,8 +360,14 @@ const DashboardLender = () => {
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-xs text-slate-500 italic max-w-xs truncate">
-                      {req.status === 'rejected' && req.rejectReason ? req.rejectReason : '-'}
+                    <td className="px-6 py-4 text-xs text-slate-700 max-w-xs">
+                      {req.status === 'rejected' && req.rejectReason && (
+                        <span className="italic text-rose-500">{req.rejectReason}</span>
+                      )}
+                      {req.status === 'approved' && (
+                        <span className="font-semibold text-emerald-600">Đã thanh toán từ Vietcombank-CTY CO PHAN EQUIPPEER</span>
+                      )}
+                      {req.status === 'pending' && <span className="italic text-slate-400">-</span>}
                     </td>
                   </tr>
                 ))}
@@ -488,6 +495,17 @@ const DashboardLender = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Receipt Lightbox Modal */}
+      {receiptLightbox.open && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm" onClick={() => setReceiptLightbox({ open: false, url: '' })}>
+          <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center justify-center" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setReceiptLightbox({ open: false, url: '' })} className="absolute -top-10 right-0 md:-right-10 text-white hover:text-slate-300 bg-slate-800/50 rounded-full w-8 h-8 flex items-center justify-center transition-colors">
+              <span className="material-symbols-outlined">close</span>
+            </button>
+            <img src={receiptLightbox.url} alt="Receipt" className="max-w-full max-h-[90vh] object-contain rounded-lg shadow-2xl" />
           </div>
         </div>
       )}
