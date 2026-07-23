@@ -29,7 +29,7 @@ class _MyOrdersScreenState extends State<MyOrdersScreen> {
           ? await OrderService.getIncoming()
           : await OrderService.getMyRentals();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

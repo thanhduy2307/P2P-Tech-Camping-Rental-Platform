@@ -1,4 +1,5 @@
 const https = require('https');
+const http = require('http');
 
 /**
  * Call Gemini API using native https module to avoid external dependency issues.
@@ -16,6 +17,8 @@ const cleanAndParseJSON = (text) => {
   if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
     cleaned = cleaned.substring(firstBrace, lastBrace + 1);
   }
+  // Sanitize control characters (except \t, \n, \r) that break JSON.parse
+  cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '');
   return JSON.parse(cleaned);
 };
 
@@ -46,7 +49,7 @@ const callGeminiAPI = (prompt) => {
     const options = {
       hostname: 'generativelanguage.googleapis.com',
       port: 443,
-      path: `/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      path: `/v1/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -92,12 +95,11 @@ const callGeminiAPI = (prompt) => {
 /**
  * AI Feature 1: Camping Consultant / Gear Recommendation
  */
-exports.generateCampingRecommendation = async (query, availableAssets) => {
+exports.generateCampingRecommendation = async (query, availableAssets, location) => {
   const apiKey = process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
-    // FALLBACK: Smart rule-based matching
-    return getLocalCampingRecommendation(query, availableAssets);
+    return getLocalCampingRecommendation(query, availableAssets, location);
   }
 
   try {
@@ -110,32 +112,50 @@ exports.generateCampingRecommendation = async (query, availableAssets) => {
       description: a.description
     }));
 
-    const prompt = `Bạn là một chuyên gia tư vấn cắm trại cho nền tảng thuê đồ P2P. Phong cách của bạn: THÂN THIỆN, HIỆN ĐẠI, TRỰC QUAN VÀ DỄ ĐỌC.
-Khách hàng yêu cầu: "${query}"
-Danh sách thiết bị có sẵn:
+    const locationInfo = location
+      ? `Vị trí hiện tại của người dùng: ${location.addressString ? location.addressString + ' (' : ''}${location.lat}, ${location.lng}${location.addressString ? ')' : ''}.`
+      : '';
+
+    const prompt = `Bạn là chatbot tư vấn của EquipPeer - nền tảng thuê đồ cắm trại và dã ngoại P2P.
+
+Xác định chủ đề: hãy tự đánh giá xem câu hỏi của khách hàng có liên quan đến cắm trại, dã ngoại, leo núi, trekking, du lịch sinh thái, hoặc thiết bị/đồ dùng ngoài trời hay không.
+- Nếu CÓ liên quan: hãy tư vấn tận tình như hướng dẫn bên dưới.
+- Nếu KHÔNG liên quan (ví dụ: toán học, chính trị, văn học, giải trí thuần túy): hãy trả về JSON từ chối.
+
+${locationInfo}
+
+QUAN TRỌNG: Xác định ý định của khách hàng từ câu hỏi:
+
+1. Nếu khách hỏi về ĐỊA ĐIỂM cắm trại (ví dụ: "gần đây có chỗ cắm trại nào không", "địa điểm cắm trại gần tôi", "camping spot near me", "nên đi đâu cắm trại"):
+   - Trong "recommendations": gợi ý các địa điểm cắm trại nổi tiếng GẦN vị trí của người dùng. Bạn có thể dùng kiến thức thực tế về các khu du lịch sinh thái, công viên quốc gia, khu cắm trại nổi tiếng gần khu vực đó. Nếu có tọa độ, hãy ưu tiên gợi ý địa điểm gần nhất.
+   - Mô tả ngắn gọn từng địa điểm (khoảng cách, đặc điểm, phù hợp với ai).
+   - "recommendedAssetIds": có thể để mảng rỗng nếu không cần thiết bị cụ thể.
+   - "suggestedPlan": gợi ý đồ nên mang theo nếu đi đến địa điểm đó (từ danh sách bên dưới).
+
+2. Nếu khách hỏi về THIẾT BỊ/ĐỒ DÙNG (ví dụ: "cần thuê lều", "nên mang gì", "cho thuê bếp"):
+   - Tư vấn trang bị cần thiết cho chuyến đi.
+   - Chọn thiết bị phù hợp từ danh sách bên dưới. Nếu có ngân sách, CHỈ chọn thiết bị trong ngân sách.
+   - Đưa checklist ngắn gọn vào "suggestedPlan".
+
+3. Nếu khách hỏi CẢ HAI (địa điểm + thiết bị): ưu tiên gợi ý địa điểm TRƯỚC, sau đó gợi ý thiết bị.
+
+QUY TẮC CHUNG:
+- Nếu từ chối, trả về:
+{"recommendations": "Xin lỗi, tôi chỉ tư vấn về cắm trại, dã ngoại và thiết bị ngoài trời. Bạn hãy đặt câu hỏi về nhu cầu cắm trại của mình nhé!", "recommendedAssetIds": [], "suggestedPlan": ""}
+- Chỉ sử dụng danh sách thiết bị bên dưới để match. Nếu không có thiết bị phù hợp, trả về mảng rỗng.
+- TUYỆT ĐỐI KHÔNG bịa đặt thiết bị không có trong danh sách.
+
+Câu hỏi khách hàng: "${query}"
+
+Danh sách thiết bị hiện có:
 ${JSON.stringify(assetListForAI, null, 2)}
 
-Nhiệm vụ của bạn:
-1. Gợi ý thiết bị & lời khuyên: 
-   - BẮT BUỘC phải có 1-2 câu chào hỏi hoặc nhận xét thân thiện ở ngay đầu (ví dụ: "Chào bạn, đi trekking leo núi thì quá tuyệt vời! Mình có vài gợi ý...").
-   - SAU ĐÓ bắt buộc dùng ký tự \\n\\n để xuống dòng rồi mới liệt kê thiết bị.
-   - Các gợi ý thiết bị: BẮT BUỘC mỗi gợi ý phải được xuống dòng (bằng ký tự \\n).
-   - Dùng tối đa 3-4 gạch đầu dòng, mỗi gạch đầu dòng dùng 1 emoji phù hợp (ví dụ: ⛺, 🔦). In đậm (**) tên thiết bị.
-2. Khớp (match) ngân sách:
-   - Nếu khách có ngân sách, CHỈ CHỌN đồ có giá <= ngân sách.
-   - Bỏ qua các món đồ không liên quan hoặc vượt ngân sách.
-3. Checklist chuẩn bị:
-   - BẮT BUỘC mỗi mục phải xuống dòng (ngăn cách bằng ký tự \\n).
-   - Tối đa 5 mục dạng Checkbox (✅) ngắn gọn dễ nhớ.
-
-Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu trúc sau:
+Trả về JSON thuần túy (không markdown, không giải thích thêm):
 {
-  "recommendations": "VÍ DỤ BẮT BUỘC TUÂN THEO: 'Chào bạn, ...\\n\\n⛺ **Lều...**: Mô tả\\n🔦 **Đèn...**: Mô tả'",
-  "recommendedAssetIds": ["danh_sách_id_thiết_bị_được_chọn_từ_database"],
-  "suggestedPlan": "Checklist ngắn gọn. Bắt buộc chứa ký tự \\n để xuống dòng giữa các ý."
-}
-Đảm bảo kết quả trả về là JSON hợp lệ, không chứa ký tự markdown \`\`\`json ở đầu và cuối.
-`;
+  "recommendations": "Nội dung tư vấn hoặc lời từ chối.",
+  "recommendedAssetIds": [],
+  "suggestedPlan": ""
+}`;
 
     const aiResponse = await callGeminiAPI(prompt);
     const parsed = cleanAndParseJSON(aiResponse);
@@ -143,7 +163,7 @@ Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu tr
     return parsed;
   } catch (error) {
     console.error('Error generating AI recommendation, falling back to local:', error.message);
-    return getLocalCampingRecommendation(query, availableAssets);
+    return getLocalCampingRecommendation(query, availableAssets, location);
   }
 };
 
@@ -239,9 +259,32 @@ Yêu cầu trả về kết quả định dạng JSON thuần túy theo cấu tr
 
 // ==================== LOCAL FALLBACK IMPLEMENTATIONS ====================
 
-function getLocalCampingRecommendation(query, availableAssets) {
+function getLocalCampingRecommendation(query, availableAssets, location) {
   const normalizedQuery = query.toLowerCase();
-  
+
+  // Detect if user is asking about camping SPOTS vs gear
+  const locationKeywords = ['chỗ', 'địa điểm', 'chỗ nào', 'nơi', 'khu', 'camping spot', 'đi đâu', 'gần', 'bán kính', 'km', 'cách'];
+  const askingAboutSpots = locationKeywords.some(k => normalizedQuery.includes(k))
+    && !normalizedQuery.includes('thuê') && !normalizedQuery.includes('mua') && !normalizedQuery.includes('giá');
+
+  if (askingAboutSpots) {
+    const locationName = (location && location.addressString) || 'khu vực của bạn';
+    const recommendations = `Hiện tại mình chưa có dữ liệu về các địa điểm cắm trại cụ thể gần ${locationName}. Tuy nhiên, mình có thể gợi ý bạn tham khảo một số khu vực nổi tiếng gần đó như:
+• Các khu du lịch sinh thái, công viên văn hóa
+• Khu cắm trại dọc sông/hồ gần trung tâm
+• Các homestay có sân vườn tổ chức cắm trại
+
+Bạn có thể lên Google Maps tìm "địa điểm cắm trại gần đây" để xem đánh giá và khoảng cách chính xác hơn.
+
+Ngoài ra, nếu bạn cần thuê đồ cắm trại cho chuyến đi, mình sẵn sàng tư vấn thiết bị phù hợp!`;
+    return {
+      recommendations,
+      recommendedAssetIds: [],
+      suggestedPlan: '',
+      aiSource: 'Local'
+    };
+  }
+
   // Parse numbers from query
   let peopleCount = 2; // default
   const peopleMatch = normalizedQuery.match(/(\d+)\s*(người|ng|chỗ|nhân)/);
@@ -274,13 +317,13 @@ function getLocalCampingRecommendation(query, availableAssets) {
   }
 
   let recommendations = `Dựa trên phân tích nhu cầu của bạn cho chuyến đi dã ngoại ${peopleCount} người trong ${daysCount} ngày, chúng tôi đề xuất các trang bị cơ bản sau: `;
-  
+
   if (maxBudget) {
     recommendations += `Chúng tôi đã chọn lọc các thiết bị có giá thuê ngày phù hợp với ngân sách tối đa ${maxBudget.toLocaleString('vi-VN')} đ của bạn. `;
   }
 
   const suggestedChecklist = [];
-  
+
   // Decide basic needs based on query analysis
   if (normalizedQuery.includes('trekking') || normalizedQuery.includes('đi bộ') || normalizedQuery.includes('leo núi')) {
     recommendations += `Vì bạn đi leo núi/trekking dã ngoại, hãy ưu tiên các thiết bị siêu nhẹ, balo trợ lực tốt, lều gọn nhẹ chống gió và túi ngủ giữ ấm tốt. `;
@@ -292,7 +335,7 @@ function getLocalCampingRecommendation(query, availableAssets) {
 
   // Filter available assets that match keywords
   const recommendedAssetIds = [];
-  
+
   availableAssets.forEach(asset => {
     // Skip if daily price exceeds specified budget
     if (maxBudget && asset.pricePerDay > maxBudget) {
@@ -435,7 +478,86 @@ const callGeminiWithImage = (mimeType, base64Data, textPrompt) => {
     const options = {
       hostname: 'generativelanguage.googleapis.com',
       port: 443,
-      path: `/v1/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+      path: `/v1/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (isSettled) return;
+        clearTimeout(timer);
+        isSettled = true;
+        try {
+          if (res.statusCode !== 200) {
+            return reject(new Error(`Gemini API error (Status ${res.statusCode}): ${body}`));
+          }
+          const json = JSON.parse(body);
+          if (json.candidates && json.candidates[0] && json.candidates[0].content && json.candidates[0].content.parts[0]) {
+            resolve(json.candidates[0].content.parts[0].text);
+          } else {
+            reject(new Error(`Invalid response structure from Gemini API: ${body}`));
+          }
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+
+    req.on('error', (error) => {
+      if (isSettled) return;
+      clearTimeout(timer);
+      isSettled = true;
+      reject(error);
+    });
+
+    req.write(data);
+    req.end();
+  });
+};
+
+/**
+ * Helper to call Gemini with multiple image parts + text prompt.
+ */
+const callGeminiWithMultipleImages = (imagesData, textPrompt) => {
+  return new Promise((resolve, reject) => {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return reject(new Error('GEMINI_API_KEY is not configured in .env file'));
+    }
+
+    const parts = imagesData.map(img => ({
+      inlineData: {
+        mimeType: img.mimeType,
+        data: img.base64Data
+      }
+    }));
+    parts.push({ text: textPrompt });
+
+    const data = JSON.stringify({
+      contents: [{
+        parts: parts
+      }]
+    });
+
+    let isSettled = false;
+    const timer = setTimeout(() => {
+      if (!isSettled) {
+        isSettled = true;
+        req.destroy();
+        reject(new Error('Gemini API image request global timeout (60s)'));
+      }
+    }, 60000);
+
+    const options = {
+      hostname: 'generativelanguage.googleapis.com',
+      port: 443,
+      path: `/v1/models/gemini-3.5-flash:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -560,10 +682,32 @@ const callGeminiWithMultipleImages = (imagesData, textPrompt) => {
 /**
  * AI-powered Image Anti-Fraud Scan.
  */
-exports.scanImageForFraud = async (imageB64) => {
+const urlToBase64 = (url) => {
+  return new Promise((resolve, reject) => {
+    const mod = url.startsWith('https') ? https : http;
+    mod.get(url, { timeout: 15000 }, (res) => {
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        return reject(new Error(`Failed to download image: HTTP ${res.statusCode}`));
+      }
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => {
+        const buffer = Buffer.concat(chunks);
+        const mimeType = res.headers['content-type'] || 'image/jpeg';
+        resolve({ mimeType, base64: buffer.toString('base64') });
+      });
+    }).on('error', reject).on('timeout', function () { this.destroy(); reject(new Error('Image download timeout')); });
+  });
+};
+
+/**
+ * AI-powered Image Anti-Fraud Scan.
+ * Accepts either a URL string or a base64 string.
+ */
+exports.scanImageForFraud = async (imageInput) => {
   const apiKey = process.env.GEMINI_API_KEY;
 
-  if (!apiKey || !imageB64) {
+  if (!apiKey || !imageInput) {
     return {
       isCopied: false,
       reason: "[Dự phòng] Mô phỏng quét ảnh chống giả: Ảnh chụp thực tế của sản phẩm không phát hiện watermark hoặc nguồn sao chép trực tuyến.",
@@ -573,9 +717,14 @@ exports.scanImageForFraud = async (imageB64) => {
 
   try {
     let mimeType = 'image/jpeg';
-    let base64Data = imageB64;
+    let base64Data = imageInput;
 
-    if (imageB64.startsWith('data:')) {
+    // If input is a URL, download and convert to base64
+    if (typeof imageInput === 'string' && imageInput.startsWith('http')) {
+      const result = await urlToBase64(imageInput);
+      mimeType = result.mimeType;
+      base64Data = result.base64;
+    } else if (imageInput.startsWith('data:')) {
       const parts = imageB64.split(';base64,');
       if (parts.length === 2) {
         mimeType = parts[0].replace('data:', '');

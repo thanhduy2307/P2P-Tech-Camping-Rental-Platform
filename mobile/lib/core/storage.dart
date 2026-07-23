@@ -31,7 +31,8 @@ class Storage {
   static Map<String, dynamic>? getUser() {
     final raw = _prefs.getString(_userKey);
     if (raw == null) return null;
-    return jsonDecode(raw) as Map<String, dynamic>;
+    final decoded = jsonDecode(raw);
+    return (decoded is Map<String, dynamic>) ? decoded : null;
   }
 
   static String? getRole() => _prefs.getString(_roleKey);

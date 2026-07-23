@@ -1,4 +1,4 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/asset.dart';
 
 class AssetService {
@@ -9,7 +9,7 @@ class AssetService {
     if (lat != null) query['lat'] = lat.toString();
     if (lng != null) query['lng'] = lng.toString();
     final res = await ApiClient.get('/assets', query: query);
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Asset.fromJson(e)).toList();
   }
 
@@ -21,14 +21,14 @@ class AssetService {
   /// Lender: list own assets.
   static Future<List<Asset>> getMyAssets() async {
     final res = await ApiClient.get('/assets/my');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Asset.fromJson(e)).toList();
   }
 
   /// Create a new asset listing.
   static Future<Map<String, dynamic>> createAsset(
       Map<String, dynamic> body) async {
-    final res = await ApiClient.post('/assets', body);
+    final res = await ApiClient.post('/assets', body, longRunning: true);
     return res;
   }
 
@@ -40,8 +40,14 @@ class AssetService {
   }
 
   /// AI gear recommendation from a free-text camping need.
-  static Future<Map<String, dynamic>> recommend(String query) async {
-    final res = await ApiClient.post('/assets/recommend', {'query': query});
+  static Future<Map<String, dynamic>> recommend(String query, {double? lat, double? lng}) async {
+    final body = <String, dynamic>{'query': query};
+    if (lat != null && lng != null) {
+      body['lat'] = lat;
+      body['lng'] = lng;
+    }
+    final res = await ApiClient.post('/assets/recommend', body);
     return res['data'];
   }
 }
+

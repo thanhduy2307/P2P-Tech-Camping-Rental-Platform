@@ -32,9 +32,9 @@ class Order {
   });
 
   factory Order.fromJson(Map<String, dynamic> json) {
-    final asset = json['asset'] as Map<String, dynamic>?;
-    final renter = json['renter'] as Map<String, dynamic>?;
-    final lender = json['lender'] as Map<String, dynamic>?;
+    final asset = _asMap(json['asset']);
+    final renter = _asMap(json['renter']);
+    final assetLender = _asMap(asset?['lender']);
     return Order(
       id: json['_id'] ?? json['id'] ?? '',
       assetId: asset?['_id'] ?? asset?['id'] ?? json['asset']?.toString() ?? '',
@@ -44,7 +44,7 @@ class Order {
           : null,
       renterId: renter?['_id'] ?? renter?['id'] ?? json['renter']?.toString() ?? '',
       lenderId:
-          lender?['_id'] ?? lender?['id'] ?? json['lender']?.toString() ?? '',
+          assetLender?['_id'] ?? assetLender?['id'] ?? asset?['lender']?.toString() ?? '',
       startDate: json['startDate']?.toString() ?? '',
       endDate: json['endDate']?.toString() ?? '',
       rentalDays: json['rentalDays'] ?? 0,
@@ -57,4 +57,7 @@ class Order {
   }
 
   static double _toDouble(dynamic v) => (v is num) ? v.toDouble() : 0.0;
+
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map<String, dynamic>) ? v : null;
 }

@@ -47,10 +47,21 @@ class Conversation {
   });
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    final user = json['user'];
+    final lastMsg = json['lastMessage'];
+    final lastContent = (lastMsg is Map<String, dynamic>)
+        ? (lastMsg['content']?.toString() ?? '')
+        : (lastMsg?.toString() ?? '');
+    final userName = (user is Map<String, dynamic>)
+        ? (user['name']?.toString() ?? 'Người dùng')
+        : 'Người dùng';
+    final userId = (user is Map<String, dynamic>)
+        ? (user['_id']?.toString() ?? '')
+        : (user?.toString() ?? '');
     return Conversation(
-      peerId: json['peer']?['_id']?.toString() ?? json['peerId']?.toString() ?? '',
-      peerName: json['peer']?['name'] ?? json['peerName'] ?? 'Người dùng',
-      lastMessage: json['lastMessage'] ?? '',
+      peerId: userId,
+      peerName: userName,
+      lastMessage: lastContent,
       unreadCount: json['unreadCount'] ?? 0,
       updatedAt: json['updatedAt']?.toString() ?? '',
     );
