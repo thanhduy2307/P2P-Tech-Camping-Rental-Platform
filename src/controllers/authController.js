@@ -326,7 +326,7 @@ exports.googleMobileUrl = async (req, res) => {
       redirect_uri: process.env.GOOGLE_CALLBACK_URL,
       state: 'mobile',
     });
-    res.json({ success: true, data: { url } });
+    res.json({ success: true, data: { url, clientId: process.env.GOOGLE_CLIENT_ID } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

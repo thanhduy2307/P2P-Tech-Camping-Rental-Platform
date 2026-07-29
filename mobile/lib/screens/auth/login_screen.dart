@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:velox_mobile/core/api_client.dart';
+import 'package:velox_mobile/models/user.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/main.dart';
 import 'package:velox_mobile/services/auth_service.dart';
@@ -129,18 +131,20 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: const Icon(Icons.g_mobiledata, size: 22),
                     onPressed: () async {
                       try {
-                        final url = await AuthService.getGoogleAuthUrl();
+                        final info = await AuthService.getGoogleAuthInfo();
                         if (!context.mounted) return;
-                        final token = await Navigator.push<String>(
+                        final idToken = await Navigator.push<String>(
                           context,
-                          MaterialPageRoute(builder: (_) => GoogleAuthWebView(url: url)),
+                          MaterialPageRoute(builder: (_) => GoogleAuthWebView(clientId: info['clientId']!)),
                         );
-                        if (token == null || !context.mounted) return;
-                        if (token.startsWith('__ERROR__:')) {
-                          UiHelper.showErrorToast(context, token.replaceFirst('__ERROR__:', ''));
+                        if (idToken == null || !context.mounted) return;
+                        if (idToken.startsWith('__ERROR__:')) {
+                          UiHelper.showErrorToast(context, idToken.replaceFirst('__ERROR__:', ''));
                           return;
                         }
-                        await auth.completeGoogleSignIn(token);
+                        final res = await ApiClient.post('/auth/google/mobile', {'idToken': idToken});
+                        await AuthService.persistSession(res['data']);
+                        await auth.refresh();
                         if (!context.mounted) return;
                         Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
                       } catch (e) {

@@ -135,10 +135,13 @@ class AuthService {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
 
-  /// Get Google OAuth URL for mobile WebView flow.
-  static Future<String> getGoogleAuthUrl() async {
+  /// Get Google OAuth URL + client ID for mobile WebView flow.
+  static Future<Map<String, String>> getGoogleAuthInfo() async {
     final res = await ApiClient.get('/auth/google/mobile/url');
-    return res['data']['url'] as String;
+    return {
+      'url': res['data']['url'] as String,
+      'clientId': res['data']['clientId'] as String,
+    };
   }
 
   /// Persist token + user after a successful auth response.
