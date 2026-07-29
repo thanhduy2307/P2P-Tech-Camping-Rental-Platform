@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/main.dart';
+import 'package:velox_mobile/services/auth_service.dart';
+import 'package:velox_mobile/screens/auth/google_auth_webview.dart';
 import 'package:velox_mobile/widgets/common.dart';
 import 'package:velox_mobile/widgets/brand_logo.dart';
 import 'package:velox_mobile/widgets/velox_button.dart';
@@ -127,7 +129,18 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: const Icon(Icons.g_mobiledata, size: 22),
                     onPressed: () async {
                       try {
-                        await auth.signInWithGoogle();
+                        final url = await AuthService.getGoogleAuthUrl();
+                        if (!context.mounted) return;
+                        final token = await Navigator.push<String>(
+                          context,
+                          MaterialPageRoute(builder: (_) => GoogleAuthWebView(url: url)),
+                        );
+                        if (token == null || !context.mounted) return;
+                        if (token.startsWith('__ERROR__:')) {
+                          UiHelper.showErrorToast(context, token.replaceFirst('__ERROR__:', ''));
+                          return;
+                        }
+                        await auth.completeGoogleSignIn(token);
                         if (!context.mounted) return;
                         Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
                       } catch (e) {

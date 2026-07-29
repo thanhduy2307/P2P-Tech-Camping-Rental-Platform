@@ -1,4 +1,3 @@
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/core/storage.dart';
 import 'package:velox_mobile/models/user.dart';
@@ -136,17 +135,10 @@ class AuthService {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
 
-  static Future<Map<String, dynamic>> signInWithGoogle() async {
-    final googleUser = await GoogleSignIn(
-      scopes: ['email', 'profile'],
-    ).signIn();
-    if (googleUser == null) throw Exception('Đăng nhập Google bị hủy');
-    final googleAuth = await googleUser.authentication;
-    if (googleAuth.idToken == null) throw Exception('Không lấy được idToken từ Google');
-    final res = await ApiClient.post('/auth/google/mobile', {
-      'idToken': googleAuth.idToken,
-    });
-    return res['data'];
+  /// Get Google OAuth URL for mobile WebView flow.
+  static Future<String> getGoogleAuthUrl() async {
+    final res = await ApiClient.get('/auth/google/mobile/url');
+    return res['data']['url'] as String;
   }
 
   /// Persist token + user after a successful auth response.

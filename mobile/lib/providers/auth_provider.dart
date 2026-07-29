@@ -122,13 +122,14 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  Future<void> signInWithGoogle() async {
+  Future<void> completeGoogleSignIn(String token) async {
     _setLoading(true);
     _error = null;
     try {
-      final data = await AuthService.signInWithGoogle();
-      await AuthService.persistSession(data);
-      _user = User.fromJson(data);
+      await Storage.setToken(token);
+      final user = await AuthService.getMe();
+      await Storage.setUser(user.toJson());
+      _user = user;
       notifyListeners();
     } catch (e) {
       _error = e.toString();

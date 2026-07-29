@@ -245,17 +245,17 @@ exports.login = async (req, res) => {
 
 exports.googleCallback = async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).json({ success: false, message: 'Google auth code missing' });
     }
 
+    const isMobile = state === 'mobile';
+    const redirectUri = isMobile ? process.env.GOOGLE_CALLBACK_URL : 'postmessage';
+
     let tokens;
     try {
-      const exchangeResult = await client.getToken({
-        code,
-        redirect_uri: 'postmessage'
-      });
+      const exchangeResult = await client.getToken({ code, redirect_uri: redirectUri });
       tokens = exchangeResult.tokens;
     } catch (err) {
       const exchangeResult = await client.getToken(code);
@@ -277,10 +277,9 @@ exports.googleCallback = async (req, res) => {
         email,
         googleId: sub,
         authProvider: 'google',
-        role: 'renter' // Default role
+        role: 'renter'
       });
     } else if (!user.googleId) {
-      // Link account
       user.googleId = sub;
       if (user.authProvider === 'local') {
         user.authProvider = 'google';
@@ -288,25 +287,48 @@ exports.googleCallback = async (req, res) => {
       await user.save();
     }
 
-    res.status(200).json({
-      success: true,
-      message: 'Google Login Successful! Please copy your token to use in Swagger.',
-      data: {
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        avatar: user.avatar,
-        isProfileCompleted: user.isProfileCompleted,
-        renterStatus: user.renterStatus,
-        renterOnboarding: user.renterOnboarding,
-        lenderStatus: user.lenderStatus,
-        lenderOnboarding: user.lenderOnboarding,
-        token: generateToken(user._id)
-      }
-    });
+    const token = generateToken(user._id);
+    const userData = {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      avatar: user.avatar,
+      isProfileCompleted: user.isProfileCompleted,
+      renterStatus: user.renterStatus,
+      renterOnboarding: user.renterOnboarding,
+      lenderStatus: user.lenderStatus,
+      lenderOnboarding: user.lenderOnboarding,
+      token
+    };
+
+    if (isMobile) {
+      const html = `<html><body><script>
+        window.onGoogleAuth.postMessage('${token}');
+      </script></body></html>`;
+      return res.send(html);
+    }
+
+    res.status(200).json({ success: true, message: 'Google Login Successful! Please copy your token to use in Swagger.', data: userData });
   } catch (error) {
+    if (req.query.state === 'mobile') {
+      return res.send(`<html><body><script>window.onGoogleAuth.postMessage('__ERROR__:${error.message}');</script></body></html>`);
+    }
     res.status(401).json({ success: false, message: 'Google Auth Error: ' + error.message });
+  }
+};
+
+exports.googleMobileUrl = async (req, res) => {
+  try {
+    const url = client.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['email', 'profile'],
+      redirect_uri: process.env.GOOGLE_CALLBACK_URL,
+      state: 'mobile',
+    });
+    res.json({ success: true, data: { url } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
   }
 };
 
