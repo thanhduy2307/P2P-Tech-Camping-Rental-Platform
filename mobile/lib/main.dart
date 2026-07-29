@@ -23,6 +23,7 @@ import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
 import 'package:velox_mobile/screens/inspector/inspector_dashboard_screen.dart';
 import 'package:velox_mobile/screens/admin/admin_dashboard_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
+import 'package:velox_mobile/screens/posts/social_feed_screen.dart';
 import 'package:velox_mobile/core/constants.dart';
 import 'package:velox_mobile/core/theme.dart';
 
@@ -46,6 +47,7 @@ class AppRoutes {
   static const inspectorDashboard = '/inspector/dashboard';
   static const adminDashboard = '/admin/dashboard';
   static const notifications = '/notifications';
+  static const socialFeed = '/social-feed';
 
   static String homeForRole(String? role) {
     switch (role) {
@@ -132,6 +134,7 @@ class MyApp extends StatelessWidget {
           AppRoutes.inspectorDashboard: (_) => const InspectorDashboardScreen(),
           AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
           AppRoutes.notifications: (_) => const NotificationsScreen(),
+          AppRoutes.socialFeed: (_) => const SocialFeedScreen(),
         },
       ),
     );
