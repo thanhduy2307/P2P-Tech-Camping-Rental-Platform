@@ -4,13 +4,32 @@ import api from '../../configs/axios';
 
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
-const fileToBase64 = (file) =>
+// Compress and resize image before converting to base64 to prevent Buffer overflow
+const fileToBase64 = (file, maxWidth = 1024, quality = 0.75) =>
   new Promise((resolve, reject) => {
     if (!file) { resolve(''); return; }
     const reader = new FileReader();
     reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = (err) => reject(err);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.src = ev.target.result;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let { width, height } = img;
+        // Scale down if wider than maxWidth
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = reject;
+    };
+    reader.onerror = reject;
   });
 
 // ─── Component ────────────────────────────────────────────────────────────────
