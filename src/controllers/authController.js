@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const User = require('../models/User');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
 const jwt = require('jsonwebtoken');
@@ -16,6 +17,16 @@ const generateToken = (id) => {
     expiresIn: process.env.JWT_EXPIRES_IN
   });
 };
+
+// In-memory sessions for mobile Google OAuth polling
+const googleSessions = {};
+
+// Cleanup stale sessions every 5 minutes
+setInterval(() => {
+  for (const [id, session] of Object.entries(googleSessions)) {
+    if (Date.now() - session.createdAt > 600000) delete googleSessions[id];
+  }
+}, 300000);
 
 exports.register = async (req, res) => {
   try {
@@ -250,7 +261,7 @@ exports.googleCallback = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Google auth code missing' });
     }
 
-    const isMobile = state === 'mobile';
+    const isMobile = state && state.startsWith('mobile');
     const redirectUri = isMobile ? process.env.GOOGLE_CALLBACK_URL : 'postmessage';
 
     let tokens;
@@ -302,34 +313,60 @@ exports.googleCallback = async (req, res) => {
       token
     };
 
+    // Mobile flow with polling session
     if (isMobile) {
-      const html = `<html><body><script>
-        window.onGoogleAuth.postMessage('${token}');
-      </script></body></html>`;
-      return res.send(html);
+      const sessionId = state.replace('mobile:', '');
+      if (sessionId && googleSessions[sessionId]) {
+        googleSessions[sessionId] = { status: 'done', data: userData, createdAt: Date.now() };
+        return res.send(`<html><body style="display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif"><div style="text-align:center"><h2>Đăng nhập thành công!</h2><p>Bạn có thể quay lại ứng dụng.</p></div></body></html>`);
+      }
     }
 
     res.status(200).json({ success: true, message: 'Google Login Successful! Please copy your token to use in Swagger.', data: userData });
   } catch (error) {
-    if (req.query.state === 'mobile') {
-      return res.send(`<html><body><script>window.onGoogleAuth.postMessage('__ERROR__:${error.message}');</script></body></html>`);
+    if (req.query.state && req.query.state.startsWith('mobile:')) {
+      const sessionId = req.query.state.replace('mobile:', '');
+      if (sessionId && googleSessions[sessionId]) {
+        googleSessions[sessionId] = { status: 'error', error: error.message, createdAt: Date.now() };
+      }
+      return res.send(`<html><body style="display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:sans-serif"><div style="text-align:center"><h2>Đăng nhập thất bại</h2><p>${error.message}</p></div></body></html>`);
     }
     res.status(401).json({ success: false, message: 'Google Auth Error: ' + error.message });
   }
 };
 
-exports.googleMobileUrl = async (req, res) => {
+exports.googleStartMobile = async (req, res) => {
   try {
-    const url = client.generateAuthUrl({
+    const sessionId = crypto.randomBytes(16).toString('hex');
+    googleSessions[sessionId] = { status: 'pending', createdAt: Date.now() };
+    const authUrl = client.generateAuthUrl({
       access_type: 'offline',
       scope: ['email', 'profile'],
       redirect_uri: process.env.GOOGLE_CALLBACK_URL,
-      state: 'mobile',
+      state: `mobile:${sessionId}`,
     });
-    res.json({ success: true, data: { url, clientId: process.env.GOOGLE_CLIENT_ID } });
+    res.json({ success: true, data: { sessionId, authUrl } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+exports.googlePollSession = async (req, res) => {
+  const session = googleSessions[req.params.sessionId];
+  if (!session) {
+    return res.status(404).json({ success: false, message: 'Session expired or not found' });
+  }
+  if (session.status === 'done') {
+    const data = session.data;
+    delete googleSessions[req.params.sessionId];
+    return res.json({ success: true, data: { status: 'done', ...data } });
+  }
+  if (session.status === 'error') {
+    const error = session.error;
+    delete googleSessions[req.params.sessionId];
+    return res.json({ success: true, data: { status: 'error', error } });
+  }
+  res.json({ success: true, data: { status: 'pending' } });
 };
 
 exports.googleMobile = async (req, res) => {

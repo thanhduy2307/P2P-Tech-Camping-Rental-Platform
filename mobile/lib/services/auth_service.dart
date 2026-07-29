@@ -135,13 +135,19 @@ class AuthService {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
 
-  /// Get Google OAuth URL + client ID for mobile WebView flow.
-  static Future<Map<String, String>> getGoogleAuthInfo() async {
-    final res = await ApiClient.get('/auth/google/mobile/url');
+  /// Start mobile Google OAuth flow: returns sessionId + authUrl to open in browser.
+  static Future<Map<String, String>> startGoogleAuth() async {
+    final res = await ApiClient.post('/auth/google/start-mobile', null);
     return {
-      'url': res['data']['url'] as String,
-      'clientId': res['data']['clientId'] as String,
+      'sessionId': res['data']['sessionId'] as String,
+      'authUrl': res['data']['authUrl'] as String,
     };
+  }
+
+  /// Poll for Google OAuth session result.
+  static Future<Map<String, dynamic>?> pollGoogleSession(String sessionId) async {
+    final res = await ApiClient.get('/auth/google/session/$sessionId');
+    return res['data'] as Map<String, dynamic>?;
   }
 
   /// Persist token + user after a successful auth response.

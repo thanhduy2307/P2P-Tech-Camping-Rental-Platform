@@ -6,7 +6,8 @@ const {
   login,
   googleCallback,
   googleMobile,
-  googleMobileUrl,
+  googleStartMobile,
+  googlePollSession,
   switchRole,
   completeProfile,
   applyLender,
@@ -37,7 +38,8 @@ router.post('/verify-otp', verifyOtp);
 router.post('/login', login);
 router.get('/google/callback', googleCallback);
 router.post('/google/mobile', googleMobile);
-router.get('/google/mobile/url', googleMobileUrl);
+router.post('/google/start-mobile', googleStartMobile);
+router.get('/google/session/:sessionId', googlePollSession);
 router.get('/me', protect, getMe);
 router.put('/switch-role', protect, switchRole);
 router.put('/complete-profile', protect, completeProfile);
