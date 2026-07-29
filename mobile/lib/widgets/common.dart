@@ -1,4 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/widgets/equip_dialog.dart';
 
@@ -84,6 +89,31 @@ class UiHelper {
     if (parts.isEmpty) return '?';
     if (parts.length == 1) return parts[0][0].toUpperCase();
     return (parts[0][0] + parts.last[0]).toUpperCase();
+  }
+
+  static Future<List<String>> imagesToBase64(List<XFile> images) async {
+    final results = <String>[];
+    for (final img in images) {
+      final ext = img.path.split('.').last.toLowerCase();
+      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
+      final file = File(img.path);
+      final originalBytes = await file.readAsBytes();
+      // Compress if > 500KB
+      List<int> bytes;
+      if (originalBytes.length > 500 * 1024) {
+        final compressed = await FlutterImageCompress.compressWithFile(
+          img.path,
+          minWidth: 1024,
+          minHeight: 1024,
+          quality: 75,
+        );
+        bytes = compressed ?? originalBytes;
+      } else {
+        bytes = originalBytes;
+      }
+      results.add('data:$mime;base64,${base64Encode(bytes)}');
+    }
+    return results;
   }
 }
 

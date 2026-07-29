@@ -1,5 +1,5 @@
-import 'dart:convert';
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
@@ -69,15 +69,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   void _removeImage(int index) => setState(() => _images.removeAt(index));
 
-  Future<List<String>> _encodeImages() async {
-    final list = <String>[];
-    for (final img in _images) {
-      final bytes = await img.readAsBytes();
-      final ext = img.path.split('.').last.toLowerCase();
-      list.add('data:image/${ext == 'png' ? 'png' : 'jpeg'};base64,${base64Encode(bytes)}');
-    }
-    return list;
-  }
+  Future<List<String>> _encodeImages() async => UiHelper.imagesToBase64(_images);
 
   Future<void> _confirmHandover() async {
     if (_order == null) return;

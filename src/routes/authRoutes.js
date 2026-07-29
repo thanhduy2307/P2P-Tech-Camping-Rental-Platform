@@ -6,6 +6,8 @@ const {
   forgotPasswordReset,
   login,
   googleCallback,
+  googleStartMobile,
+  googlePollSession,
   switchRole,
   completeProfile,
   applyLender,
@@ -36,6 +38,8 @@ router.post('/verify-otp', verifyOtp);
 router.post('/forgot-password', forgotPasswordRequest);
 router.post('/reset-password', forgotPasswordReset);
 router.post('/login', login);
+router.post('/google/start-mobile', googleStartMobile);
+router.get('/google/session/:sessionId', googlePollSession);
 router.get('/google/callback', googleCallback);
 router.get('/me', protect, getMe);
 router.put('/switch-role', protect, switchRole);

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -82,16 +81,7 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
     setState(() => _selectedImages.removeAt(index));
   }
 
-  Future<List<String>> _imagesToBase64() async {
-    final results = <String>[];
-    for (final img in _selectedImages) {
-      final bytes = await img.readAsBytes();
-      final ext = img.path.split('.').last.toLowerCase();
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-      results.add('data:$mime;base64,${base64Encode(bytes)}');
-    }
-    return results;
-  }
+  Future<List<String>> _imagesToBase64() async => UiHelper.imagesToBase64(_selectedImages);
 
   Future<void> _estimate() async {
     try {

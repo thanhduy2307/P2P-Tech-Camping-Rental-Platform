@@ -7,11 +7,60 @@ const { OAuth2Client } = require('google-auth-library');
 const { notifyUser, notifyUsersByRole } = require('../utils/notificationHelper');
 const aiService = require('../services/aiService');
 
+const crypto = require('crypto');
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_CALLBACK_URL
 );
+
+// In-memory store for mobile Google auth sessions
+const mobileAuthSessions = new Map();
+
+// URL helper for mobile Google auth
+const getGoogleAuthUrl = (sessionId) => {
+  const redirectUri = process.env.GOOGLE_CALLBACK_URL;
+  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&state=mobile:${sessionId}&access_type=offline`;
+};
+
+// @desc    Start mobile Google auth session
+// @route   POST /api/auth/google/start-mobile
+exports.googleStartMobile = async (req, res) => {
+  try {
+    const sessionId = crypto.randomUUID();
+    const authUrl = getGoogleAuthUrl(sessionId);
+    mobileAuthSessions.set(sessionId, { createdAt: Date.now(), status: 'pending' });
+    // Clean old sessions every 5 min
+    for (const [sid, data] of mobileAuthSessions) {
+      if (Date.now() - data.createdAt > 300000) mobileAuthSessions.delete(sid);
+    }
+    res.status(200).json({ success: true, data: { sessionId, authUrl } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Poll mobile Google auth session for result
+// @route   GET /api/auth/google/session/:sessionId
+exports.googlePollSession = async (req, res) => {
+  try {
+    const session = mobileAuthSessions.get(req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found or expired' });
+    }
+    if (session.status === 'completed') {
+      mobileAuthSessions.delete(req.params.sessionId);
+      return res.status(200).json({ success: true, data: session.result });
+    }
+    if (session.status === 'error') {
+      mobileAuthSessions.delete(req.params.sessionId);
+      return res.status(400).json({ success: false, message: session.message || 'Google auth failed' });
+    }
+    res.status(200).json({ success: true, status: 'pending' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -413,16 +462,20 @@ exports.login = async (req, res) => {
 
 exports.googleCallback = async (req, res) => {
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).json({ success: false, message: 'Google auth code missing' });
     }
+
+    // Mobile OAuth flow: state=mobile:<sessionId>
+    const isMobile = typeof state === 'string' && state.startsWith('mobile:');
+    const sessionId = isMobile ? state.split(':')[1] : null;
 
     let tokens;
     try {
       const exchangeResult = await client.getToken({
         code,
-        redirect_uri: 'postmessage'
+        redirect_uri: process.env.GOOGLE_CALLBACK_URL
       });
       tokens = exchangeResult.tokens;
     } catch (err) {
@@ -445,10 +498,9 @@ exports.googleCallback = async (req, res) => {
         email,
         googleId: sub,
         authProvider: 'google',
-        role: 'renter' // Default role
+        role: 'renter'
       });
     } else if (!user.googleId) {
-      // Link account
       user.googleId = sub;
       if (user.authProvider === 'local') {
         user.authProvider = 'google';
@@ -456,9 +508,8 @@ exports.googleCallback = async (req, res) => {
       await user.save();
     }
 
-    res.status(200).json({
+    const result = {
       success: true,
-      message: 'Google Login Successful! Please copy your token to use in Swagger.',
       data: {
         _id: user._id,
         name: user.name,
@@ -472,8 +523,24 @@ exports.googleCallback = async (req, res) => {
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
       }
-    });
+    };
+
+    if (isMobile && sessionId) {
+      // Store result in session for mobile polling
+      const session = mobileAuthSessions.get(sessionId);
+      if (session) {
+        session.status = 'completed';
+        session.result = result;
+        return res.send('<script>window.close()</script><p>Login successful! You can close this tab.</p>');
+      }
+    }
+
+    res.status(200).json(result);
   } catch (error) {
+    if (mobileAuthSessions.has(sessionId || '')) {
+      mobileAuthSessions.set(sessionId, { status: 'error', message: error.message });
+      return res.send(`<script>window.close()</script><p>Login failed: ${error.message}</p>`);
+    }
     res.status(401).json({ success: false, message: 'Google Auth Error: ' + error.message });
   }
 };
