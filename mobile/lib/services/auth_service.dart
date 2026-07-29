@@ -110,6 +110,22 @@ class AuthService {
     return res['data'];
   }
 
+  static Future<List<dynamic>> getMyWithdrawals() async {
+    final res = await ApiClient.get('/auth/my-withdrawals');
+    return res['data'] ?? [];
+  }
+
+  static Future<Map<String, dynamic>> createWithdrawal({
+    required double amount,
+    required Map<String, dynamic> bankAccount,
+  }) async {
+    final res = await ApiClient.post('/auth/withdraw', {
+      'amount': amount,
+      'bankAccount': bankAccount,
+    });
+    return res;
+  }
+
   static Future<double> getBalance() async {
     final res = await ApiClient.get('/auth/balance');
     return (res['data']['balance'] as num).toDouble();
@@ -117,6 +133,21 @@ class AuthService {
 
   static Future<void> updateAvatar(String base64DataUri) async {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
+  }
+
+  /// Start mobile Google OAuth flow: returns sessionId + authUrl to open in browser.
+  static Future<Map<String, String>> startGoogleAuth() async {
+    final res = await ApiClient.post('/auth/google/start-mobile', null);
+    return {
+      'sessionId': res['data']['sessionId'] as String,
+      'authUrl': res['data']['authUrl'] as String,
+    };
+  }
+
+  /// Poll for Google OAuth session result.
+  static Future<Map<String, dynamic>?> pollGoogleSession(String sessionId) async {
+    final res = await ApiClient.get('/auth/google/session/$sessionId');
+    return res['data'] as Map<String, dynamic>?;
   }
 
   /// Persist token + user after a successful auth response.

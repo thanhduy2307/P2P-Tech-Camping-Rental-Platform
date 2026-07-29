@@ -78,5 +78,15 @@ class OrderService {
         {'disputeNotes': notes, if (disputeType != null) 'disputeType': disputeType});
     return res;
   }
+
+  static Future<Map<String, dynamic>> requestExtension(String id, int days) async {
+    final res = await ApiClient.post('/orders/$id/extend', {'extensionDays': days});
+    return res;
+  }
+
+  static Future<Map<String, dynamic>> approveExtension(String id) async {
+    final res = await ApiClient.put('/orders/$id/extend/approve', {});
+    return res;
+  }
 }
 

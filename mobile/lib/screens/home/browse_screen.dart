@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -138,6 +139,8 @@ class _BrowseBodyState extends State<_BrowseBody> {
   bool _loading = true;
   String _query = '';
   String _category = 'Tất cả';
+  bool _sortByDistance = false;
+  Position? _userPos;
 
   final List<String> _categories = [
     'Tất cả', 'Công nghệ', 'Cắm trại', 'Blogs'
@@ -160,13 +163,30 @@ class _BrowseBodyState extends State<_BrowseBody> {
     }
   }
 
+  static double _distance(Position p, double lat, double lng) {
+    const R = 6371;
+    final dLat = (lat - p.latitude) * 3.1415927 / 180;
+    final dLng = (lng - p.longitude) * 3.1415927 / 180;
+    final a = 0.5 - math.cos(dLat / 2) * math.cos(p.latitude * 3.1415927 / 180) * math.cos(p.latitude * 3.1415927 / 180) *
+        (1 - math.cos(dLng / 2));
+    return R * 2 * math.asin(a);
+  }
+
   List<Asset> get _filtered {
-    return _assets.where((a) {
+    var result = _assets.where((a) {
       final matchQ = a.name.toLowerCase().contains(_query.toLowerCase()) ||
           a.category.toLowerCase().contains(_query.toLowerCase());
       final matchC = _category == 'Tất cả' || a.category == _category;
       return matchQ && matchC;
     }).toList();
+    if (_sortByDistance && _userPos != null) {
+      result.sort((a, b) {
+        final da = a.lat != null && a.lng != null ? _distance(_userPos!, a.lat!, a.lng!) : double.infinity;
+        final db = b.lat != null && b.lng != null ? _distance(_userPos!, b.lat!, b.lng!) : double.infinity;
+        return da.compareTo(db);
+      });
+    }
+    return result;
   }
 
   @override
@@ -212,39 +232,60 @@ class _BrowseBodyState extends State<_BrowseBody> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) {
-                        final c = _categories[i];
-                        final active = c == _category;
-                        return GestureDetector(
-                          onTap: () => setState(() => _category = c),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: active ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFEDF0EE),
-                              borderRadius: BorderRadius.circular(999),
-                              border: active
-                                  ? Border.all(color: const Color(0xFF10B981))
-                                  : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              c,
-                              style: TextStyle(
-                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                                color: active ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
-                              ),
-                            ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _categories.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (_, i) {
+                              final c = _categories[i];
+                              final active = c == _category;
+                              return GestureDetector(
+                                onTap: () => setState(() => _category = c),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: active ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFEDF0EE),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: active ? Border.all(color: const Color(0xFF10B981)) : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(c, style: TextStyle(
+                                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                    color: active ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
+                                  )),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          _sortByDistance ? Icons.sort : Icons.sort_by_alpha,
+                          color: _sortByDistance ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
+                        ),
+                        tooltip: 'Sắp xếp theo khoảng cách',
+                        onPressed: () async {
+                          if (_userPos == null) {
+                            final perm = await Geolocator.checkPermission();
+                            if (perm == LocationPermission.denied) {
+                              final req = await Geolocator.requestPermission();
+                              if (req == LocationPermission.denied) return;
+                            }
+                            final pos = await Geolocator.getCurrentPosition();
+                            _userPos = pos;
+                          }
+                          setState(() => _sortByDistance = !_sortByDistance);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),

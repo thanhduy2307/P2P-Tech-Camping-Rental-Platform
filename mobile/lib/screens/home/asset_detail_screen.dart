@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/services/order_service.dart';
@@ -273,10 +274,7 @@ class AlertRequestPayment extends StatelessWidget {
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Thanh toán'),
-      content: SingleChildScrollView(
-        child: Text(
-            'Đơn hàng đã được tạo. Vui lòng mở liên kết VNPay sau để thanh toán:\n\n${url ?? ''}'),
-      ),
+      content: const Text('Đơn hàng đã được tạo. Bạn sẽ được chuyển đến VNPay để thanh toán.'),
       actions: [
         TextButton(
             onPressed: () {
@@ -284,6 +282,16 @@ class AlertRequestPayment extends StatelessWidget {
               Navigator.pop(context);
             },
             child: const Text('Đóng')),
+        ElevatedButton(
+          onPressed: () {
+            if (url != null && url!.startsWith('http')) {
+              launchUrl(Uri.parse(url!), mode: LaunchMode.externalApplication);
+            }
+            Navigator.pop(context);
+            Navigator.pop(context);
+          },
+          child: const Text('Mở VNPay'),
+        ),
       ],
     );
   }
