@@ -719,9 +719,10 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (_, i) {
         final d = _disputes[i];
-        final asset = d['assetId'] is Map ? d['assetId'] : {};
-        final renter = d['renterId'] is Map ? d['renterId'] : {};
-        final lender = d['lenderId'] is Map ? d['lenderId'] : {};
+        final asset = d['asset'] is Map ? d['asset'] : (d['assetId'] is Map ? d['assetId'] : {});
+        final renter = d['renter'] is Map ? d['renter'] : (d['renterId'] is Map ? d['renterId'] : {});
+        final assetLender = asset['lender'] is Map ? asset['lender'] : {};
+        final lender = d['lender'] is Map ? d['lender'] : (d['lenderId'] is Map ? d['lenderId'] : assetLender);
         final dispute = d['dispute'] is Map ? d['dispute'] : {};
         return Card(
           child: ExpansionTile(

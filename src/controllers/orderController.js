@@ -1234,7 +1234,7 @@ exports.getPaymentUrl = async (req, res) => {
 exports.getDisputedOrders = async (req, res) => {
   try {
     const orders = await Order.find({ status: 'disputed' })
-      .populate('asset', 'name images')
+      .populate({ path: 'asset', select: 'name images lender', populate: { path: 'lender', select: 'name email' } })
       .populate('renter', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: orders });
