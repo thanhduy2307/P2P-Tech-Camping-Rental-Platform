@@ -37,6 +37,42 @@ exports.getStats = async (req, res) => {
     const pendingLenderAppsCount = await User.countDocuments({ lenderStatus: 'pending' });
     const pendingRenterAppsCount = await User.countDocuments({ renterStatus: 'pending' });
 
+    // Top users by total withdrawal amount (approved requests only)
+    const topWithdrawalUsers = await WithdrawalRequest.aggregate([
+      { $match: { status: 'approved' } },
+      {
+        $group: {
+          _id: '$lender',
+          totalWithdrawn: { $sum: '$amount' },
+          withdrawalCount: { $sum: 1 },
+          lastWithdrawnAt: { $max: '$transferredAt' }
+        }
+      },
+      { $sort: { totalWithdrawn: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userInfo'
+        }
+      },
+      { $unwind: '$userInfo' },
+      {
+        $project: {
+          _id: 1,
+          totalWithdrawn: 1,
+          withdrawalCount: 1,
+          lastWithdrawnAt: 1,
+          name: '$userInfo.name',
+          email: '$userInfo.email',
+          avatar: '$userInfo.avatar',
+          role: '$userInfo.role'
+        }
+      }
+    ]);
+
     res.status(200).json({
       success: true,
       data: {
@@ -52,7 +88,8 @@ exports.getStats = async (req, res) => {
           withdrawals: pendingWithdrawalsCount,
           lenderApplications: pendingLenderAppsCount,
           renterApplications: pendingRenterAppsCount
-        }
+        },
+        topWithdrawalUsers
       }
     });
   } catch (error) {
