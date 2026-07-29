@@ -9,7 +9,7 @@ class AppConstants {
   static const String roleInspector = 'inspector';
   static const String roleAdmin = 'admin';
 
-  // Brand colors.
-  static const int primaryColorValue = 0xFF2B6CB0;
-  static const int accentColorValue = 0xFF38A169;
+  // Brand colors (mirrored from web frontend).
+  static const int primaryColorValue = 0xFF006C49;
+  static const int accentColorValue = 0xFF10B981;
 }

@@ -670,7 +670,7 @@ exports.aiEstimateDeposit = async (req, res) => {
 // @access  Public / Renter
 exports.recommendAssetsByNeed = async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query, lat, lng, addressString } = req.body;
 
     if (!query) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập nhu cầu cắm trại dã ngoại của bạn.' });
@@ -679,7 +679,8 @@ exports.recommendAssetsByNeed = async (req, res) => {
     // Get all verified assets to match against
     const availableAssets = await Asset.find({ status: 'verified' });
 
-    const aiRecommendation = await aiService.generateCampingRecommendation(query, availableAssets);
+    const location = (lat != null && lng != null) ? { lat: parseFloat(lat), lng: parseFloat(lng), addressString: addressString || '' } : null;
+    const aiRecommendation = await aiService.generateCampingRecommendation(query, availableAssets, location);
 
     // Populate the recommended assets from database using the IDs returned by AI
     let recommendedAssets = [];

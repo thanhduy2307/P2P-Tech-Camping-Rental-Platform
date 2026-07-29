@@ -4,6 +4,7 @@ import 'package:velox_mobile/models/order.dart';
 import 'package:velox_mobile/services/admin_service.dart';
 import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
+import 'package:velox_mobile/widgets/equip_dialog.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -77,7 +78,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     try {
       _stats = await AdminService.getStats();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _statsLoading = false);
     }
@@ -91,7 +92,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
         search: _userSearch.text,
       );
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _usersLoading = false);
     }
@@ -102,7 +103,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     try {
       _assets = await AdminService.getAssets(status: _assetStatusFilter);
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _assetsLoading = false);
     }
@@ -113,7 +114,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     try {
       _orders = await AdminService.getOrders(status: _orderStatusFilter);
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _ordersLoading = false);
     }
@@ -125,7 +126,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       _renterApps = await AdminService.getRenterApplications();
       _lenderApps = await AdminService.getLenderApplications();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _ekycLoading = false);
     }
@@ -136,75 +137,103 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     try {
       _withdrawals = await AdminService.getWithdrawals();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _withdrawalsLoading = false);
     }
   }
 
   Future<void> _verifyRenter(String id, String status) async {
+    final confirmed = await EquipDialog.confirm(
+      context,
+      'Xác nhận',
+      status == 'approved' ? 'Duyệt hồ sơ eKYC Renter này?' : 'Từ chối hồ sơ eKYC Renter này?',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+    );
+    if (confirmed != true) return;
     try {
       await AdminService.verifyRenterApplication(id, status);
       if (!mounted) return;
-      UiHelper.showSuccess(context, status == 'approved' ? 'Đã duyệt eKYC Renter.' : 'Đã từ chối.');
+      EquipDialog.success(context, status == 'approved' ? 'Đã duyệt eKYC Renter.' : 'Đã từ chối.');
       _loadEkyc();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 
   Future<void> _verifyLender(String id, String status) async {
+    final confirmed = await EquipDialog.confirm(
+      context,
+      'Xác nhận',
+      status == 'approved' ? 'Duyệt hồ sơ eKYC Lender này?' : 'Từ chối hồ sơ eKYC Lender này?',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+    );
+    if (confirmed != true) return;
     try {
       await AdminService.verifyLenderApplication(id, status);
-      if (!mounted) UiHelper.showSuccess(context, status == 'approved' ? 'Đã duyệt eKYC Lender.' : 'Đã từ chối.');
+      if (mounted) EquipDialog.success(context, status == 'approved' ? 'Đã duyệt eKYC Lender.' : 'Đã từ chối.');
       _loadEkyc();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 
   Future<void> _verifyWithdrawal(String id, String status) async {
+    final confirmed = await EquipDialog.confirm(
+      context,
+      'Xác nhận',
+      status == 'approved' ? 'Duyệt yêu cầu rút tiền này?' : 'Từ chối yêu cầu rút tiền này?',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+    );
+    if (confirmed != true) return;
     try {
       await AdminService.verifyWithdrawal(id, status);
-      if (!mounted) UiHelper.showSuccess(context, status == 'approved' ? 'Đã duyệt rút tiền.' : 'Đã từ chối.');
+      if (mounted) EquipDialog.success(context, status == 'approved' ? 'Đã duyệt rút tiền.' : 'Đã từ chối.');
       _loadWithdrawals();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 
   Future<void> _changeRole(String id, String role) async {
+    final confirmed = await EquipDialog.confirm(
+      context,
+      'Xác nhận',
+      'Bạn có chắc muốn đổi vai trò thành $role?',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
+    );
+    if (confirmed != true) return;
     try {
       await AdminService.updateUserRole(id, role);
       if (!mounted) return;
-      UiHelper.showSuccess(context, 'Đã đổi vai trò thành $role.');
+      UiHelper.showSuccessToast(context, 'Đã đổi vai trò thành $role.');
       _loadUsers();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 
   Future<void> _toggleBan(dynamic u) async {
     final banned = u.isBanned == true;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(banned ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?'),
-        content: Text('Bạn có chắc muốn ${banned ? 'mở khóa' : 'khóa'} tài khoản của ${u.name}?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Hủy')),
-          ElevatedButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xác nhận')),
-        ],
-      ),
+    final confirmed = await EquipDialog.confirm(
+      context,
+      banned ? 'Mở khóa tài khoản?' : 'Khóa tài khoản?',
+      'Bạn có chắc muốn ${banned ? 'mở khóa' : 'khóa'} tài khoản của ${u.name}?',
+      confirmText: 'Xác nhận',
+      cancelText: 'Hủy',
     );
-    if (ok != true) return;
+    if (confirmed != true) return;
     try {
       await AdminService.toggleBan(u.id);
       if (!mounted) return;
-      UiHelper.showSuccess(context, banned ? 'Đã mở khóa.' : 'Đã khóa tài khoản.');
+      UiHelper.showSuccessToast(context, banned ? 'Đã mở khóa.' : 'Đã khóa tài khoản.');
       _loadUsers();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 

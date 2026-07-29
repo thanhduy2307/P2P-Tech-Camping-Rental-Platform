@@ -1,4 +1,4 @@
-package com.velox.velox_mobile;
+package com.equippeer.app;
 
 import android.os.Build;
 import androidx.annotation.NonNull;

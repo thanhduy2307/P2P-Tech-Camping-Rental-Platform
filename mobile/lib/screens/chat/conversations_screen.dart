@@ -26,7 +26,7 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
     try {
       _list = await ChatService.getConversations();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

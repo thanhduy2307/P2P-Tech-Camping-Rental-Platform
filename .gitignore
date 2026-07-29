@@ -21,3 +21,5 @@ dist/
 *.sln
 *.sw?
 scratch/
+test-key.sh
+*.nginx.conf

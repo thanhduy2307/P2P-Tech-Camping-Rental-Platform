@@ -18,7 +18,8 @@ class ApiException implements Exception {
 /// Lightweight API client wrapping the `http` package. Automatically attaches
 /// the bearer token from [Storage] and decodes JSON responses.
 class ApiClient {
-  static const Duration _timeout = Duration(seconds: 30);
+  static const Duration _defaultTimeout = Duration(seconds: 120);
+  static const Duration _longTimeout = Duration(seconds: 300);
 
   static Map<String, String> _headers({bool hasBody = true}) {
     final headers = <String, String>{};
@@ -40,7 +41,6 @@ class ApiClient {
       return body;
     }
 
-    // Normalize error message from common backend shapes.
     String message = 'Có lỗi xảy ra (${res.statusCode})';
     if (body is Map) {
       if (body['message'] != null) {
@@ -50,7 +50,6 @@ class ApiClient {
       }
     }
 
-    // Token hết hạn hoặc bị khóa -> xoá session để buộc đăng nhập lại.
     if (res.statusCode == 401 || res.statusCode == 403) {
       await Storage.clear();
     }
@@ -63,23 +62,29 @@ class ApiClient {
         .replace(queryParameters: query);
     final res = await http
         .get(uri, headers: _headers(hasBody: false))
-        .timeout(_timeout);
+        .timeout(_defaultTimeout);
     return _parse(res);
   }
 
-  static Future<dynamic> post(String path, Map<String, dynamic>? body) async {
+  static Future<dynamic> post(String path, Map<String, dynamic>? body,
+      {Duration? timeout, bool longRunning = false}) async {
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$path');
+    final effectiveTimeout =
+        timeout ?? (longRunning ? _longTimeout : _defaultTimeout);
     final res = await http
         .post(uri, headers: _headers(), body: jsonEncode(body ?? {}))
-        .timeout(_timeout);
+        .timeout(effectiveTimeout);
     return _parse(res);
   }
 
-  static Future<dynamic> put(String path, Map<String, dynamic>? body) async {
+  static Future<dynamic> put(String path, Map<String, dynamic>? body,
+      {Duration? timeout, bool longRunning = false}) async {
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$path');
+    final effectiveTimeout =
+        timeout ?? (longRunning ? _longTimeout : _defaultTimeout);
     final res = await http
         .put(uri, headers: _headers(), body: jsonEncode(body ?? {}))
-        .timeout(_timeout);
+        .timeout(effectiveTimeout);
     return _parse(res);
   }
 
@@ -87,7 +92,7 @@ class ApiClient {
     final uri = Uri.parse('${AppConstants.apiBaseUrl}$path');
     final res = await http
         .delete(uri, headers: _headers())
-        .timeout(_timeout);
+        .timeout(_defaultTimeout);
     return _parse(res);
   }
 }
