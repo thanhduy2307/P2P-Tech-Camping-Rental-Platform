@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/services/auth_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
+import 'package:velox_mobile/widgets/equip_dialog.dart';
 
 class CreateWithdrawalScreen extends StatefulWidget {
   const CreateWithdrawalScreen({super.key});
@@ -46,15 +48,15 @@ class _CreateWithdrawalScreenState extends State<CreateWithdrawalScreen> {
     final accountHolder = _accountHolderCtrl.text.trim();
 
     if (amount <= 0) {
-      UiHelper.showError(context, 'Số tiền rút phải lớn hơn 0');
+      UiHelper.showErrorToast(context, 'Số tiền rút phải lớn hơn 0');
       return;
     }
     if (amount > _balance) {
-      UiHelper.showError(context, 'Số dư không đủ (${UiHelper.formatVnd(_balance)})');
+      UiHelper.showErrorToast(context, 'Số dư không đủ (${UiHelper.formatVnd(_balance)})');
       return;
     }
     if (bankName.isEmpty || accountNumber.isEmpty || accountHolder.isEmpty) {
-      UiHelper.showError(context, 'Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng');
+      UiHelper.showErrorToast(context, 'Vui lòng nhập đầy đủ thông tin tài khoản ngân hàng');
       return;
     }
 
@@ -69,10 +71,10 @@ class _CreateWithdrawalScreenState extends State<CreateWithdrawalScreen> {
         },
       );
       if (!mounted) return;
-      UiHelper.showSuccess(context, 'Yêu cầu rút tiền đã được gửi. Số tiền đã được tạm đóng băng.');
+      EquipDialog.success(context, 'Yêu cầu rút tiền đã được gửi. Số tiền đã được tạm đóng băng.');
       Navigator.pop(context, true);
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -87,8 +89,20 @@ class _CreateWithdrawalScreenState extends State<CreateWithdrawalScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Số dư khả dụng: ${UiHelper.formatVnd(_balance)}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.teal)),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.primary, AppTheme.primaryContainer],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Text('Số dư khả dụng: ${UiHelper.formatVnd(_balance)}',
+                  style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _amountCtrl,
@@ -100,7 +114,7 @@ class _CreateWithdrawalScreenState extends State<CreateWithdrawalScreen> {
               ),
             ),
             const SizedBox(height: 16),
-            const Text('Thông tin tài khoản nhận:', style: TextStyle(fontWeight: FontWeight.bold)),
+            const Text('Thông tin tài khoản nhận:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
             const SizedBox(height: 8),
             TextField(
               controller: _bankNameCtrl,
@@ -135,8 +149,9 @@ class _CreateWithdrawalScreenState extends State<CreateWithdrawalScreen> {
               child: ElevatedButton(
                 onPressed: _loading ? null : _submit,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.teal,
+                  backgroundColor: AppTheme.primary,
                   foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: _loading
                     ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))

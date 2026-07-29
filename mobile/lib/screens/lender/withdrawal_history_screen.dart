@@ -25,7 +25,7 @@ class _WithdrawalHistoryScreenState extends State<WithdrawalHistoryScreen> {
       final data = await AuthService.getMyWithdrawals();
       setState(() => _withdrawals = data);
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       setState(() => _loading = false);
     }
