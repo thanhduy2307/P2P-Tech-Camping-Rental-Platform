@@ -40,11 +40,14 @@ class AssetService {
   }
 
   /// AI gear recommendation from a free-text camping need.
-  static Future<Map<String, dynamic>> recommend(String query, {double? lat, double? lng}) async {
+  static Future<Map<String, dynamic>> recommend(String query, {double? lat, double? lng, String? addressString}) async {
     final body = <String, dynamic>{'query': query};
     if (lat != null && lng != null) {
       body['lat'] = lat;
       body['lng'] = lng;
+    }
+    if (addressString != null && addressString.isNotEmpty) {
+      body['addressString'] = addressString;
     }
     final res = await ApiClient.post('/assets/recommend', body);
     return res['data'];
