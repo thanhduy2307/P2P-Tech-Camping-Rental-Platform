@@ -143,7 +143,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
   Position? _userPos;
 
   final List<String> _categories = [
-    'Tất cả', 'Công nghệ', 'Cắm trại', 'Blogs'
+    'Tất cả', 'Công nghệ', 'Cắm trại'
   ];
 
   @override
@@ -262,6 +262,27 @@ class _BrowseBodyState extends State<_BrowseBody> {
                                 ),
                               );
                             },
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/social-feed'),
+                        child: Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDF0EE),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.groups_outlined, size: 16, color: Color(0xFF006C49)),
+                              SizedBox(width: 4),
+                              Text('Cộng đồng', style: TextStyle(
+                                fontWeight: FontWeight.w700, color: Color(0xFF006C49))),
+                            ],
                           ),
                         ),
                       ),

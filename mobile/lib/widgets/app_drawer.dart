@@ -13,6 +13,7 @@ class AppDrawer extends StatelessWidget {
       _Item(icon: Icons.notifications_outlined, label: 'Thông báo', route: AppRoutes.notifications),
       _Item(icon: Icons.person_outline, label: 'Hồ sơ', route: AppRoutes.profile),
     ];
+    const feed = _Item(icon: Icons.groups_outlined, label: 'Cộng đồng', route: AppRoutes.socialFeed);
     switch (role) {
       case 'lender':
         return [
@@ -20,11 +21,13 @@ class AppDrawer extends StatelessWidget {
           _Item(icon: Icons.inventory_2_outlined, label: 'Kho thiết bị', route: AppRoutes.lenderInventory),
           _Item(icon: Icons.add_circle_outline, label: 'Đăng thiết bị', route: AppRoutes.postAsset),
           _Item(icon: Icons.receipt_long_outlined, label: 'Đơn thuê', route: AppRoutes.myOrders),
+          feed,
           ...all,
         ];
       case 'inspector':
         return [
           _Item(icon: Icons.dashboard_outlined, label: 'Dashboard', route: AppRoutes.inspectorDashboard),
+          feed,
           ...all,
         ];
       case 'admin':
@@ -32,12 +35,14 @@ class AppDrawer extends StatelessWidget {
           _Item(icon: Icons.dashboard_outlined, label: 'Dashboard', route: AppRoutes.adminDashboard),
           _Item(icon: Icons.people_outline, label: 'Người dùng', route: AppRoutes.adminDashboard),
           _Item(icon: Icons.receipt_long_outlined, label: 'Đơn hàng', route: AppRoutes.myOrders),
+          feed,
           ...all,
         ];
       case 'renter':
       default:
         return [
           _Item(icon: Icons.explore_outlined, label: 'Khám phá', route: AppRoutes.browse),
+          feed,
           _Item(icon: Icons.verified_user_outlined, label: 'Xác thực eKYC', route: AppRoutes.renterEkyc),
           _Item(icon: Icons.receipt_long_outlined, label: 'Đơn thuê', route: AppRoutes.myOrders),
           ...all,
