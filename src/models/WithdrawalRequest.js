@@ -24,11 +24,12 @@ const withdrawalRequestSchema = new mongoose.Schema({
     type: String,
     default: ''
   },
-  transactionReference: {
-    type: String,
-    default: ''
-  },
   adminTransferInfo: {
+    bankName: { type: String },
+    accountNumber: { type: String },
+    accountHolder: { type: String }
+  },
+  transactionReference: {
     type: String,
     default: ''
   },

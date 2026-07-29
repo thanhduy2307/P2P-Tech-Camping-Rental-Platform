@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/core/storage.dart';
@@ -20,10 +18,9 @@ import 'package:velox_mobile/screens/profile/profile_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_dashboard_screen.dart';
 import 'package:velox_mobile/screens/lender/post_asset_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
-import 'package:velox_mobile/screens/inspector/inspector_dashboard_screen.dart';
-import 'package:velox_mobile/screens/admin/admin_dashboard_screen.dart';
+import 'package:velox_mobile/screens/lender/withdrawal_history_screen.dart';
+import 'package:velox_mobile/screens/lender/create_withdrawal_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
-import 'package:velox_mobile/core/constants.dart';
 import 'package:velox_mobile/core/theme.dart';
 
 class AppRoutes {
@@ -43,54 +40,16 @@ class AppRoutes {
   static const lenderDashboard = '/lender/dashboard';
   static const postAsset = '/lender/post-asset';
   static const lenderInventory = '/lender/inventory';
-  static const inspectorDashboard = '/inspector/dashboard';
-  static const adminDashboard = '/admin/dashboard';
+  static const lenderWithdrawalHistory = '/lender/withdrawal-history';
+  static const lenderCreateWithdrawal = '/lender/create-withdrawal';
   static const notifications = '/notifications';
-
-  static String homeForRole(String? role) {
-    switch (role) {
-      case 'lender':
-        return lenderDashboard;
-      case 'inspector':
-        return inspectorDashboard;
-      case 'admin':
-        return adminDashboard;
-      case 'renter':
-      default:
-        return browse;
-    }
-  }
 }
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    _lastError = details.exception.toString();
-  };
-  runZonedGuarded(
-    () async {
-      await Storage.init();
-      runApp(const MyApp());
-    },
-    (error, stack) {
-      _lastError = error.toString();
-      runApp(MaterialApp(
-        home: Scaffold(
-          body: SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Text('EquipPeer lỗi khởi động:\n\n$error\n\n$stack',
-                  style: const TextStyle(fontSize: 13, color: Colors.red)),
-            ),
-          ),
-        ),
-      ));
-    },
-  );
+  await Storage.init();
+  runApp(const MyApp());
 }
-
-String? _lastError;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -129,8 +88,8 @@ class MyApp extends StatelessWidget {
           AppRoutes.lenderDashboard: (_) => const LenderDashboardScreen(),
           AppRoutes.postAsset: (_) => const PostAssetScreen(),
           AppRoutes.lenderInventory: (_) => const LenderInventoryScreen(),
-          AppRoutes.inspectorDashboard: (_) => const InspectorDashboardScreen(),
-          AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
+          AppRoutes.lenderWithdrawalHistory: (_) => const WithdrawalHistoryScreen(),
+          AppRoutes.lenderCreateWithdrawal: (_) => const CreateWithdrawalScreen(),
           AppRoutes.notifications: (_) => const NotificationsScreen(),
         },
       ),

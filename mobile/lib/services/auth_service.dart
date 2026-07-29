@@ -91,7 +91,7 @@ class AuthService {
       'cccdFront': cccdFront,
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
-    }, longRunning: true);
+    });
     return res['data'];
   }
 
@@ -106,7 +106,7 @@ class AuthService {
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
       'bankAccount': bankAccount,
-    }, longRunning: true);
+    });
     return res['data'];
   }
 
@@ -115,8 +115,20 @@ class AuthService {
     return (res['data']['balance'] as num).toDouble();
   }
 
-  static Future<void> updateAvatar(String base64DataUri) async {
-    await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
+  static Future<List<dynamic>> getMyWithdrawals() async {
+    final res = await ApiClient.get('/auth/my-withdrawals');
+    return res['data'] ?? [];
+  }
+
+  static Future<Map<String, dynamic>> createWithdrawal({
+    required double amount,
+    required Map<String, dynamic> bankAccount,
+  }) async {
+    final res = await ApiClient.post('/auth/withdraw', {
+      'amount': amount,
+      'bankAccount': bankAccount,
+    });
+    return res;
   }
 
   /// Persist token + user after a successful auth response.

@@ -1,11 +1,9 @@
 const User = require('../models/User');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
-const Transaction = require('../models/Transaction');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
 const { OAuth2Client } = require('google-auth-library');
 const { notifyUser, notifyUsersByRole } = require('../utils/notificationHelper');
-const aiService = require('../services/aiService');
 
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -119,19 +117,13 @@ exports.registerPhone = async (req, res) => {
     const smsResult = await smsService.sendSMS(cleanPhone, otp);
 
     const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
-    const isTelegram = process.env.SMS_PROVIDER === 'telegram';
     const showOtp = isMock || !smsResult.success;
-
-    let successMessage = 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.';
-    if (isTelegram) {
-        successMessage = 'Mã OTP xác thực đã được gửi về Telegram Bot của hệ thống.';
-    }
 
     res.status(201).json({
       success: true,
       message: smsResult.success 
-        ? successMessage
-        : 'Cổng gửi bị lỗi. Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
+        ? 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.'
+        : 'Cổng Twilio bị lỗi gửi (chưa bật Geo-permissions hoặc giới hạn Trial). Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
       data: {
         userId: user._id,
         phoneNumber: user.phoneNumber,
@@ -386,15 +378,8 @@ exports.completeProfile = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please provide phone number' });
     }
 
-    const hasCoordinates = address && address.coordinates &&
-      (address.coordinates.lat !== undefined || address.coordinates.lng !== undefined);
-    const hasFullAddress = address && address.province && address.district && address.ward && address.street;
-
-    if (!address || (!hasCoordinates && !hasFullAddress)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide complete address (province, district, ward, street) or coordinates (lat, lng).'
-      });
+    if (!address || !address.province || !address.district || !address.ward || !address.street) {
+      return res.status(400).json({ success: false, message: 'Please provide complete address (province, district, ward, street)' });
     }
 
     const user = await User.findById(req.user._id);
@@ -414,17 +399,14 @@ exports.completeProfile = async (req, res) => {
     }
 
     user.phoneNumber = phoneNumber;
-    const currentAddr = user.address || {};
-    const currentCoords = currentAddr.coordinates || {};
-    const reqCoords = address.coordinates || {};
     user.address = {
-      province: address.province !== undefined ? address.province : (currentAddr.province || ''),
-      district: address.district !== undefined ? address.district : (currentAddr.district || ''),
-      ward: address.ward !== undefined ? address.ward : (currentAddr.ward || ''),
-      street: address.street !== undefined ? address.street : (currentAddr.street || ''),
+      province: address.province,
+      district: address.district,
+      ward: address.ward,
+      street: address.street,
       coordinates: {
-        lat: reqCoords.lat !== undefined ? Number(reqCoords.lat) : (currentCoords.lat || 0),
-        lng: reqCoords.lng !== undefined ? Number(reqCoords.lng) : (currentCoords.lng || 0)
+        lat: address.coordinates && address.coordinates.lat ? address.coordinates.lat : 0,
+        lng: address.coordinates && address.coordinates.lng ? address.coordinates.lng : 0
       }
     };
 
@@ -493,12 +475,7 @@ exports.applyLender = async (req, res) => {
     let finalCccdBack = cccdBack;
     let finalCccdSelfie = cccdSelfie;
 
-    let isReusingApprovedImages = false;
-
     if (user.renterStatus === 'approved') {
-      if (!cccdFront && !cccdBack && !cccdSelfie) {
-        isReusingApprovedImages = true;
-      }
       finalCccdFront = finalCccdFront || user.renterOnboarding.cccdFront;
       finalCccdBack = finalCccdBack || user.renterOnboarding.cccdBack;
       finalCccdSelfie = finalCccdSelfie || user.renterOnboarding.cccdSelfie;
@@ -508,14 +485,7 @@ exports.applyLender = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ ảnh CCCD (Mặt trước, mặt sau và ảnh Selfie)' });
     }
 
-    let aiResult = { status: 'pending', confidenceScore: 100, reason: 'Tái sử dụng ảnh đã duyệt.' };
-    
-    if (isReusingApprovedImages) {
-      aiResult.status = 'approved';
-    } else {
-      aiResult = await aiService.verifyEkycImages(finalCccdFront, finalCccdBack, finalCccdSelfie);
-    }
-
+    user.lenderStatus = 'pending';
     user.lenderOnboarding = {
       cccdFront: finalCccdFront,
       cccdBack: finalCccdBack,
@@ -525,51 +495,23 @@ exports.applyLender = async (req, res) => {
         bankName: bankAccount.bankName,
         accountHolder: bankAccount.accountHolder
       },
-      rejectReason: aiResult.status === 'rejected' ? aiResult.reason : ''
+      rejectReason: ''
     };
-    user.lenderStatus = aiResult.status;
-
-    if (aiResult.status === 'approved') {
-      user.role = 'lender';
-    }
 
     await user.save();
 
-    let message = '';
-    
-    if (aiResult.status === 'approved') {
-      message = 'Đăng ký Lender thành công! Tài khoản của bạn đã được duyệt tự động.';
-      await notifyUser(
-        user._id,
-        'EKYC',
-        'Hồ sơ Lender được duyệt',
-        'Chúc mừng! Hồ sơ đăng ký Người cho thuê của bạn đã được phê duyệt tự động. Bạn có thể bắt đầu đăng thiết bị.',
-        '/profile'
-      );
-    } else if (aiResult.status === 'rejected') {
-      message = 'Hồ sơ bị từ chối tự động. Vui lòng chụp lại ảnh rõ nét hơn.';
-      await notifyUser(
-        user._id,
-        'EKYC',
-        'Hồ sơ Lender bị từ chối',
-        `Hệ thống từ chối hồ sơ của bạn. Lý do: ${aiResult.reason}`,
-        '/profile'
-      );
-    } else {
-      // Pending
-      message = 'Nộp hồ sơ eKYC đăng ký Lender thành công. Vui lòng chờ Admin phê duyệt.';
-      await notifyUsersByRole(
-        'inspector',
-        'EKYC',
-        'Yêu cầu duyệt Lender mới (Cần duyệt tay)',
-        `Người dùng ${user.name} nộp hồ sơ Lender (AI tự tin: ${aiResult.confidenceScore || 0}%). Lý do: ${aiResult.reason}`,
-        '/dashboard-inspector'
-      );
-    }
+    // Send notification to inspector
+    await notifyUsersByRole(
+      'inspector',
+      'EKYC',
+      'Yêu cầu duyệt Lender mới',
+      `Người dùng ${user.name} vừa nộp hồ sơ đăng ký trở thành Người cho thuê (Lender).`,
+      '/dashboard-inspector'
+    );
 
     res.status(200).json({
       success: true,
-      message,
+      message: 'Nộp hồ sơ eKYC đăng ký Lender thành công. Vui lòng quay lại sau khi hồ sơ được phê duyệt.',
       data: {
         _id: user._id,
         name: user.name,
@@ -579,8 +521,7 @@ exports.applyLender = async (req, res) => {
         renterStatus: user.renterStatus,
         renterOnboarding: user.renterOnboarding,
         lenderStatus: user.lenderStatus,
-        lenderOnboarding: user.lenderOnboarding,
-        aiScore: aiResult.confidenceScore
+        lenderOnboarding: user.lenderOnboarding
       }
     });
   } catch (error) {
@@ -724,13 +665,6 @@ exports.createWithdrawal = async (req, res) => {
     user.balance -= amount;
     await user.save();
 
-    await Transaction.create({
-      user: user._id,
-      amount: -amount,
-      type: 'deduction',
-      reason: 'Yêu cầu rút tiền. Số dư bị đóng băng chờ duyệt.'
-    });
-
     const request = await WithdrawalRequest.create({
       lender: user._id,
       amount,
@@ -775,7 +709,7 @@ exports.getWithdrawals = async (req, res) => {
 
 exports.verifyWithdrawal = async (req, res) => {
   try {
-    const { status, rejectReason, adminTransferInfo, transferReceiptImage, transactionReference } = req.body;
+    const { status, rejectReason } = req.body;
 
     if (!['approved', 'rejected'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Trạng thái kiểm duyệt không hợp lệ. Phải là "approved" hoặc "rejected".' });
@@ -784,10 +718,6 @@ exports.verifyWithdrawal = async (req, res) => {
     if (status === 'rejected' && !rejectReason) {
       return res.status(400).json({ success: false, message: 'Vui lòng cung cấp lý do từ chối yêu cầu rút tiền.' });
     }
-    
-    // if (status === 'approved' && (!adminTransferInfo || !transferReceiptImage || !transactionReference)) {
-      // return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ: Thông tin STK Admin, Mã giao dịch và Ảnh biên lai chuyển tiền.' });
-    // }
 
     const request = await WithdrawalRequest.findById(req.params.id);
     if (!request) {
@@ -800,9 +730,15 @@ exports.verifyWithdrawal = async (req, res) => {
 
     if (status === 'approved') {
       request.status = 'approved';
-      request.adminTransferInfo = adminTransferInfo;
-      request.transactionReference = transactionReference;
-      request.transferReceiptImage = transferReceiptImage;
+      if (req.body.adminTransferInfo) {
+        request.adminTransferInfo = req.body.adminTransferInfo;
+      }
+      if (req.body.transactionReference) {
+        request.transactionReference = req.body.transactionReference;
+      }
+      if (req.body.transferReceiptImage) {
+        request.transferReceiptImage = req.body.transferReceiptImage;
+      }
       request.transferredAt = new Date();
     } else {
       request.status = 'rejected';
@@ -813,13 +749,6 @@ exports.verifyWithdrawal = async (req, res) => {
       if (lender) {
         lender.balance += request.amount;
         await lender.save();
-        
-        await Transaction.create({
-          user: lender._id,
-          amount: request.amount,
-          type: 'addition',
-          reason: `Yêu cầu rút tiền bị từ chối. Lý do: ${rejectReason}`
-        });
       }
     }
 
@@ -831,7 +760,7 @@ exports.verifyWithdrawal = async (req, res) => {
       'WITHDRAWAL',
       status === 'approved' ? 'Yêu cầu rút tiền thành công' : 'Yêu cầu rút tiền bị từ chối',
       status === 'approved'
-        ? `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn đã được phê duyệt. Tiền được chuyển từ STK Admin: ${adminTransferInfo}. Mã GD: ${transactionReference}.`
+        ? `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn đã được phê duyệt và chuyển khoản.`
         : `Yêu cầu rút số tiền ${request.amount.toLocaleString()}đ của bạn bị từ chối. Lý do: ${rejectReason}. Số tiền đã được hoàn lại vào ví.`,
       '/profile'
     );
@@ -939,8 +868,8 @@ exports.updateAvatar = async (req, res) => {
 
 exports.updatePublicProfileInfo = async (req, res) => {
   try {
-    const { bio, coverImage, name, address } = req.body;
-
+    const { bio, coverImage, name } = req.body;
+    
     const user = await User.findById(req.user._id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
@@ -949,22 +878,6 @@ exports.updatePublicProfileInfo = async (req, res) => {
     if (bio !== undefined) user.bio = bio;
     if (coverImage !== undefined) user.coverImage = coverImage;
     if (name !== undefined) user.name = name;
-
-    // Cho phép cập nhật địa chỉ / tọa độ (dùng cho Inspector để nhận task kiểm định).
-    if (address !== undefined) {
-      const current = user.address || {};
-      const coords = address.coordinates || {};
-      user.address = {
-        province: address.province !== undefined ? address.province : (current.province || ''),
-        district: address.district !== undefined ? address.district : (current.district || ''),
-        ward: address.ward !== undefined ? address.ward : (current.ward || ''),
-        street: address.street !== undefined ? address.street : (current.street || ''),
-        coordinates: {
-          lat: coords.lat !== undefined ? Number(coords.lat) : (current.coordinates ? current.coordinates.lat : 0),
-          lng: coords.lng !== undefined ? Number(coords.lng) : (current.coordinates ? current.coordinates.lng : 0)
-        }
-      };
-    }
 
     await user.save();
 
@@ -975,8 +888,7 @@ exports.updatePublicProfileInfo = async (req, res) => {
         _id: user._id,
         name: user.name,
         bio: user.bio,
-        coverImage: user.coverImage,
-        address: user.address
+        coverImage: user.coverImage
       }
     });
   } catch (error) {
@@ -1000,54 +912,28 @@ exports.applyRenterEkyc = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Hồ sơ của bạn đang trong quá trình xét duyệt. Không thể nộp đơn mới.' });
     }
 
-    // Call AI Service to verify images
-    const aiResult = await aiService.verifyEkycImages(cccdFront, cccdBack, cccdSelfie);
-
+    user.renterStatus = 'pending';
     user.renterOnboarding = {
       cccdFront,
       cccdBack,
       cccdSelfie,
-      rejectReason: aiResult.status === 'rejected' ? aiResult.reason : ''
+      rejectReason: ''
     };
-    user.renterStatus = aiResult.status;
 
     await user.save();
 
-    let message = '';
-    
-    if (aiResult.status === 'approved') {
-      message = 'Xác thực tự động thành công! Bạn đã có quyền đặt thuê.';
-      await notifyUser(
-        user._id,
-        'EKYC',
-        'Xác thực Renter thành công',
-        'Chúc mừng! Hồ sơ xác minh danh tính của bạn đã được AI hệ thống duyệt tự động thành công.',
-        '/profile'
-      );
-    } else if (aiResult.status === 'rejected') {
-      message = 'Hồ sơ bị từ chối tự động. Vui lòng chụp lại ảnh rõ nét hơn.';
-      await notifyUser(
-        user._id,
-        'EKYC',
-        'Hồ sơ Renter bị từ chối',
-        `Hệ thống từ chối hồ sơ của bạn. Lý do: ${aiResult.reason}`,
-        '/profile'
-      );
-    } else {
-      // Pending
-      message = 'Nộp hồ sơ eKYC xác thực Renter thành công. Vui lòng chờ Admin xét duyệt.';
-      await notifyUsersByRole(
-        'inspector',
-        'EKYC',
-        'Yêu cầu xác thực Renter mới (Cần duyệt tay)',
-        `Người dùng ${user.name} nộp hồ sơ eKYC (AI tự tin: ${aiResult.confidenceScore || 0}%). Lý do: ${aiResult.reason}`,
-        '/dashboard-inspector'
-      );
-    }
+    // Send notification to inspector
+    await notifyUsersByRole(
+      'inspector',
+      'EKYC',
+      'Yêu cầu xác thực Renter mới',
+      `Người dùng ${user.name} vừa nộp hồ sơ eKYC xác thực Người đi thuê (Renter).`,
+      '/dashboard-inspector'
+    );
 
     res.status(200).json({
       success: true,
-      message,
+      message: 'Nộp hồ sơ eKYC xác thực Renter thành công. Vui lòng chờ Admin xét duyệt.',
       data: {
         _id: user._id,
         name: user.name,
@@ -1055,8 +941,7 @@ exports.applyRenterEkyc = async (req, res) => {
         role: user.role,
         renterStatus: user.renterStatus,
         renterOnboarding: user.renterOnboarding,
-        isProfileCompleted: user.isProfileCompleted,
-        aiScore: aiResult.confidenceScore
+        isProfileCompleted: user.isProfileCompleted
       }
     });
   } catch (error) {
@@ -1131,15 +1016,3 @@ exports.verifyRenterApplication = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
-
-exports.getMyTransactions = async (req, res) => {
-  try {
-    const transactions = await Transaction.find({ user: req.user._id })
-      .populate('order', 'startDate endDate totalRent deposit')
-      .sort({ createdAt: -1 });
-    res.status(200).json({ success: true, data: transactions });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
-
