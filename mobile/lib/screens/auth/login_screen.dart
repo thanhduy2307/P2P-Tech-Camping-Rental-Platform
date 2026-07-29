@@ -125,7 +125,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Google',
                     outline: true,
                     icon: const Icon(Icons.g_mobiledata, size: 22),
-                    onPressed: () {},
+                    onPressed: () async {
+                      try {
+                        await auth.signInWithGoogle();
+                        if (!context.mounted) return;
+                        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+                      } catch (e) {
+                        if (context.mounted) UiHelper.showErrorToast(context, e);
+                      }
+                    },
                   ),
                   const SizedBox(height: 20),
                   Row(

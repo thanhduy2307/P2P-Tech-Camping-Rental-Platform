@@ -310,6 +310,60 @@ exports.googleCallback = async (req, res) => {
   }
 };
 
+exports.googleMobile = async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ success: false, message: 'idToken is required' });
+    }
+
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID
+    });
+
+    const payload = ticket.getPayload();
+    const { email, name, sub } = payload;
+
+    let user = await User.findOne({ email });
+
+    if (!user) {
+      user = await User.create({
+        name,
+        email,
+        googleId: sub,
+        authProvider: 'google',
+        role: 'renter'
+      });
+    } else if (!user.googleId) {
+      user.googleId = sub;
+      if (user.authProvider === 'local') {
+        user.authProvider = 'google';
+      }
+      await user.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
+        lenderStatus: user.lenderStatus,
+        lenderOnboarding: user.lenderOnboarding,
+        token: generateToken(user._id)
+      }
+    });
+  } catch (error) {
+    res.status(401).json({ success: false, message: 'Google Mobile Auth Error: ' + error.message });
+  }
+};
+
 exports.switchRole = async (req, res) => {
   try {
     const user = await User.findById(req.user._id);
