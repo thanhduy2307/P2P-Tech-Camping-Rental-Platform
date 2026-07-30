@@ -59,40 +59,26 @@ exports.register = async (req, res) => {
   }
 };
 
-exports.registerPhone = async (req, res) => {
+exports.registerWithEmail = async (req, res) => {
   try {
-    const { name, phoneNumber, password, role } = req.body;
+    const { name, email, password, role } = req.body;
 
-    if (!name || !phoneNumber || !password) {
-      return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ Họ tên, Số điện thoại và Mật khẩu.' });
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu.' });
     }
 
-    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
-    if (cleanPhone.length < 9 || cleanPhone.length > 11 || !/^\d+$/.test(cleanPhone)) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại không đúng định dạng.' });
-    }
-
-    // Generate unique virtual email to satisfy unique index constraint on email
-    const virtualEmail = `${cleanPhone}@sdt.equippeer.vn`;
-
-    // Check if phone number already registered or virtual email exists
-    const userExists = await User.findOne({
-      $or: [
-        { phoneNumber: cleanPhone },
-        { email: virtualEmail }
-      ]
-    });
+    const cleanEmail = email.trim().toLowerCase();
+    
+    // Check if email already registered
+    const userExists = await User.findOne({ email: cleanEmail });
     if (userExists) {
-      if (userExists.isPhoneVerified) {
-        return res.status(400).json({ success: false, message: 'Số điện thoại này đã được đăng ký và xác thực.' });
+      if (userExists.isEmailVerified) {
+        return res.status(400).json({ success: false, message: 'Email này đã được đăng ký và xác thực.' });
       } else {
         // If not verified, remove any duplicate registration so they can re-register
         await User.deleteMany({
-          $or: [
-            { phoneNumber: cleanPhone },
-            { email: virtualEmail }
-          ],
-          isPhoneVerified: false
+          email: cleanEmail,
+          isEmailVerified: false
         });
       }
     }
@@ -105,38 +91,30 @@ exports.registerPhone = async (req, res) => {
 
     const user = await User.create({
       name,
-      email: virtualEmail,
-      phoneNumber: cleanPhone,
+      email: cleanEmail,
       password: hashedPassword,
       role: role || 'renter',
-      isPhoneVerified: false,
-      phoneVerificationOtp: otp,
-      phoneVerificationOtpExpires: new Date(Date.now() + 10 * 60 * 1000)
+      isEmailVerified: false,
+      verificationOtp: otp,
+      verificationOtpExpires: new Date(Date.now() + 10 * 60 * 1000)
     });
 
-    // Send real SMS OTP via SMS Service
-    const smsService = require('../services/smsService');
-    const smsResult = await smsService.sendSMS(cleanPhone, otp);
+    // Send real Email OTP via Email Service
+    const emailService = require('../services/emailService');
+    const emailResult = await emailService.sendOTP(cleanEmail, otp);
 
-    const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
-    const isTelegram = process.env.SMS_PROVIDER === 'telegram';
-    const showOtp = isMock || !smsResult.success;
-
-    let successMessage = 'Mã OTP xác thực đã được gửi đến số điện thoại của bạn.';
-    if (isTelegram) {
-        successMessage = 'Mã OTP xác thực đã được gửi về Telegram Bot của hệ thống.';
-    }
+    const showOtp = emailResult.mocked;
 
     res.status(201).json({
       success: true,
-      message: smsResult.success 
-        ? successMessage
-        : 'Cổng gửi bị lỗi. Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
+      message: emailResult.success 
+        ? 'Mã OTP xác thực đã được gửi đến email của bạn.'
+        : 'Cổng gửi email bị lỗi. Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
       data: {
         userId: user._id,
-        phoneNumber: user.phoneNumber,
+        email: user.email,
         otp: showOtp ? otp : undefined,
-        smsSent: smsResult.success
+        emailSent: emailResult.success
       }
     });
   } catch (error) {
@@ -157,22 +135,22 @@ exports.verifyOtp = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng.' });
     }
 
-    if (user.isPhoneVerified) {
-      return res.status(400).json({ success: false, message: 'Số điện thoại đã được xác minh.' });
+    if (user.isEmailVerified) {
+      return res.status(400).json({ success: false, message: 'Email đã được xác minh.' });
     }
 
-    if (!user.phoneVerificationOtp || user.phoneVerificationOtp !== otp.trim()) {
+    if (!user.verificationOtp || user.verificationOtp !== otp.trim()) {
       return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
     }
 
-    if (new Date() > user.phoneVerificationOtpExpires) {
+    if (new Date() > user.verificationOtpExpires) {
       return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
     }
 
     // Activate account
-    user.isPhoneVerified = true;
-    user.phoneVerificationOtp = undefined;
-    user.phoneVerificationOtpExpires = undefined;
+    user.isEmailVerified = true;
+    user.verificationOtp = undefined;
+    user.verificationOtpExpires = undefined;
     await user.save();
 
     res.status(200).json({
@@ -192,6 +170,76 @@ exports.verifyOtp = async (req, res) => {
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
       }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.forgotPasswordRequest = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp email.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const user = await User.findOne({ email: cleanEmail });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản với email này.' });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.verificationOtp = otp;
+    user.verificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+
+    const emailService = require('../services/emailService');
+    const emailResult = await emailService.sendOTP(cleanEmail, otp);
+
+    res.status(200).json({
+      success: true,
+      message: 'Mã OTP khôi phục mật khẩu đã được gửi đến email của bạn.',
+      data: {
+        userId: user._id,
+        email: user.email,
+        otp: emailResult.mocked ? otp : undefined
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.forgotPasswordReset = async (req, res) => {
+  try {
+    const { userId, otp, newPassword } = req.body;
+    if (!userId || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản.' });
+    }
+
+    if (!user.verificationOtp || user.verificationOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
+    }
+
+    if (new Date() > user.verificationOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.verificationOtp = undefined;
+    user.verificationOtpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Đặt lại mật khẩu thành công! Bạn có thể đăng nhập bằng mật khẩu mới.'
     });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });

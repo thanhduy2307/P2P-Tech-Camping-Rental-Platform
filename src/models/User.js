@@ -51,9 +51,8 @@ const userSchema = new mongoose.Schema({
   },
   phoneNumber: {
     type: String,
-    default: '',
     sparse: true,
-    index: true
+    unique: true
   },
   address: {
     province: { type: String, default: '' },
@@ -96,14 +95,14 @@ const userSchema = new mongoose.Schema({
     },
     rejectReason: { type: String, default: '' }
   },
-  isPhoneVerified: {
+  isEmailVerified: {
     type: Boolean,
     default: false
   },
-  phoneVerificationOtp: {
+  verificationOtp: {
     type: String
   },
-  phoneVerificationOtpExpires: {
+  verificationOtpExpires: {
     type: Date
   },
   isBanned: {

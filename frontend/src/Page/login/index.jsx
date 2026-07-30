@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../../redux/authSlice';
 import api from '../../configs/axios';
+import Swal from 'sweetalert2';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -15,6 +16,73 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Forgot password states
+  const [isForgotModalOpen, setIsForgotModalOpen] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotUserId, setForgotUserId] = useState('');
+  const [forgotStep, setForgotStep] = useState(1); // 1: Email, 2: OTP & New Password
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotError, setForgotError] = useState('');
+
+  const handleForgotRequest = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotLoading(true);
+
+    try {
+      const response = await api.post('/auth/forgot-password', { email: forgotEmail });
+      if (response.data && response.data.success) {
+        setForgotUserId(response.data.data.userId);
+        setForgotStep(2);
+      } else {
+        setForgotError('Không thể gửi yêu cầu.');
+      }
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setForgotError(err.response.data.message);
+      } else {
+        setForgotError('Lỗi kết nối mạng.');
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  };
+
+  const handleForgotReset = async (e) => {
+    e.preventDefault();
+    setForgotError('');
+    setForgotLoading(true);
+
+    try {
+      const response = await api.post('/auth/reset-password', {
+        userId: forgotUserId,
+        otp: forgotOtp,
+        newPassword: forgotNewPassword
+      });
+      if (response.data && response.data.success) {
+        setIsForgotModalOpen(false);
+        setForgotStep(1);
+        setForgotEmail('');
+        setForgotOtp('');
+        setForgotNewPassword('');
+        setForgotUserId('');
+        Swal.fire('Thành công!', 'Mật khẩu đã được đặt lại thành công.', 'success');
+      } else {
+        setForgotError('Không thể đặt lại mật khẩu.');
+      }
+    } catch (err) {
+      if (err.response && err.response.data && err.response.data.message) {
+        setForgotError(err.response.data.message);
+      } else {
+        setForgotError('Mã OTP không chính xác hoặc đã hết hạn.');
+      }
+    } finally {
+      setForgotLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -250,9 +318,13 @@ const Login = () => {
                 </label>
               </div>
               <div className="text-sm">
-                <a className="font-label-sm text-label-sm text-secondary font-semibold hover:text-secondary-container transition-colors" href="#">
+                <button 
+                  type="button" 
+                  onClick={() => setIsForgotModalOpen(true)}
+                  className="font-label-sm text-label-sm text-secondary font-semibold hover:text-secondary-container transition-colors bg-transparent border-none cursor-pointer"
+                >
                   Quên mật khẩu?
-                </a>
+                </button>
               </div>
             </div>
 
@@ -301,15 +373,110 @@ const Login = () => {
 </div>
           </div>
 
-          {/* Footer Link */}
-          <p className="mt-8 text-center font-body-md text-body-md text-on-surface-variant">
-            Chưa có tài khoản?{' '}
-            <Link className="font-label-sm text-label-sm text-primary hover:text-primary-fixed-dim transition-colors" to="/register">
+          {/* Registration Link */}
+          <div className="mt-8 text-center text-sm">
+            <span className="font-body-md text-body-md text-on-surface-variant">Chưa có tài khoản? </span>
+            <Link className="font-label-md text-label-md text-primary font-bold hover:text-primary-container transition-colors" to="/register">
               Đăng ký ngay
             </Link>
-          </p>
+          </div>
         </div>
       </div>
+
+      {/* Forgot Password Modal */}
+      {isForgotModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-surface rounded-2xl p-6 w-full max-w-md shadow-lg">
+            <h3 className="text-xl font-bold text-on-surface mb-2">Quên mật khẩu</h3>
+            <p className="text-sm text-on-surface-variant mb-4">
+              {forgotStep === 1 
+                ? 'Nhập email của bạn để nhận mã khôi phục.' 
+                : 'Nhập mã OTP và mật khẩu mới của bạn.'}
+            </p>
+
+            {forgotError && (
+              <div className="bg-error-container text-on-error-container p-3 rounded-lg text-sm mb-4">
+                {forgotError}
+              </div>
+            )}
+
+            {forgotStep === 1 ? (
+              <form onSubmit={handleForgotRequest}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-on-surface mb-1">Email</label>
+                  <input 
+                    type="email" 
+                    required 
+                    value={forgotEmail} 
+                    onChange={(e) => setForgotEmail(e.target.value)}
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:ring-2 focus:ring-primary"
+                    placeholder="Nhập email đã đăng ký"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button 
+                    type="button" 
+                    onClick={() => { setIsForgotModalOpen(false); setForgotError(''); }}
+                    className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+                  >
+                    Hủy
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={forgotLoading}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    {forgotLoading ? 'Đang gửi...' : 'Gửi mã OTP'}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleForgotReset}>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-on-surface mb-1">Mã OTP (gửi qua email)</label>
+                  <input 
+                    type="text" 
+                    required 
+                    maxLength="6"
+                    value={forgotOtp} 
+                    onChange={(e) => setForgotOtp(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:ring-2 focus:ring-primary font-mono text-center tracking-widest"
+                    placeholder="******"
+                  />
+                </div>
+                <div className="mb-4">
+                  <label className="block text-sm font-medium text-on-surface mb-1">Mật khẩu mới</label>
+                  <input 
+                    type="password" 
+                    required 
+                    minLength="6"
+                    value={forgotNewPassword} 
+                    onChange={(e) => setForgotNewPassword(e.target.value)}
+                    className="w-full px-3 py-2 border border-outline-variant rounded-lg bg-surface-container-lowest focus:ring-2 focus:ring-primary"
+                    placeholder="••••••••"
+                  />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button 
+                    type="button" 
+                    onClick={() => { setForgotStep(1); setForgotError(''); }}
+                    className="px-4 py-2 text-sm font-medium text-on-surface-variant hover:bg-surface-container-high rounded-lg"
+                  >
+                    Quay lại
+                  </button>
+                  <button 
+                    type="submit" 
+                    disabled={forgotLoading}
+                    className="px-4 py-2 text-sm font-medium text-white bg-primary rounded-lg hover:opacity-90 disabled:opacity-50"
+                  >
+                    {forgotLoading ? 'Đang xử lý...' : 'Đặt lại mật khẩu'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
