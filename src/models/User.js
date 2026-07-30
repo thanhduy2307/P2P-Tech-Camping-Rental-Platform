@@ -47,7 +47,9 @@ const userSchema = new mongoose.Schema({
   },
   phoneNumber: {
     type: String,
-    default: ''
+    default: '',
+    sparse: true,
+    index: true
   },
   address: {
     province: { type: String, default: '' },

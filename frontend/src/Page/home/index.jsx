@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import api from '../../configs/axios';
 
 const Home = () => {
@@ -154,15 +155,28 @@ const Home = () => {
 
       {/* Categories Section (Bento Grid Style) */}
       <section className="py-20 px-margin-desktop max-w-container-max mx-auto bg-surface-bright">
-        <div className="flex items-end justify-between mb-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6 }}
+          className="flex items-end justify-between mb-10"
+        >
           <div>
             <h2 className="font-headline-lg text-headline-lg text-on-surface mb-2">Khám phá Danh mục</h2>
             <p className="font-body-md text-body-md text-on-surface-variant">Thiết bị phù hợp cho mọi nhu cầu sáng tạo và trải nghiệm.</p>
           </div>
-        </div>
+        </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
           {/* Tech Card */}
-          <Link to="/assets?category=tech" className="relative group rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, x: -30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            className="h-full"
+          >
+            <Link to="/assets?category=tech" className="block w-full h-full relative group rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
             <img 
               alt="Tech Gear Category" 
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
@@ -179,9 +193,17 @@ const Home = () => {
                 <span className="material-symbols-outlined">arrow_forward</span>
               </div>
             </div>
-          </Link>
+            </Link>
+          </motion.div>
           {/* Camping Card */}
-          <Link to="/assets?category=camping" className="relative group rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
+          <motion.div
+            initial={{ opacity: 0, x: 30 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true, margin: "-50px" }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            className="h-full"
+          >
+            <Link to="/assets?category=camping" className="block w-full h-full relative group rounded-2xl overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300">
             <img 
               alt="Camping Gear Category" 
               className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" 
@@ -199,30 +221,44 @@ const Home = () => {
               </div>
             </div>
           </Link>
+          </motion.div>
         </div>
       </section>
 
       {/* Featured Products Section */}
       <section className="py-20 px-margin-desktop max-w-container-max mx-auto">
-        <div className="flex items-center justify-between mb-10">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6 }}
+          className="flex items-center justify-between mb-10"
+        >
           <h2 className="font-headline-lg text-headline-lg text-on-surface font-extrabold">Thiết bị Nổi bật</h2>
           <Link to="/assets" className="font-title-md text-secondary hover:text-secondary-container flex items-center gap-1 transition-colors">
             Xem tất cả <span className="material-symbols-outlined text-[20px]">chevron_right</span>
           </Link>
-        </div>
+        </motion.div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {loadingFeatured ? (
             <div className="col-span-full text-center py-12">
               <p className="text-on-surface-variant">Đang tải thiết bị nổi bật...</p>
             </div>
           ) : (
-            displayAssets.map(item => {
+            displayAssets.map((item, index) => {
               const priceVND = (item.pricePerDay >= 1000000) 
                 ? `${(item.pricePerDay / 1000000).toFixed(1).replace(/\.0$/, '')}tr` 
                 : `${(item.pricePerDay / 1000).toFixed(0)}k`;
               const imgUrl = item.images && item.images.length > 0 ? item.images[0] : 'https://placehold.co/400x300?text=No+Image';
               return (
-                <div key={item._id} className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col">
+                <motion.div 
+                  key={item._id} 
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="bg-surface-container-lowest rounded-xl border border-outline-variant/30 overflow-hidden shadow-sm hover:shadow-[0_8px_30px_rgba(0,0,0,0.08)] hover:-translate-y-1 transition-all duration-300 flex flex-col"
+                >
                   <div className="relative aspect-[4/3] bg-surface-container-low overflow-hidden group">
                     <img 
                       alt={item.name} 
@@ -253,7 +289,7 @@ const Home = () => {
                       </Link>
                     </div>
                   </div>
-                </div>
+                </motion.div>
               );
             })
           )}
@@ -261,33 +297,56 @@ const Home = () => {
       </section>
 
       {/* Why Choose Us Section */}
-      <section className="py-24 bg-surface-container-low border-y border-outline-variant/20">
-        <div className="max-w-container-max mx-auto px-margin-desktop text-center">
+      <section className="py-24 bg-surface-container-low border-y border-outline-variant/20 overflow-hidden">
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-50px" }}
+          transition={{ duration: 0.6 }}
+          className="max-w-container-max mx-auto px-margin-desktop text-center"
+        >
           <h2 className="font-headline-lg text-headline-lg text-on-surface mb-16">Tại sao chọn EquipPeer?</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 bg-primary-container/10 rounded-2xl flex items-center justify-center mb-6 text-primary">
-                <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>verified_user</span>
-              </div>
-              <h3 className="font-title-md text-title-md text-on-surface mb-3">Bảo hiểm An toàn</h3>
-              <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">Mọi giao dịch thuê đồ đều được bảo hiểm, đảm bảo an tâm cho cả người thuê và người cho thuê.</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 bg-secondary-container/10 rounded-2xl flex items-center justify-center mb-6 text-secondary">
-                <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>handyman</span>
-              </div>
-              <h3 className="font-title-md text-title-md text-on-surface mb-3">Kiểm duyệt Chất lượng</h3>
-              <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">Cộng đồng uy tín với hệ thống đánh giá hai chiều và xác minh danh tính chặt chẽ.</p>
-            </div>
-            <div className="flex flex-col items-center">
-              <div className="w-20 h-20 bg-primary-container/10 rounded-2xl flex items-center justify-center mb-6 text-primary">
-                <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>savings</span>
-              </div>
-              <h3 className="font-title-md text-title-md text-on-surface mb-3">Giá cả Hợp lý</h3>
-              <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">Tiết kiệm chi phí đáng kể so với mua mới, tiếp cận thiết bị cao cấp dễ dàng hơn.</p>
-            </div>
+            {[
+              {
+                icon: 'verified_user',
+                color: 'text-primary',
+                bg: 'bg-primary-container/10',
+                title: 'Bảo hiểm An toàn',
+                desc: 'Mọi giao dịch thuê đồ đều được bảo hiểm, đảm bảo an tâm cho cả người thuê và người cho thuê.'
+              },
+              {
+                icon: 'handyman',
+                color: 'text-secondary',
+                bg: 'bg-secondary-container/10',
+                title: 'Kiểm duyệt Chất lượng',
+                desc: 'Cộng đồng uy tín với hệ thống đánh giá hai chiều và xác minh danh tính chặt chẽ.'
+              },
+              {
+                icon: 'savings',
+                color: 'text-primary',
+                bg: 'bg-primary-container/10',
+                title: 'Giá cả Hợp lý',
+                desc: 'Tiết kiệm chi phí đáng kể so với mua mới, tiếp cận thiết bị cao cấp dễ dàng hơn.'
+              }
+            ].map((feature, i) => (
+              <motion.div 
+                key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-50px" }}
+                transition={{ duration: 0.5, delay: i * 0.2 }}
+                className="flex flex-col items-center"
+              >
+                <div className={`w-20 h-20 ${feature.bg} rounded-2xl flex items-center justify-center mb-6 ${feature.color}`}>
+                  <span className="material-symbols-outlined text-[40px]" style={{ fontVariationSettings: "'FILL' 1" }}>{feature.icon}</span>
+                </div>
+                <h3 className="font-title-md text-title-md text-on-surface mb-3">{feature.title}</h3>
+                <p className="font-body-md text-body-md text-on-surface-variant max-w-xs">{feature.desc}</p>
+              </motion.div>
+            ))}
           </div>
-        </div>
+        </motion.div>
       </section>
     </>
   );

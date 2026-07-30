@@ -174,15 +174,15 @@ exports.vnpayReturn = async (req, res) => {
           console.error("Failed to process automated handover flow:", autoErr);
         }
 
-        return res.redirect('http://localhost:5173/orders?payment=success');
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders?payment=success`);
       } else {
-        return res.redirect('http://localhost:5173/orders?payment=fail');
+        return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders?payment=fail`);
       }
     } else {
-      return res.redirect('http://localhost:5173/orders?payment=fail&reason=checksum');
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders?payment=fail&reason=checksum`);
     }
   } catch (error) {
-    return res.redirect('http://localhost:5173/orders?payment=fail&error=' + encodeURIComponent(error.message));
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/orders?payment=fail&error=` + encodeURIComponent(error.message));
   }
 };
 

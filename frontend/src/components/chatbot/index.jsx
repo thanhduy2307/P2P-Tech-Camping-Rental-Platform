@@ -13,8 +13,44 @@ const AIChatbot = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [location, setLocation] = useState(null);
+  const locationRef = useRef(null);
+  const [addressString, setAddressString] = useState('');
+  const addressStringRef = useRef('');
   
   const messagesEndRef = useRef(null);
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.detail) {
+        const { lat, lng, addressLabel } = e.detail;
+        const loc = { lat, lng };
+        setLocation(loc);
+        locationRef.current = loc;
+        setAddressString(addressLabel);
+        addressStringRef.current = addressLabel;
+      }
+    };
+    window.addEventListener('location-updated', handler);
+    return () => window.removeEventListener('location-updated', handler);
+  }, []);
+
+  const ensureLocation = async () => {
+    if (locationRef.current) return locationRef.current;
+    if (!navigator.geolocation) return null;
+    try {
+      const pos = await new Promise((resolve, reject) =>
+        navigator.geolocation.getCurrentPosition(resolve, reject,
+          { timeout: 5000, enableHighAccuracy: false })
+      );
+      const loc = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      setLocation(loc);
+      locationRef.current = loc;
+      return loc;
+    } catch {
+      return null;
+    }
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,7 +71,6 @@ const AIChatbot = () => {
     const query = textToSend || inputValue;
     if (!query.trim()) return;
 
-    // Add user message
     setMessages(prev => [...prev, {
       sender: 'user',
       text: query,
@@ -45,8 +80,13 @@ const AIChatbot = () => {
     if (!textToSend) setInputValue('');
     setLoading(true);
 
+    const loc = await ensureLocation();
+
     try {
-      const res = await api.post('/assets/recommend', { query });
+      const body = { query };
+      if (loc) Object.assign(body, loc);
+      if (addressStringRef.current) body.addressString = addressStringRef.current;
+      const res = await api.post('/assets/recommend', body);
       
       if (res.data && res.data.success) {
         const { recommendations, suggestedPlan, assets } = res.data.data;
