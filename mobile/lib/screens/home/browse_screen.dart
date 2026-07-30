@@ -137,6 +137,9 @@ class _BrowseBody extends StatefulWidget {
 class _BrowseBodyState extends State<_BrowseBody> {
   List<Asset> _assets = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  int _page = 1;
+  int _total = 0;
   String _query = '';
   String _category = 'Tất cả';
   bool _sortByDistance = false;
@@ -153,13 +156,46 @@ class _BrowseBodyState extends State<_BrowseBody> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _page = 1;
+    });
     try {
-      _assets = await AssetService.getVerifiedAssets();
+      final result = await AssetService.getVerifiedAssets(page: 1);
+      final list = result['assets'] as List<Asset>;
+      _total = result['total'] as int;
+      if (!mounted) return;
+      setState(() {
+        _assets = list;
+        _loading = false;
+        _page = 1;
+      });
     } catch (e) {
-      if (mounted) UiHelper.showErrorToast(context, e);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        UiHelper.showErrorToast(context, e);
+      }
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_loadingMore || _assets.length >= _total) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final result = await AssetService.getVerifiedAssets(page: nextPage);
+      final list = result['assets'] as List<Asset>;
+      if (!mounted) return;
+      setState(() {
+        _assets.addAll(list);
+        _page = nextPage;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingMore = false);
+        UiHelper.showErrorToast(context, e);
+      }
     }
   }
 
@@ -316,7 +352,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
             const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
           else if (_filtered.isEmpty)
             const SliverFillRemaining(child: Center(child: Text('Không có thiết bị nào.')))
-          else
+          else ...[
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
@@ -336,6 +372,22 @@ class _BrowseBodyState extends State<_BrowseBody> {
                 ),
               ),
             ),
+            if (_assets.length < _total)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _loadingMore ? null : _loadMore,
+                      child: _loadingMore
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Xem thêm'),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

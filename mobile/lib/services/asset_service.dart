@@ -5,14 +5,22 @@ import 'package:velox_mobile/models/review.dart';
 class AssetService {
   static const _timeout = Duration(seconds: 180);
   /// Browse verified assets, optionally sorted by distance to the user.
-  static Future<List<Asset>> getVerifiedAssets(
-      {double? lat, double? lng}) async {
+  static Future<Map<String, dynamic>> getVerifiedAssets({
+    double? lat, double? lng, int page = 1, int limit = 20
+  }) async {
     final query = <String, String>{};
     if (lat != null) query['lat'] = lat.toString();
     if (lng != null) query['lng'] = lng.toString();
+    query['page'] = page.toString();
+    query['limit'] = limit.toString();
     final res = await ApiClient.get('/assets', query: query);
     final list = res['data'] as List? ?? [];
-    return list.map((e) => Asset.fromJson(e)).toList();
+    final assets = list.map((e) => Asset.fromJson(e)).toList();
+    return {
+      'assets': assets,
+      'total': res['total'] ?? assets.length,
+      'page': res['page'] ?? page,
+    };
   }
 
   static Future<Asset> getAssetById(String id) async {
