@@ -59,15 +59,6 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(u.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800)),
-        actions: (currentUserId != null && currentUserId != u.id)
-            ? [
-                IconButton(
-                  icon: const Icon(Icons.chat, color: Color(0xFF0058BE)),
-                  onPressed: () => Navigator.pushNamed(context, '/chat',
-                      arguments: {'peerId': u.id, 'peerName': u.name}),
-                ),
-              ]
-            : null,
       ),
       body: SingleChildScrollView(
         child: Column(

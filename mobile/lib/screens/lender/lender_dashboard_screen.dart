@@ -19,11 +19,12 @@ class LenderDashboardScreen extends StatefulWidget {
 class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
   int _assetCount = 0;
   int _activeRentals = 0;
+  bool _loadingStats = true;
 
   @override
   void initState() {
     super.initState();
-    _loadStats();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadStats());
   }
 
   Future<void> _loadStats() async {
@@ -33,9 +34,14 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
       setState(() {
         _assetCount = assets.length;
         _activeRentals = assets.where((a) => a.status == 'rented').length;
+        _loadingStats = false;
       });
     } catch (_) {
-      if (mounted) UiHelper.showErrorToast(context, 'Không thể tải thống kê');
+      if (!mounted) return;
+      setState(() => _loadingStats = false);
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted && _assetCount == 0) _loadStats();
+      });
     }
   }
 
@@ -109,7 +115,7 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
             ),
             child: Row(
               children: [
-                _statItem(Icons.inventory_2, '$_assetCount', 'Tổng thiết bị'),
+                _statItem(Icons.inventory_2, _loadingStats ? '...' : '$_assetCount', 'Tổng thiết bị'),
                 Container(
                   width: 1,
                   height: 40,
@@ -136,6 +142,7 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
               () => Navigator.pushNamed(context, '/my-orders')),
           const SizedBox(height: 8),
           _menuTile(Icons.account_balance_wallet, 'Kiểm tra số dư', () async {
+            _loadStats();
             UiHelper.showLoading(context);
             try {
               final bal = await AuthService.getBalance();
