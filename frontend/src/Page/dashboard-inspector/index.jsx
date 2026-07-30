@@ -755,8 +755,6 @@ const DashboardInspector = () => {
                       <span className="material-symbols-outlined text-primary text-sm">fact_check</span>
                       Biên bản thẩm định thực tế (Bắt buộc cho Offline)
                     </h5>
-                    
-                    {selectedAsset.category === 'Tech' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
                         <input 
