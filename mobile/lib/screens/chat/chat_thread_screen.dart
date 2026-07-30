@@ -24,9 +24,17 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final args = ModalRoute.of(context)?.settings.arguments as Map?;
-      _peerId = args?['peerId']?.toString() ?? '';
-      _peerName = args?['peerName']?.toString() ?? 'Chat';
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is Map) {
+        _peerId = args['peerId']?.toString() ?? '';
+        _peerName = args['peerName']?.toString() ?? 'Chat';
+      } else if (args is String) {
+        _peerId = args;
+      }
+      if (_peerId.isEmpty) {
+        if (mounted) Navigator.pop(context);
+        return;
+      }
       _load();
     });
   }

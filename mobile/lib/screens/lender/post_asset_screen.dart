@@ -121,9 +121,6 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
       UiHelper.showErrorToast(context, 'Vui lòng chọn ảnh thiết bị');
       return;
     }
-    if (_editId != null && _selectedImages.isEmpty && _existingImages.isEmpty) {
-      // editing but no images - proceed
-    }
     setState(() => _loading = true);
     try {
       final body = <String, dynamic>{
@@ -236,13 +233,15 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
               icon: const Icon(Icons.my_location, size: 16),
               label: const Text('Lấy vị trí hiện tại'),
               onPressed: () async {
-                final perm = await Geolocator.checkPermission();
-                if (perm == LocationPermission.denied) {
-                  final req = await Geolocator.requestPermission();
-                  if (req == LocationPermission.denied) return;
-                }
-                final pos = await Geolocator.getCurrentPosition();
-                setState(() { _lat = pos.latitude; _lng = pos.longitude; _address = ''; });
+                try {
+                  final perm = await Geolocator.checkPermission();
+                  if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+                    final req = await Geolocator.requestPermission();
+                    if (req == LocationPermission.denied || req == LocationPermission.deniedForever) return;
+                  }
+                  final pos = await Geolocator.getCurrentPosition();
+                  setState(() { _lat = pos.latitude; _lng = pos.longitude; _address = ''; });
+                } catch (_) {}
               },
             )),
             const SizedBox(height: 16),

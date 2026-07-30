@@ -96,7 +96,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               try {
                                 await NotificationService.markRead(n.id);
                                 if (!mounted) return;
-                                _load();
+                                await _load();
                                 if (n.link != null && n.link!.isNotEmpty) {
                                   _navigate(n.link!);
                                 }

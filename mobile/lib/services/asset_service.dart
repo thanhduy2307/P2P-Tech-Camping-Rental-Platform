@@ -24,12 +24,16 @@ class AssetService {
 
   static Future<Asset> getAssetById(String id) async {
     final res = await ApiClient.get('/assets/$id');
-    return Asset.fromJson(res['data']);
+    final data = res['data'];
+    if (data == null) throw Exception('Không tìm thấy thiết bị');
+    return Asset.fromJson(data);
   }
 
   static Future<Map<String, dynamic>> getAssetDetail(String id) async {
     final res = await ApiClient.get('/assets/$id');
-    final data = res['data'] as Map<String, dynamic>;
+    final raw = res['data'];
+    if (raw == null) throw Exception('Không tìm thấy thiết bị');
+    final data = raw as Map<String, dynamic>;
     final reviews = (data['reviews'] as List?)
             ?.map((e) => Review.fromJson(e as Map<String, dynamic>))
             .toList() ??

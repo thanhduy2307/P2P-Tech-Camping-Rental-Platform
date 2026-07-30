@@ -239,12 +239,12 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           const SizedBox(height: 8),
           _row(Icons.assignment, 'Trạng thái: ${_statusText(s)}'),
           _row(Icons.date_range, '${_fmt(o.startDate)} → ${_fmt(o.endDate)} (${o.rentalDays} ngày)'),
-          _row(Icons.person, 'Người thuê: ${o.renterName ?? o.renterId.substring(0, 6)}'),
-          _row(Icons.person_outline, 'Chủ: ${o.lenderName ?? o.lenderId.substring(0, 6)}'),
+          _row(Icons.person, 'Người thuê: ${o.renterName ?? (o.renterId.length >= 6 ? o.renterId.substring(0, 6) : o.renterId)}'),
+          _row(Icons.person_outline, 'Chủ: ${o.lenderName ?? (o.lenderId.length >= 6 ? o.lenderId.substring(0, 6) : o.lenderId)}'),
           _row(Icons.monetization_on, 'Tiền thuê: ${UiHelper.formatVnd(o.totalRent)}'),
           _row(Icons.lock, 'Tiền cọc: ${UiHelper.formatVnd(o.deposit)}'),
           if (o.platformFee > 0) _row(Icons.receipt, 'Phí nền tảng: ${UiHelper.formatVnd(o.platformFee)}'),
-          if (o.lateDays != null && o.lateFee! > 0)
+          if (o.lateDays != null && o.lateFee != null && o.lateFee! > 0)
             _row(Icons.warning, 'Trễ $o.lateDays ngày, phí: ${UiHelper.formatVnd(o.lateFee!)}', warn: true),
           if (o.handoverOTP != null && o.handoverOTP!.length == 6)
             _row(Icons.vpn_key, 'OTP bàn giao: ${o.handoverOTP}'),

@@ -84,8 +84,9 @@ class UiHelper {
   }
 
   static String initials(String name) {
-    final parts = name.trim().split(' ');
-    if (parts.isEmpty) return '?';
+    final trimmed = name.trim();
+    if (trimmed.isEmpty) return '?';
+    final parts = trimmed.split(' ');
     if (parts.length == 1) return parts[0][0].toUpperCase();
     return (parts[0][0] + parts.last[0]).toUpperCase();
   }

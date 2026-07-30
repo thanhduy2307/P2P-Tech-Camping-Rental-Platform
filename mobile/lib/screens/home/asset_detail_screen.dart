@@ -200,9 +200,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                       ),
                     ),
                   ],
-                  if (a.lenderId != null)
-                    Text('myId: $myId | lenderId: ${a.lenderId}',
-                        style: const TextStyle(fontSize: 11, color: Color(0xFF808080))),
                 ],
               ),
             ),

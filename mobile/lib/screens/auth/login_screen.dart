@@ -38,12 +38,18 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       final data = await AuthService.startGoogleAuth();
       if (!mounted) return;
-      await launchUrl(Uri.parse(data['authUrl']!), mode: LaunchMode.externalApplication);
+      final authUrl = data['authUrl']?.toString();
+      final sessionId = data['sessionId']?.toString();
+      if (authUrl == null || sessionId == null) {
+        UiHelper.showErrorToast(context, 'Google Auth không khả dụng');
+        return;
+      }
+      await launchUrl(Uri.parse(authUrl), mode: LaunchMode.externalApplication);
       if (!mounted) return;
       final result = await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (_) => _GoogleAuthPollingDialog(sessionId: data['sessionId']!),
+        builder: (_) => _GoogleAuthPollingDialog(sessionId: sessionId),
       );
       if (!mounted) return;
       if (result == 'done') {

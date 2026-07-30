@@ -21,7 +21,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final id = ModalRoute.of(context)?.settings.arguments as String?;
-      if (id != null) _load(id);
+      if (id != null) { _load(id); } else { setState(() => _loading = false); }
     });
   }
 

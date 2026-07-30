@@ -229,7 +229,7 @@ class _InspectorDashboardScreenState extends State<InspectorDashboardScreen>
           return Card(
             child: ExpansionTile(
               leading: const Icon(Icons.gavel, color: Color(0xFFBA1A1A)),
-              title: Text('Đơn #${(d['_id'] as String).substring(0, 8)}...',
+              title: Text('Đơn #${((d['_id']?.toString() ?? '').length >= 8 ? d['_id'].toString().substring(0, 8) : d['_id']?.toString() ?? '?')}...',
                   style: const TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

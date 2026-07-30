@@ -72,7 +72,7 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
                   label: const Text('Thêm ảnh'),
                   onPressed: () async {
                     final picked = await picker.pickMultiImage();
-                    if (picked.isNotEmpty) setDState(() => selected = picked);
+                    if (picked.isNotEmpty) setDState(() => selected = [...selected, ...picked]);
                   },
                 ),
               ],
