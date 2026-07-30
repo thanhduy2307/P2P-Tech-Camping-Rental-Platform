@@ -115,7 +115,9 @@ class MainScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final role = Provider.of<AuthProvider>(context).role ?? 'renter';
+    final auth = Provider.of<AuthProvider>(context);
+    final role = auth.role ?? 'renter';
+    final lenderStatus = auth.user?.lenderStatus ?? 'none';
     final showBottom = showBottomNav && role == 'renter';
     final appBar = showTopBar
         ? PreferredSize(
@@ -145,7 +147,7 @@ class MainScaffold extends StatelessWidget {
                           color: role == 'renter' ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(999),
                         ),
-                        child: Text('$role${role == 'renter' && auth.user?.lenderStatus == 'approved' ? '+lender' : ''}', style: TextStyle(
+                        child: Text('$role${lenderStatus == 'approved' ? '+L' : ''}', style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
                           color: role == 'renter' ? const Color(0xFF006C49) : const Color(0xFF7C3AED),
