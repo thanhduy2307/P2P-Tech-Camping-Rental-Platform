@@ -17,6 +17,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   Asset? _asset;
   List<Review> _reviews = [];
   bool _loading = true;
+  int _imageIndex = 0;
 
   @override
   void initState() {
@@ -79,18 +80,38 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (a.images.isNotEmpty)
-      SizedBox(
-        height: 260,
-        child: PageView(
-          children: a.images
-              .map((u) => AssetImageWidget(
-                    image: u,
-                    fit: BoxFit.cover,
-                    placehold: const Center(child: CircularProgressIndicator()),
-                    errWidget: const Icon(Icons.image, size: 60),
-                  ))
-              .toList(),
-        ),
+      Column(
+        children: [
+          SizedBox(
+            height: 260,
+            child: PageView(
+              onPageChanged: (i) => setState(() => _imageIndex = i),
+              children: a.images
+                  .map((u) => AssetImageWidget(
+                        image: u,
+                        fit: BoxFit.cover,
+                        placehold: const Center(child: CircularProgressIndicator()),
+                        errWidget: const Icon(Icons.image, size: 60),
+                      ))
+                  .toList(),
+            ),
+          ),
+          if (a.images.length > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(a.images.length, (i) => Container(
+                  width: 8, height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i == _imageIndex ? const Color(0xFF006C49) : const Color(0xFFBBCABF),
+                  ),
+                )),
+              ),
+            ),
+        ],
       ),
             Padding(
               padding: const EdgeInsets.all(16),

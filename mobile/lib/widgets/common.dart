@@ -91,6 +91,24 @@ class UiHelper {
     return (parts[0][0] + parts.last[0]).toUpperCase();
   }
 
+  static String timeAgo(String iso) {
+    try {
+      final dt = DateTime.parse(iso);
+      final diff = DateTime.now().difference(dt);
+      if (diff.inMinutes < 1) return 'Vừa xong';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}p';
+      if (diff.inHours < 24) return '${diff.inHours}h';
+      if (diff.inDays < 7) return '${diff.inDays}d';
+      return '${dt.day}/${dt.month}';
+    } catch (_) { return ''; }
+  }
+
+  static Color nameColor(String name) {
+    final hash = name.hashCode;
+    const colors = [Color(0xFF10B981), Color(0xFF0058BE), Color(0xFF7C3AED), Color(0xFFE11D48), Color(0xFFF59E0B)];
+    return colors[hash.abs() % colors.length];
+  }
+
   static Future<List<String>> imagesToBase64(List<XFile> images) async {
     final results = <String>[];
     for (final img in images) {
@@ -165,6 +183,40 @@ class AssetImageWidget extends StatelessWidget {
     return Container(
       color: Colors.grey[200],
       child: const Icon(Icons.image, color: Colors.grey, size: 40),
+    );
+  }
+}
+
+class ShimmerLoading extends StatefulWidget {
+  final double? width;
+  final double? height;
+  final double borderRadius;
+  const ShimmerLoading({super.key, this.width, this.height, this.borderRadius = 12});
+  @override
+  State<ShimmerLoading> createState() => _ShimmerLoadingState();
+}
+
+class _ShimmerLoadingState extends State<ShimmerLoading> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  @override
+  void initState() { super.initState(); _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1500))..repeat(); }
+  @override
+  void dispose() { _controller.dispose(); super.dispose(); }
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) => Container(
+        width: widget.width,
+        height: widget.height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(widget.borderRadius),
+          gradient: LinearGradient(
+            colors: [Colors.grey[200]!, Colors.grey[100]!, Colors.grey[200]!],
+            stops: [0.0, _controller.value, 1.0],
+          ),
+        ),
+      ),
     );
   }
 }

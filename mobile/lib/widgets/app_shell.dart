@@ -12,18 +12,26 @@ class _NavItem {
   const _NavItem(this.icon, this.label, this.route);
 }
 
-const List<_NavItem> _navItems = [
+const List<_NavItem> _renterNav = [
   _NavItem(Icons.explore_outlined, 'Khám phá', '/browse'),
   _NavItem(Icons.calendar_today_outlined, 'Thuê đồ', '/my-orders'),
   _NavItem(Icons.chat_bubble_outline, 'Tin nhắn', '/conversations'),
   _NavItem(Icons.person_outline, 'Cá nhân', '/profile'),
 ];
 
+const List<_NavItem> _lenderNav = [
+  _NavItem(Icons.dashboard_outlined, 'Dashboard', '/lender/dashboard'),
+  _NavItem(Icons.inventory_2_outlined, 'Kho', '/lender/inventory'),
+  _NavItem(Icons.chat_bubble_outline, 'Tin nhắn', '/conversations'),
+  _NavItem(Icons.person_outline, 'Cá nhân', '/profile'),
+];
+
 class VeloxBottomNav extends StatelessWidget {
   final int currentIndex;
+  final List<_NavItem> items;
   final void Function(int)? onTap;
 
-  const VeloxBottomNav({super.key, required this.currentIndex, this.onTap});
+  const VeloxBottomNav({super.key, required this.currentIndex, required this.items, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -38,8 +46,8 @@ class VeloxBottomNav extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (i) {
-              final item = _navItems[i];
+            children: List.generate(items.length, (i) {
+              final item = items[i];
               final active = i == currentIndex;
               return Expanded(
                 child: InkWell(
@@ -108,10 +116,14 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
+  List<_NavItem> _navForRole(String role) {
+    return role == 'lender' ? _lenderNav : _renterNav;
+  }
+
   void _onNavTap(int index) {
+    final nav = _navForRole(Provider.of<AuthProvider>(context, listen: false).role ?? 'renter');
     if (index == widget.currentIndex) return;
-    final route = _navItems[index].route;
-    Navigator.pushReplacementNamed(context, route);
+    Navigator.pushReplacementNamed(context, nav[index].route);
   }
 
   @override
@@ -119,7 +131,8 @@ class _MainScaffoldState extends State<MainScaffold> {
     final auth = Provider.of<AuthProvider>(context);
     final role = auth.role ?? 'renter';
     final lenderStatus = auth.user?.lenderStatus ?? 'none';
-    final showBottom = widget.showBottomNav && role == 'renter';
+    final showBottom = widget.showBottomNav && (role == 'renter' || role == 'lender');
+    final navItems = _navForRole(role);
     final appBar = widget.showTopBar
         ? PreferredSize(
             preferredSize: const Size.fromHeight(64),
@@ -192,7 +205,7 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: widget.body,
       floatingActionButton: widget.floatingActionButton,
       bottomNavigationBar: showBottom
-          ? VeloxBottomNav(currentIndex: widget.currentIndex, onTap: (i) => _onNavTap(i))
+          ? VeloxBottomNav(currentIndex: widget.currentIndex, items: navItems, onTap: (i) => _onNavTap(i))
           : null,
     );
   }

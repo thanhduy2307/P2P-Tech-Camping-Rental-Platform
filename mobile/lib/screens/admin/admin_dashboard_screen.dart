@@ -208,37 +208,41 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Future<void> _verifyWithdrawal(String id, String status) async {
+    if (id.isEmpty) {
+      if (mounted) UiHelper.showErrorToast(context, 'ID giao dịch không hợp lệ');
+      return;
+    }
     if (status == 'rejected') {
       final reasonCtl = TextEditingController();
-      final reason = await showDialog<String>(
-        context: context,
-        barrierDismissible: false,
-        builder: (ctx) => AlertDialog(
-          title: const Text('Từ chối rút tiền'),
-          content: SizedBox(
-            height: 120,
-            child: TextField(
-              controller: reasonCtl,
-              decoration: const InputDecoration(
-                labelText: 'Lý do từ chối',
-                hintText: 'Nhập lý do...',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 3,
-              autofocus: true,
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
-              child: const Text('Xác nhận'),
-            ),
-          ],
-        ),
-      );
-      if (reason == null || reason.isEmpty) return;
       try {
+        final reason = await showDialog<String>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Từ chối rút tiền'),
+            content: SizedBox(
+              height: 120,
+              child: TextField(
+                controller: reasonCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Lý do từ chối',
+                  hintText: 'Nhập lý do...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                autofocus: true,
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
+                child: const Text('Xác nhận'),
+              ),
+            ],
+          ),
+        );
+        if (reason == null || reason.isEmpty) return;
         await AdminService.verifyWithdrawal(id, status, rejectReason: reason);
         if (mounted) EquipDialog.success(context, 'Đã từ chối.');
         _loadWithdrawals();
@@ -731,12 +735,12 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                       TextButton.icon(
                         icon: const Icon(Icons.check_circle, size: 18, color: Color(0xFF006C49)),
                         label: const Text('Duyệt', style: TextStyle(color: Color(0xFF006C49), fontSize: 12)),
-                        onPressed: () => _verifyWithdrawal(w['_id'], 'approved'),
+                        onPressed: () => _verifyWithdrawal(w['_id']?.toString() ?? '', 'approved'),
                       ),
                       TextButton.icon(
                         icon: const Icon(Icons.cancel, size: 18, color: Color(0xFFBA1A1A)),
                         label: const Text('Từ chối', style: TextStyle(color: Color(0xFFBA1A1A), fontSize: 12)),
-                        onPressed: () => _verifyWithdrawal(w['_id'], 'rejected'),
+                        onPressed: () => _verifyWithdrawal(w['_id']?.toString() ?? '', 'rejected'),
                       ),
                     ],
                   )
