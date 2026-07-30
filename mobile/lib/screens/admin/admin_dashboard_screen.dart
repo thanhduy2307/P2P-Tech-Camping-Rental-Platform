@@ -208,17 +208,51 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Future<void> _verifyWithdrawal(String id, String status) async {
+    if (status == 'rejected') {
+      final reasonCtl = TextEditingController();
+      final reason = await showDialog<String>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Từ chối rút tiền'),
+          content: TextField(
+            controller: reasonCtl,
+            decoration: const InputDecoration(
+              labelText: 'Lý do từ chối',
+              hintText: 'Nhập lý do...',
+            ),
+            maxLines: 3,
+            autofocus: true,
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
+              child: const Text('Xác nhận'),
+            ),
+          ],
+        ),
+      );
+      if (reason == null || reason.isEmpty) return;
+      try {
+        await AdminService.verifyWithdrawal(id, status, rejectReason: reason);
+        if (mounted) EquipDialog.success(context, 'Đã từ chối.');
+        _loadWithdrawals();
+      } catch (e) {
+        if (mounted) UiHelper.showErrorToast(context, e);
+      }
+      return;
+    }
     final confirmed = await EquipDialog.confirm(
       context,
       'Xác nhận',
-      status == 'approved' ? 'Duyệt yêu cầu rút tiền này?' : 'Từ chối yêu cầu rút tiền này?',
+      'Duyệt yêu cầu rút tiền này?',
       confirmText: 'Xác nhận',
       cancelText: 'Hủy',
     );
     if (confirmed != true) return;
     try {
       await AdminService.verifyWithdrawal(id, status);
-      if (mounted) EquipDialog.success(context, status == 'approved' ? 'Đã duyệt rút tiền.' : 'Đã từ chối.');
+      if (mounted) EquipDialog.success(context, 'Đã duyệt rút tiền.');
       _loadWithdrawals();
     } catch (e) {
       if (mounted) UiHelper.showErrorToast(context, e);
