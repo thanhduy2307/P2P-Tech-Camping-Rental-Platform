@@ -138,22 +138,28 @@ class AssetImageWidget extends StatelessWidget {
     if (image.startsWith('data:')) {
       try {
         final parts = image.split(',');
-        if (parts.length == 2) {
-          final bytes = base64Decode(parts[1]);
-          return Image.memory(bytes, width: width, height: height, fit: fit,
-            errorBuilder: (_, __, ___) => _fallback(),
-          );
+        if (parts.length >= 2) {
+          final raw = parts.sublist(1).join(',');
+          final bytes = base64Decode(raw);
+          return Image.memory(bytes, width: width, height: height, fit: fit);
         }
+      } catch (_) {
+        return _fallback();
+      }
+    }
+    if (image.startsWith('http://') || image.startsWith('https://')) {
+      try {
+        return CachedNetworkImage(
+          imageUrl: image,
+          width: width,
+          height: height,
+          fit: fit,
+          placeholder: (_, __) => placehold ?? Container(color: Colors.grey[200]),
+          errorWidget: (_, __, ___) => errWidget ?? _fallback(),
+        );
       } catch (_) {}
     }
-    return CachedNetworkImage(
-      imageUrl: image,
-      width: width,
-      height: height,
-      fit: fit,
-      placeholder: (_, __) => placehold ?? Container(color: Colors.grey[200]),
-      errorWidget: (_, __, ___) => errWidget ?? _fallback(),
-    );
+    return _fallback();
   }
 
   Widget _fallback() {

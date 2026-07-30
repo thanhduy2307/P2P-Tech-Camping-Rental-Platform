@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:velox_mobile/core/storage.dart';
@@ -230,10 +229,10 @@ class _ReviewTile extends StatelessWidget {
             CircleAvatar(
               radius: 18,
               backgroundColor: const Color(0xFF10B981),
-              backgroundImage: review.renterAvatar != null
-                  ? CachedNetworkImageProvider(review.renterAvatar!)
+              backgroundImage: review.renterAvatar != null && !review.renterAvatar!.startsWith('data:')
+                  ? NetworkImage(review.renterAvatar!)
                   : null,
-              child: review.renterAvatar == null
+              child: review.renterAvatar == null || (review.renterAvatar!.startsWith('data:'))
                   ? const Icon(Icons.person, size: 18, color: Color(0xFF005236))
                   : null,
             ),
