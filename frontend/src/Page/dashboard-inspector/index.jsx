@@ -33,15 +33,10 @@ const DashboardInspector = () => {
   const [modalImageIndex, setModalImageIndex] = useState(0);
 
   // Checklist States for In-person Inspections
-  const [techChecklist, setTechChecklist] = useState({
-    shutterCountTest: '',
-    deadPixelSensorCheck: false,
-    lensMoldCheck: false
-  });
-  const [campingChecklist, setCampingChecklist] = useState({
-    zipperWearCheck: false,
-    frameElasticityCheck: false,
-    tentHolesCheck: false
+  const [generalChecklist, setGeneralChecklist] = useState({
+    appearanceCheck: false,
+    functionCheck: false,
+    accessoriesCheck: false
   });
 
   // Fetch pending inspection tasks
@@ -136,15 +131,10 @@ const DashboardInspector = () => {
     setStatus('verified');
     setVerificationNotes('');
     setModalImageIndex(0);
-    setTechChecklist({
-      shutterCountTest: '',
-      deadPixelSensorCheck: false,
-      lensMoldCheck: false
-    });
-    setCampingChecklist({
-      zipperWearCheck: false,
-      frameElasticityCheck: false,
-      tentHolesCheck: false
+    setGeneralChecklist({
+      appearanceCheck: false,
+      functionCheck: false,
+      accessoriesCheck: false
     });
     setIsModalOpen(true);
   };
@@ -166,23 +156,16 @@ const DashboardInspector = () => {
 
     const isOffline = selectedAsset.taskDetails && !selectedAsset.taskDetails.isRemote;
     if (status === 'verified' && isOffline) {
-      if (selectedAsset.category === 'Tech') {
-        if (techChecklist.shutterCountTest === '') {
-          Swal.fire('Vui lòng nhập số shot đã test của thiết bị.');
-          return;
-        }
-        payload.inspectionChecklist = {
-          shutterCountTest: parseInt(techChecklist.shutterCountTest),
-          deadPixelSensorCheck: techChecklist.deadPixelSensorCheck,
-          lensMoldCheck: techChecklist.lensMoldCheck
-        };
-      } else if (selectedAsset.category === 'Camping') {
-        payload.inspectionChecklist = {
-          zipperWearCheck: campingChecklist.zipperWearCheck,
-          frameElasticityCheck: campingChecklist.frameElasticityCheck,
-          tentHolesCheck: campingChecklist.tentHolesCheck
-        };
+      if (!generalChecklist.functionCheck || !generalChecklist.appearanceCheck) {
+        Swal.fire('Vui lòng đảm bảo thiết bị hoạt động bình thường và đúng như mô tả.');
+        return;
       }
+      
+      payload.inspectionChecklist = {
+        appearanceCheck: generalChecklist.appearanceCheck,
+        functionCheck: generalChecklist.functionCheck,
+        accessoriesCheck: generalChecklist.accessoriesCheck,
+      };
     }
 
     setSubmitLoading(true);
@@ -774,73 +757,37 @@ const DashboardInspector = () => {
                     </h5>
                     
                     {selectedAsset.category === 'Tech' ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-semibold text-slate-700">Test số shot (máy ảnh) *</label>
-                          <input 
-                            type="number"
-                            placeholder="Nhập số shot đếm được (e.g. 12500)"
-                            className="bg-white border border-slate-250 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-primary w-full md:w-1/2"
-                            value={techChecklist.shutterCountTest}
-                            onChange={(e) => setTechChecklist(prev => ({ ...prev, shutterCountTest: e.target.value }))}
-                          />
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.appearanceCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, appearanceCheck: e.target.checked }))}
+                        />
+                        <span>Ngoại hình đúng như mô tả và hình ảnh</span>
+                      </label>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                            <input 
-                              type="checkbox"
-                              className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.deadPixelSensorCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, deadPixelSensorCheck: e.target.checked }))}
-                            />
-                            <span>Sensor hoạt động tốt, không chết pixel</span>
-                          </label>
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.functionCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, functionCheck: e.target.checked }))}
+                        />
+                        <span>Hoạt động bình thường, không lỗi chức năng</span>
+                      </label>
 
-                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                            <input 
-                              type="checkbox"
-                              className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.lensMoldCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, lensMoldCheck: e.target.checked }))}
-                            />
-                            <span>Kính lens sạch, không mốc rễ tre</span>
-                          </label>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.zipperWearCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, zipperWearCheck: e.target.checked }))}
-                          />
-                          <span>Khóa kéo tốt, trơn tru không rách mòn</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.frameElasticityCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, frameElasticityCheck: e.target.checked }))}
-                          />
-                          <span>Khung lều đàn hồi tốt, không cong gãy</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.tentHolesCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, tentHolesCheck: e.target.checked }))}
-                          />
-                          <span>Màng chống muỗi kín, không lỗ thủng</span>
-                        </label>
-                      </div>
-                    )}
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 md:col-span-2">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.accessoriesCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, accessoriesCheck: e.target.checked }))}
+                        />
+                        <span>Phụ kiện đi kèm đầy đủ như mô tả</span>
+                      </label>
+                    </div>
                   </div>
                 )}
 
