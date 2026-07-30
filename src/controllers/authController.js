@@ -50,13 +50,14 @@ exports.googlePollSession = async (req, res) => {
     }
     if (session.status === 'completed') {
       mobileAuthSessions.delete(req.params.sessionId);
-      return res.status(200).json({ success: true, data: session.result });
+      const userData = session.result && session.result.data ? session.result.data : {};
+      return res.status(200).json({ success: true, data: { status: 'done', ...userData } });
     }
     if (session.status === 'error') {
       mobileAuthSessions.delete(req.params.sessionId);
       return res.status(400).json({ success: false, message: session.message || 'Google auth failed' });
     }
-    res.status(200).json({ success: true, status: 'pending' });
+    res.status(200).json({ success: true, data: { status: 'pending' } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

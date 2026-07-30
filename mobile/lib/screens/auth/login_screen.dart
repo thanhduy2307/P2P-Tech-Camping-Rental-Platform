@@ -208,21 +208,16 @@ class _GoogleAuthPollingDialogState extends State<_GoogleAuthPollingDialog> {
 
   Future<void> _poll() async {
     try {
-      final result = await AuthService.pollGoogleSession(widget.sessionId);
+      final data = await AuthService.pollGoogleSession(widget.sessionId);
       if (!mounted) return;
-      if (result == null) {
-        _timer?.cancel();
-        Navigator.pop(context, 'Phiên đăng nhập đã hết hạn');
-        return;
-      }
-      final status = result['status'] as String;
+      if (data == null) return;
+      _timer?.cancel();
+      final status = data['status'] as String?;
       if (status == 'done') {
-        _timer?.cancel();
-        await AuthService.persistSession(result);
+        await AuthService.persistSession(data);
         if (mounted) Navigator.pop(context, 'done');
-      } else if (status == 'error') {
-        _timer?.cancel();
-        Navigator.pop(context, result['error'] as String? ?? 'Đăng nhập thất bại');
+      } else {
+        Navigator.pop(context, data['message'] as String? ?? 'Đăng nhập thất bại');
       }
     } catch (_) {}
   }

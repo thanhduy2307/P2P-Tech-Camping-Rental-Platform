@@ -147,16 +147,22 @@ class AuthService {
   /// Start mobile Google OAuth flow: returns sessionId + authUrl to open in browser.
   static Future<Map<String, String>> startGoogleAuth() async {
     final res = await ApiClient.post('/auth/google/start-mobile', null);
+    final d = res['data'] as Map<String, dynamic>? ?? {};
     return {
-      'sessionId': res['data']['sessionId'] as String,
-      'authUrl': res['data']['authUrl'] as String,
+      'sessionId': (d['sessionId'] as String? ?? ''),
+      'authUrl': (d['authUrl'] as String? ?? ''),
     };
   }
 
   /// Poll for Google OAuth session result.
   static Future<Map<String, dynamic>?> pollGoogleSession(String sessionId) async {
-    final res = await ApiClient.get('/auth/google/session/$sessionId');
-    return res['data'] as Map<String, dynamic>?;
+    try {
+      final res = await ApiClient.get('/auth/google/session/$sessionId');
+      final data = res['data'] as Map<String, dynamic>?;
+      if (data == null) return null;
+      if (data['status'] as String? == 'pending') return null;
+      return data;
+    } catch (_) { return null; }
   }
 
   /// Persist token + user after a successful auth response.
