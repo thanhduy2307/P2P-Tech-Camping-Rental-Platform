@@ -139,6 +139,19 @@ class MainScaffold extends StatelessWidget {
                         ),
                       const BrandLogo(size: 26),
                       const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: role == 'renter' ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text('$role${role == 'renter' && auth.user?.lenderStatus == 'approved' ? '+lender' : ''}', style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: role == 'renter' ? const Color(0xFF006C49) : const Color(0xFF7C3AED),
+                        )),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.receipt_long_outlined),
                         color: AppTheme.onSurface,
