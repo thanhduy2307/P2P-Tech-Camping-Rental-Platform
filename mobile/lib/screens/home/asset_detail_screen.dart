@@ -105,7 +105,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
     final a = _asset!;
-    final currentUser = context.read<AuthProvider>().user;
+    final authProv = context.read<AuthProvider>();
+    final currentUser = authProv.user;
+    final role = authProv.role;
     final isOwner = a.lenderId != null && currentUser?.id == a.lenderId;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),
@@ -177,6 +179,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans')),
                   const SizedBox(height: 4),
                   Text(a.description, style: const TextStyle(color: Color(0xFF3C4A42))),
+                  Text('lenderId: ${a.lenderId ?? 'null'}  |  userId: ${currentUser?.id ?? 'null'}  |  role: $role',
+                      style: const TextStyle(fontSize: 10, color: Color(0xFF808080))),
                   const SizedBox(height: 16),
                   if (a.lenderName != null)
                     Card(
