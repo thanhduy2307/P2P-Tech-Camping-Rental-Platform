@@ -12,7 +12,7 @@ const {
   requestExtension,
   approveExtension,
   submitRating,
-  getContract,
+
   getMyRentals,
   getIncomingOrders,
   getPaymentUrl,
@@ -49,7 +49,7 @@ router.put('/:id/cancel', protect, authorize('renter', 'lender'), cancelOrder);
 router.post('/:id/extend', protect, authorize('renter'), requestExtension);
 router.put('/:id/extend/approve', protect, authorize('lender'), approveExtension);
 router.post('/:id/rate', protect, authorize('renter', 'lender'), submitRating);
-router.get('/:id/contract', protect, authorize('renter', 'lender'), getContract);
+
 router.get('/:id/pay', protect, authorize('renter'), getPaymentUrl);
 
 module.exports = router;

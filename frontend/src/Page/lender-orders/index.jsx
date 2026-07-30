@@ -507,7 +507,7 @@ const LenderOrders = () => {
                   <th className="px-6 py-3">Thời gian thuê</th>
                   <th className="px-6 py-3">Doanh thu thu về</th>
                   <th className="px-6 py-3">Trạng thái cuối</th>
-                  <th className="px-6 py-3">Báo cáo hợp đồng</th>
+                  <th className="px-6 py-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -544,19 +544,7 @@ const LenderOrders = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1.5 items-start">
-                        {order.asset?.depositAmount >= 2000000 ? (
-                          <a 
-                            href={`http://localhost:5000/api/orders/${order._id}/contract?token=${localStorage.getItem('token')}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-teal-600 hover:text-teal-700 hover:underline text-xs font-bold flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-sm">description</span>
-                            Hợp đồng điện tử
-                          </a>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Không yêu cầu</span>
-                        )}
+
                         {order.renter && (
                           <button
                             onClick={() => {
@@ -651,7 +639,7 @@ const LenderOrders = () => {
                           <span className="material-symbols-outlined text-sm">warning</span>
                           Cảnh báo trả đồ trễ hạn
                         </p>
-                        <p>Renter đã trả đồ muộn <strong>{lateDays} ngày</strong> so với hợp đồng.</p>
+                        <p>Renter đã trả đồ muộn <strong>{lateDays} ngày</strong> so với thời hạn.</p>
                         {selectedOrder.depositMethod === 'online' ? (
                           <p>Hệ thống sẽ tự động trừ <strong>{lateFee.toLocaleString('vi-VN')} đ</strong> phí phạt từ cọc của Renter và cộng vào ví của bạn.</p>
                         ) : (
