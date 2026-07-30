@@ -105,8 +105,8 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
     final a = _asset!;
-    final isOwner = a.lenderId != null &&
-        context.read<AuthProvider>().user?.id == a.lenderId;
+    final currentUser = context.read<AuthProvider>().user;
+    final isOwner = a.lenderId != null && currentUser?.id == a.lenderId;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),
       body: SingleChildScrollView(
@@ -219,16 +219,20 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                   ],
                   if (isOwner) ...[
                     const SizedBox(height: 16),
-                    Container(
+                    const Divider(),
+                    SizedBox(
                       width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFF1F4F2),
-                        borderRadius: BorderRadius.circular(12),
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, '/lender/post-asset', arguments: a.id),
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Chỉnh sửa thiết bị'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: const Color(0xFF005236),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
                       ),
-                      child: const Text('Đây là thiết bị của bạn',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Color(0xFF3C4A42), fontWeight: FontWeight.w500)),
                     ),
                   ] else ...[
                     const Divider(),
