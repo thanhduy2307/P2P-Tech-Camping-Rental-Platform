@@ -45,6 +45,10 @@ const userSchema = new mongoose.Schema({
     type: Number,
     default: 0 // Used to track funds for Lender payouts
   },
+  debtAmount: {
+    type: Number,
+    default: 0 // Used to track debt owed to platform/lenders
+  },
   phoneNumber: {
     type: String,
     default: '',

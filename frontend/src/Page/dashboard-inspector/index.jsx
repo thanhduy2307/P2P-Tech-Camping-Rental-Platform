@@ -21,6 +21,7 @@ const DashboardInspector = () => {
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const [lenderCompensation, setLenderCompensation] = useState('');
   const [renterRefund, setRenterRefund] = useState('');
+  const [renterDebt, setRenterDebt] = useState('');
   const [resolveLoading, setResolveLoading] = useState(false);
   
   // Modal & Form States
@@ -92,6 +93,7 @@ const DashboardInspector = () => {
     setSelectedDispute(order);
     setLenderCompensation('');
     setRenterRefund('');
+    setRenterDebt('');
     setIsDisputeModalOpen(true);
   };
 
@@ -110,7 +112,8 @@ const DashboardInspector = () => {
       const payload = {
         action: actionStr,
         lenderCompensation: lenderCompensation ? Number(lenderCompensation) : 0,
-        renterRefund: renterRefund ? Number(renterRefund) : 0
+        renterRefund: renterRefund ? Number(renterRefund) : 0,
+        renterDebt: renterDebt ? Number(renterDebt) : 0
       };
       const response = await api.put(`/orders/${selectedDispute._id}/resolve-dispute`, payload);
       if (response.data && response.data.success) {
@@ -126,20 +129,6 @@ const DashboardInspector = () => {
     }
   };
 
-  const handleRequestRenterConfirmation = async (orderId, amount) => {
-    try {
-      const payload = { approvedDeductionAmount: amount };
-      const response = await api.put(`/orders/${orderId}/dispute-request-confirmation`, payload);
-      if (response.data?.success) {
-        Swal.fire('Thành công', 'Đã gửi yêu cầu xác nhận đền bù cho Renter.', 'success');
-        setIsDisputeModalOpen(false);
-        fetchDisputes();
-      }
-    } catch (err) {
-      console.error(err);
-      Swal.fire(err.response?.data?.message || 'Không thể gửi yêu cầu xác nhận đền bù.');
-    }
-  };
 
   // Open modal
   const handleOpenReview = (asset) => {
@@ -1034,9 +1023,9 @@ const DashboardInspector = () => {
                     - Nhập số tiền bồi thường để Cưỡng chế trừ cọc Renter.<br/>
                     - Hoặc Bác bỏ nếu yêu cầu vô lý.
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền bồi thường cho Lender (đ)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền bồi thường (cho Lender)</label>
                       <input 
                         type="number" 
                         min="0"
@@ -1047,7 +1036,7 @@ const DashboardInspector = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền hoàn trả cho Renter (đ)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền hoàn trả (cho Renter)</label>
                       <input 
                         type="number" 
                         min="0"
@@ -1057,22 +1046,25 @@ const DashboardInspector = () => {
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
                       />
                     </div>
+                    {selectedDispute.depositMethod === 'online' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Renter nợ thêm (Nếu thiếu)</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={renterDebt}
+                          onChange={(e) => setRenterDebt(e.target.value)}
+                          placeholder="VD: 100000"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500 italic">
                     * Tổng số tiền bồi thường và hoàn trả phải được phân bổ hợp lý dựa trên tổng giá trị cọc và thuê của đơn hàng.
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 flex-wrap">
-                    {selectedDispute.requestedDeductionAmount > 0 && selectedDispute.disputeStatus !== 'inspector_reviewed' && (
-                      <button 
-                        type="button" 
-                        onClick={() => handleRequestRenterConfirmation(selectedDispute._id, selectedDispute.requestedDeductionAmount)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all shadow flex items-center gap-1.5"
-                      >
-                        <span className="material-symbols-outlined text-sm">forward_to_inbox</span>
-                        Gửi Renter xác nhận đền bù ({selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ)
-                      </button>
-                    )}
                     <button 
                       type="button" 
                       onClick={() => setIsDisputeModalOpen(false)}
