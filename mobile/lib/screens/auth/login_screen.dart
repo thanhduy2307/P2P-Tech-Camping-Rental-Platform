@@ -27,7 +27,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await auth.login(_emailController.text.trim(), _passwordController.text);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
     } catch (e) {
       UiHelper.showErrorToast(context, e);
     }
@@ -49,7 +49,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (result == 'done') {
         await auth.refresh();
         if (!mounted) return;
-        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
       } else if (result != null) {
         UiHelper.showErrorToast(context, result);
       }

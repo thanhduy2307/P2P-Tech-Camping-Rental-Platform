@@ -49,7 +49,9 @@ class AppRoutes {
   static const notifications = '/notifications';
   static const socialFeed = '/social-feed';
 
-  static String homeForRole(String? role) {
+  static String homeForRole(String? role, {String? lenderStatus}) {
+    // If user is approved lender, always show lender dashboard even if current role is renter
+    if (lenderStatus == 'approved') return lenderDashboard;
     switch (role) {
       case 'lender':
         return lenderDashboard;
