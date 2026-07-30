@@ -21,6 +21,9 @@ const LenderOrders = () => {
   const [imgPreview2, setImgPreview2] = useState('');
   const [imgPreview3, setImgPreview3] = useState('');
   
+  const [repairInvoiceFile, setRepairInvoiceFile] = useState(null);
+  const [repairInvoicePreview, setRepairInvoicePreview] = useState('');
+  
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -113,6 +116,7 @@ const LenderOrders = () => {
     setImgFile1(null); setImgPreview1('');
     setImgFile2(null); setImgPreview2('');
     setImgFile3(null); setImgPreview3('');
+    setRepairInvoiceFile(null); setRepairInvoicePreview('');
     setActionError('');
     setActualCashDepositReturned(order.deposit || '');
     setCashDepositDeductionReason('');
@@ -145,6 +149,10 @@ const LenderOrders = () => {
         setActionError('Vui lòng nhập lý do hỏng hóc và khiếu nại.');
         return;
       }
+      if (!repairInvoiceFile) {
+        setActionError('Vui lòng tải lên ảnh báo giá hoặc hóa đơn chi phí sửa chữa thiết bị.');
+        return;
+      }
       if (selectedOrder.depositMethod === 'cash' && !cashDepositHandoverConfirmed) {
         setActionError('Vui lòng đánh dấu xác nhận cam kết giữ đúng tiền đền bù của cọc mặt.');
         return;
@@ -163,10 +171,11 @@ const LenderOrders = () => {
     setActionLoading(true);
     try {
       // Convert files to base64
-      const [b64_1, b64_2, b64_3] = await Promise.all([
+      const [b64_1, b64_2, b64_3, b64_repair] = await Promise.all([
         fileToBase64(imgFile1),
         fileToBase64(imgFile2),
         fileToBase64(imgFile3),
+        fileToBase64(repairInvoiceFile),
       ]);
       const images = [b64_1, b64_2, b64_3];
 
@@ -182,6 +191,9 @@ const LenderOrders = () => {
           payload.disputeNotes = cashDepositDeductionReason;
           payload.requestedDeductionAmount = Number(actualCashDepositReturned);
           payload.disputeType = 'damage_issue';
+          if (b64_repair) {
+            payload.repairQuotationImages = [b64_repair];
+          }
         } else {
           url = `/orders/${selectedOrder._id}/return`;
           payload.returnImages = images;
@@ -698,6 +710,35 @@ const LenderOrders = () => {
                       value={cashDepositDeductionReason}
                       onChange={(e) => setCashDepositDeductionReason(e.target.value)}
                     />
+                  </div>
+                  <div className="space-y-1 mt-2">
+                    <label className="font-semibold text-slate-700 block mb-1">Ảnh báo giá / Hóa đơn sửa chữa:</label>
+                    <div className="border border-dashed border-red-300 rounded-lg p-2 flex items-center gap-3 bg-white hover:border-red-400 transition-colors">
+                      {repairInvoicePreview ? (
+                        <img src={repairInvoicePreview} alt="preview" className="w-14 h-14 object-cover rounded-md border border-slate-200 flex-shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-slate-300 text-2xl">receipt_long</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor="repair-invoice-upload"
+                          className="cursor-pointer inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-sm">upload</span>
+                          {repairInvoiceFile ? 'Đổi ảnh hóa đơn' : 'Tải lên hóa đơn'}
+                        </label>
+                        {repairInvoiceFile && <span className="block text-[9px] text-slate-400 mt-1 truncate">{repairInvoiceFile.name}</span>}
+                        <input
+                          id="repair-invoice-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, setRepairInvoiceFile, setRepairInvoicePreview)}
+                        />
+                      </div>
+                    </div>
                   </div>
                   {selectedOrder.depositMethod === 'cash' && (
                     <label className="flex items-start gap-2 cursor-pointer mt-2 pt-2 border-t border-red-200/50">
