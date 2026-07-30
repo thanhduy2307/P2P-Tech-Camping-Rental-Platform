@@ -511,7 +511,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               DropdownButton<String>(
-                                value: u.role,
+                                value: u.role ?? 'renter',
                                 items: const [
                                   DropdownMenuItem(value: 'renter', child: Text('Renter')),
                                   DropdownMenuItem(value: 'lender', child: Text('Lender')),

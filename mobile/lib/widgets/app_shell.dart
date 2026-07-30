@@ -82,7 +82,7 @@ class VeloxBottomNav extends StatelessWidget {
   }
 }
 
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends StatefulWidget {
   final Widget body;
   final int currentIndex;
   final bool showTopBar;
@@ -101,8 +101,15 @@ class MainScaffold extends StatelessWidget {
     this.showDrawer = true,
   });
 
-  void _onNavTap(BuildContext context, int index) {
-    if (index == currentIndex) return;
+  @override
+  State<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends State<MainScaffold> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  void _onNavTap(int index) {
+    if (index == widget.currentIndex) return;
     final route = _navItems[index].route;
     Navigator.pushReplacementNamed(context, route);
   }
@@ -112,8 +119,8 @@ class MainScaffold extends StatelessWidget {
     final auth = Provider.of<AuthProvider>(context);
     final role = auth.role ?? 'renter';
     final lenderStatus = auth.user?.lenderStatus ?? 'none';
-    final showBottom = showBottomNav && role == 'renter';
-    final appBar = showTopBar
+    final showBottom = widget.showBottomNav && role == 'renter';
+    final appBar = widget.showTopBar
         ? PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -126,11 +133,11 @@ class MainScaffold extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      if (showDrawer)
+                      if (widget.showDrawer)
                         IconButton(
                           icon: const Icon(Icons.menu),
                           color: AppTheme.onSurface,
-                          onPressed: () => Scaffold.of(context).openDrawer(),
+                          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                           tooltip: 'Menu',
                         ),
                       const BrandLogo(size: 26),
@@ -178,13 +185,14 @@ class MainScaffold extends StatelessWidget {
         : null;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.background,
       appBar: appBar,
-      drawer: showDrawer ? const AppDrawer() : null,
-      body: body,
-      floatingActionButton: floatingActionButton,
+      drawer: widget.showDrawer ? const AppDrawer() : null,
+      body: widget.body,
+      floatingActionButton: widget.floatingActionButton,
       bottomNavigationBar: showBottom
-          ? VeloxBottomNav(currentIndex: currentIndex, onTap: (i) => _onNavTap(context, i))
+          ? VeloxBottomNav(currentIndex: widget.currentIndex, onTap: (i) => _onNavTap(i))
           : null,
     );
   }

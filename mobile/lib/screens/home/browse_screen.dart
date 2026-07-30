@@ -331,13 +331,15 @@ class _BrowseBodyState extends State<_BrowseBody> {
                         tooltip: 'Sắp xếp theo khoảng cách',
                         onPressed: () async {
                           if (_userPos == null) {
-                            final perm = await Geolocator.checkPermission();
-                            if (perm == LocationPermission.denied) {
-                              final req = await Geolocator.requestPermission();
-                              if (req == LocationPermission.denied) return;
-                            }
-                            final pos = await Geolocator.getCurrentPosition();
-                            _userPos = pos;
+                            try {
+                              final perm = await Geolocator.checkPermission();
+                              if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+                                final req = await Geolocator.requestPermission();
+                                if (req == LocationPermission.denied || req == LocationPermission.deniedForever) return;
+                              }
+                              final pos = await Geolocator.getCurrentPosition();
+                              _userPos = pos;
+                            } catch (_) { return; }
                           }
                           setState(() => _sortByDistance = !_sortByDistance);
                         },

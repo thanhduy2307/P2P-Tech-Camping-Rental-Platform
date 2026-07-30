@@ -3,7 +3,6 @@ import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/models/review.dart';
 
 class AssetService {
-  static const _timeout = Duration(seconds: 180);
   /// Browse verified assets, optionally sorted by distance to the user.
   static Future<Map<String, dynamic>> getVerifiedAssets({
     double? lat, double? lng, int page = 1, int limit = 20

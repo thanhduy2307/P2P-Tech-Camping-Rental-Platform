@@ -148,16 +148,14 @@ class AssetImageWidget extends StatelessWidget {
       }
     }
     if (image.startsWith('http://') || image.startsWith('https://')) {
-      try {
-        return CachedNetworkImage(
-          imageUrl: image,
-          width: width,
-          height: height,
-          fit: fit,
-          placeholder: (_, __) => placehold ?? Container(color: Colors.grey[200]),
-          errorWidget: (_, __, ___) => errWidget ?? _fallback(),
-        );
-      } catch (_) {}
+      return CachedNetworkImage(
+        imageUrl: image,
+        width: width,
+        height: height,
+        fit: fit,
+        placeholder: (_, __) => placehold ?? Container(color: Colors.grey[200]),
+        errorWidget: (_, __, ___) => errWidget ?? _fallback(),
+      );
     }
     return _fallback();
   }

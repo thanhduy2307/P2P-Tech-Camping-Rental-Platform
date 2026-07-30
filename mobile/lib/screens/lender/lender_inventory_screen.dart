@@ -4,7 +4,6 @@ import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
-import 'package:velox_mobile/widgets/equip_dialog.dart';
 
 class LenderInventoryScreen extends StatefulWidget {
   const LenderInventoryScreen({super.key});

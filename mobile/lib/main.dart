@@ -25,7 +25,6 @@ import 'package:velox_mobile/screens/inspector/inspector_dashboard_screen.dart';
 import 'package:velox_mobile/screens/admin/admin_dashboard_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
 import 'package:velox_mobile/screens/posts/social_feed_screen.dart';
-import 'package:velox_mobile/core/constants.dart';
 import 'package:velox_mobile/core/theme.dart';
 
 class AppRoutes {

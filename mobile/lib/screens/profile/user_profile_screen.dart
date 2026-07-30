@@ -1,10 +1,9 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:velox_mobile/models/user.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
+import 'package:velox_mobile/models/user.dart';
 import 'package:velox_mobile/services/user_service.dart';
-import 'package:velox_mobile/core/theme.dart';
 
 class UserProfileScreen extends StatefulWidget {
   const UserProfileScreen({super.key});
