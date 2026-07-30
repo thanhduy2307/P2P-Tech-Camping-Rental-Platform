@@ -105,9 +105,7 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
     final a = _asset!;
-    final authProv = context.read<AuthProvider>();
-    final currentUser = authProv.user;
-    final role = authProv.role;
+    final currentUser = context.read<AuthProvider>().user;
     final isOwner = a.lenderId != null && currentUser?.id == a.lenderId;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),
@@ -179,8 +177,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                       style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans')),
                   const SizedBox(height: 4),
                   Text(a.description, style: const TextStyle(color: Color(0xFF3C4A42))),
-                  Text('lenderId: ${a.lenderId ?? 'null'}  |  userId: ${currentUser?.id ?? 'null'}  |  role: $role',
-                      style: const TextStyle(fontSize: 10, color: Color(0xFF808080))),
                   const SizedBox(height: 16),
                   if (a.lenderName != null)
                     Card(
@@ -236,71 +232,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                           padding: const EdgeInsets.symmetric(vertical: 16),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
-                      ),
-                    ),
-                  ] else ...[
-                    const Divider(),
-                    const Text('Đặt thuê',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans')),
-                    const SizedBox(height: 8),
-                    VeloxTextField(
-                      label: 'Ngày bắt đầu',
-                      hint: 'Chọn ngày',
-                      controller: _start,
-                      readOnly: true,
-                      onTap: () => _pickDate(_start),
-                      prefixIcon: const Icon(Icons.calendar_today_outlined),
-                    ),
-                    const SizedBox(height: 12),
-                    VeloxTextField(
-                      label: 'Ngày kết thúc',
-                      hint: 'Chọn ngày',
-                      controller: _end,
-                      readOnly: true,
-                      onTap: () => _pickDate(_end),
-                      prefixIcon: const Icon(Icons.calendar_today_outlined),
-                    ),
-                    const SizedBox(height: 12),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Phương thức cọc',
-                            style: TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w600, fontSize: 14)),
-                        const SizedBox(height: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF1F4F2),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: const Color(0xFFBBCABF)),
-                          ),
-                          child: DropdownButtonHideUnderline(
-                            child: DropdownButton<String>(
-                              isExpanded: true,
-                              value: _depositMethod,
-                              items: const [
-                                DropdownMenuItem(value: 'online', child: Text('Cọc online (VNPay)')),
-                                DropdownMenuItem(value: 'cash', child: Text('Cọc tiền mặt')),
-                              ],
-                              onChanged: (v) => setState(() => _depositMethod = v!),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: _book,
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFF10B981),
-                          foregroundColor: const Color(0xFF005236),
-                          padding: const EdgeInsets.symmetric(vertical: 16),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                        ),
-                        child: const Text('Đặt và thanh toán', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                       ),
                     ),
                   ],
