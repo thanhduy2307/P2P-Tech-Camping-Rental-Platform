@@ -34,6 +34,9 @@ const DashboardInspector = () => {
 
   // Checklist States for In-person Inspections
   const [techChecklist, setTechChecklist] = useState({
+    isCamera: false,
+    generalConditionCheck: false,
+    accessoriesCheck: false,
     shutterCountTest: '',
     deadPixelSensorCheck: false,
     lensMoldCheck: false
@@ -137,6 +140,9 @@ const DashboardInspector = () => {
     setVerificationNotes('');
     setModalImageIndex(0);
     setTechChecklist({
+      isCamera: false,
+      generalConditionCheck: false,
+      accessoriesCheck: false,
       shutterCountTest: '',
       deadPixelSensorCheck: false,
       lensMoldCheck: false
@@ -167,15 +173,26 @@ const DashboardInspector = () => {
     const isOffline = selectedAsset.taskDetails && !selectedAsset.taskDetails.isRemote;
     if (status === 'verified' && isOffline) {
       if (selectedAsset.category === 'Tech') {
-        if (techChecklist.shutterCountTest === '') {
-          Swal.fire('Vui lòng nhập số shot đã test của thiết bị.');
+        if (!techChecklist.generalConditionCheck) {
+          Swal.fire('Vui lòng xác nhận thiết bị hoạt động bình thường.');
           return;
         }
+        if (techChecklist.isCamera && techChecklist.shutterCountTest === '') {
+          Swal.fire('Vui lòng nhập số shot đã test của máy ảnh.');
+          return;
+        }
+        
         payload.inspectionChecklist = {
-          shutterCountTest: parseInt(techChecklist.shutterCountTest),
-          deadPixelSensorCheck: techChecklist.deadPixelSensorCheck,
-          lensMoldCheck: techChecklist.lensMoldCheck
+          isCamera: techChecklist.isCamera,
+          generalConditionCheck: techChecklist.generalConditionCheck,
+          accessoriesCheck: techChecklist.accessoriesCheck,
         };
+
+        if (techChecklist.isCamera) {
+          payload.inspectionChecklist.shutterCountTest = parseInt(techChecklist.shutterCountTest);
+          payload.inspectionChecklist.deadPixelSensorCheck = techChecklist.deadPixelSensorCheck;
+          payload.inspectionChecklist.lensMoldCheck = techChecklist.lensMoldCheck;
+        }
       } else if (selectedAsset.category === 'Camping') {
         payload.inspectionChecklist = {
           zipperWearCheck: campingChecklist.zipperWearCheck,
@@ -774,38 +791,77 @@ const DashboardInspector = () => {
                     </h5>
                     
                     {selectedAsset.category === 'Tech' ? (
+                    {selectedAsset.category === 'Tech' ? (
                       <div className="space-y-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-semibold text-slate-700">Test số shot (máy ảnh) *</label>
-                          <input 
-                            type="number"
-                            placeholder="Nhập số shot đếm được (e.g. 12500)"
-                            className="bg-white border border-slate-250 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-primary w-full md:w-1/2"
-                            value={techChecklist.shutterCountTest}
-                            onChange={(e) => setTechChecklist(prev => ({ ...prev, shutterCountTest: e.target.value }))}
-                          />
-                        </div>
-
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                           <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
                             <input 
                               type="checkbox"
                               className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.deadPixelSensorCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, deadPixelSensorCheck: e.target.checked }))}
+                              checked={techChecklist.generalConditionCheck}
+                              onChange={(e) => setTechChecklist(prev => ({ ...prev, generalConditionCheck: e.target.checked }))}
                             />
-                            <span>Sensor hoạt động tốt, không chết pixel</span>
+                            <span>Thiết bị hoạt động bình thường, không lỗi</span>
                           </label>
 
                           <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
                             <input 
                               type="checkbox"
                               className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.lensMoldCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, lensMoldCheck: e.target.checked }))}
+                              checked={techChecklist.accessoriesCheck}
+                              onChange={(e) => setTechChecklist(prev => ({ ...prev, accessoriesCheck: e.target.checked }))}
                             />
-                            <span>Kính lens sạch, không mốc rễ tre</span>
+                            <span>Phụ kiện đi kèm đầy đủ như mô tả</span>
                           </label>
+                        </div>
+
+                        <div className="pt-3 border-t border-slate-200">
+                          <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-800 mb-3">
+                            <input 
+                              type="checkbox"
+                              className="text-primary focus:ring-primary rounded"
+                              checked={techChecklist.isCamera}
+                              onChange={(e) => setTechChecklist(prev => ({ ...prev, isCamera: e.target.checked }))}
+                            />
+                            <span>Đây là Máy ảnh / Ống kính (Hiện thêm tiêu chí)</span>
+                          </label>
+
+                          {techChecklist.isCamera && (
+                            <div className="space-y-3 animate-in fade-in duration-200 bg-white p-4 rounded-xl border border-slate-200">
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs font-semibold text-slate-700">Test số shot (máy ảnh) *</label>
+                                <input 
+                                  type="number"
+                                  placeholder="Nhập số shot đếm được (e.g. 12500)"
+                                  className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-primary w-full md:w-1/2"
+                                  value={techChecklist.shutterCountTest}
+                                  onChange={(e) => setTechChecklist(prev => ({ ...prev, shutterCountTest: e.target.value }))}
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                                  <input 
+                                    type="checkbox"
+                                    className="text-primary focus:ring-primary rounded"
+                                    checked={techChecklist.deadPixelSensorCheck}
+                                    onChange={(e) => setTechChecklist(prev => ({ ...prev, deadPixelSensorCheck: e.target.checked }))}
+                                  />
+                                  <span>Sensor hoạt động tốt, không chết pixel</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer bg-slate-50 p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                                  <input 
+                                    type="checkbox"
+                                    className="text-primary focus:ring-primary rounded"
+                                    checked={techChecklist.lensMoldCheck}
+                                    onChange={(e) => setTechChecklist(prev => ({ ...prev, lensMoldCheck: e.target.checked }))}
+                                  />
+                                  <span>Kính lens sạch, không mốc rễ tre</span>
+                                </label>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ) : (
