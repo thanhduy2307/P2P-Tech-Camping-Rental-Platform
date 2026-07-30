@@ -595,9 +595,9 @@ const LenderOrders = () => {
       {/* OTP verification modal for Handover/Return */}
       {modalOpen && selectedOrder && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
             {/* Header */}
-            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-teal-400">
                   {actionType === 'handover' ? 'local_shipping' : 'assignment_turned_in'}
@@ -606,14 +606,14 @@ const LenderOrders = () => {
               </h3>
               <button 
                 onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center shrink-0"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleActionSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleActionSubmit} className="p-6 space-y-4 overflow-y-auto">
               {actionError && (
                 <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 text-xs font-semibold">
                   {actionError}
@@ -850,23 +850,23 @@ const LenderOrders = () => {
       {/* Rating & Review Modal for Lender to rate Renter */}
       {ratingModalOpen && selectedOrderForRating && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-400">star</span>
                 Đánh giá khách thuê (Renter)
               </h3>
               <button 
                 onClick={() => setRatingModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-white border-none cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-white border-none cursor-pointer shrink-0"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmitRating} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitRating} className="p-6 space-y-4 overflow-y-auto">
               {ratingError && (
                 <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 text-xs font-semibold">
                   {ratingError}
@@ -944,8 +944,8 @@ const LenderOrders = () => {
       {cancelModalOpen && orderToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !cancelLoading && setCancelModalOpen(false)}></div>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-red-500">cancel</span>
                 Hủy đơn hàng
@@ -953,13 +953,13 @@ const LenderOrders = () => {
               <button 
                 onClick={() => setCancelModalOpen(false)}
                 disabled={cancelLoading}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 text-red-700 text-sm">
                 <span className="material-symbols-outlined shrink-0 text-red-500">warning</span>
                 <div>
@@ -985,7 +985,7 @@ const LenderOrders = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setCancelModalOpen(false)}
                 disabled={cancelLoading}
