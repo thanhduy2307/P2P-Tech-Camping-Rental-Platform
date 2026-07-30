@@ -908,8 +908,17 @@ const DashboardInspector = () => {
                 <h4 className="font-bold text-orange-800 text-xs uppercase mb-2">Thông tin khiếu nại (Từ {selectedDispute.disputeCreator === 'lender' ? 'Lender' : 'Renter'})</h4>
                 <p className="text-sm text-slate-700">{selectedDispute.disputeNotes}</p>
                 {selectedDispute.requestedDeductionAmount > 0 && (
-                  <p className="text-sm font-bold text-red-600 mt-2">Mức yêu cầu bồi thường: {selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ</p>
+                  <p className="text-sm font-bold text-red-600 mt-2">Mức yêu cầu bồi thường (Từ Lender): {selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ</p>
                 )}
+
+                {/* --- FINANCIAL CONTEXT --- */}
+                <div className="mt-4 bg-white border border-orange-100 rounded-lg p-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="text-slate-600 font-semibold">Tổng tiền thuê:</div>
+                  <div className="font-bold text-slate-800 text-right">{selectedDispute.totalRent?.toLocaleString('vi-VN')} đ</div>
+                  
+                  <div className="text-slate-600 font-semibold">Tiền cọc ({selectedDispute.depositMethod === 'cash' ? 'Tiền mặt' : 'Online'}):</div>
+                  <div className="font-bold text-slate-800 text-right">{selectedDispute.deposit?.toLocaleString('vi-VN')} đ</div>
+                </div>
 
                 {/* --- LENDER IMAGES --- */}
                 <div className="mt-4 border-t border-orange-200/50 pt-3">
