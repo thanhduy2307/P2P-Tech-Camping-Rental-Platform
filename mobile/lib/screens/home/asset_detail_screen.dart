@@ -1,15 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:provider/provider.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:velox_mobile/core/storage.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/models/review.dart';
-import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/services/asset_service.dart';
-import 'package:velox_mobile/services/order_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
-import 'package:velox_mobile/widgets/velox_button.dart';
 
 class AssetDetailScreen extends StatefulWidget {
   const AssetDetailScreen({super.key});
@@ -22,9 +18,6 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   Asset? _asset;
   List<Review> _reviews = [];
   bool _loading = true;
-  final _start = TextEditingController();
-  final _end = TextEditingController();
-  String _depositMethod = 'online';
 
   @override
   void initState() {
@@ -38,47 +31,19 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   Future<void> _load(String id) async {
     try {
       final data = await AssetService.getAssetDetail(id);
-      _asset = data['asset'] as Asset;
-      _reviews = (data['reviews'] as List).cast<Review>();
-    } catch (e) {
-      if (mounted) UiHelper.showErrorToast(context, e);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _pickDate(TextEditingController c) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      c.text = DateFormat('yyyy-MM-dd').format(picked);
-    }
-  }
-
-  Future<void> _book() async {
-    if (_asset == null || _start.text.isEmpty || _end.text.isEmpty) {
-      UiHelper.showErrorToast(context, 'Chọn ngày bắt đầu và kết thúc.');
-      return;
-    }
-    try {
-      final res = await OrderService.createOrder(
-        assetId: _asset!.id,
-        startDate: _start.text,
-        endDate: _end.text,
-        depositMethod: _depositMethod,
-      );
-      final url = res['paymentUrl'];
+      final asset = data['asset'] as Asset;
+      final reviews = (data['reviews'] as List).cast<Review>();
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertRequestPayment(url: url),
-      );
+      setState(() {
+        _asset = asset;
+        _reviews = reviews;
+        _loading = false;
+      });
     } catch (e) {
-      UiHelper.showErrorToast(context, e);
+      if (mounted) {
+        setState(() => _loading = false);
+        UiHelper.showErrorToast(context, e);
+      }
     }
   }
 
@@ -105,8 +70,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
     final a = _asset!;
-    final currentUser = context.read<AuthProvider>().user;
-    final isOwner = a.lenderId != null && currentUser?.id == a.lenderId;
+    final storedUser = Storage.getUser();
+    final myId = storedUser?['_id']?.toString();
+    final isOwner = a.lenderId != null && myId == a.lenderId;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),
       body: SingleChildScrollView(
@@ -235,6 +201,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                       ),
                     ),
                   ],
+                  if (a.lenderId != null)
+                    Text('myId: $myId | lenderId: ${a.lenderId}',
+                        style: const TextStyle(fontSize: 11, color: Color(0xFF808080))),
                 ],
               ),
             ),
@@ -298,37 +267,6 @@ class _ReviewTile extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class AlertRequestPayment extends StatelessWidget {
-  final String? url;
-  const AlertRequestPayment({super.key, this.url});
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Thanh toán'),
-      content: const Text('Đơn hàng đã được tạo. Bạn sẽ được chuyển đến VNPay để thanh toán.'),
-      actions: [
-        TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Đóng')),
-        ElevatedButton(
-          onPressed: () {
-            if (url != null && url!.startsWith('http')) {
-              launchUrl(Uri.parse(url!), mode: LaunchMode.externalApplication);
-            }
-            Navigator.pop(context);
-            Navigator.pop(context);
-          },
-          child: const Text('Mở VNPay'),
-        ),
-      ],
     );
   }
 }
