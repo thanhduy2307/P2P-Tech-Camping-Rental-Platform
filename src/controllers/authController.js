@@ -462,6 +462,7 @@ exports.login = async (req, res) => {
 };
 
 exports.googleCallback = async (req, res) => {
+  let sessionId = null;
   try {
     const { code, state } = req.query;
     if (!code) {
@@ -470,19 +471,12 @@ exports.googleCallback = async (req, res) => {
 
     // Mobile OAuth flow: state=mobile:<sessionId>
     const isMobile = typeof state === 'string' && state.startsWith('mobile:');
-    const sessionId = isMobile ? state.split(':')[1] : null;
+    sessionId = isMobile ? state.split(':')[1] : null;
 
-    let tokens;
-    try {
-      const exchangeResult = await client.getToken({
-        code,
-        redirect_uri: process.env.GOOGLE_CALLBACK_URL
-      });
-      tokens = exchangeResult.tokens;
-    } catch (err) {
-      const exchangeResult = await client.getToken(code);
-      tokens = exchangeResult.tokens;
-    }
+    // Mobile: use GOOGLE_CALLBACK_URL; Web (GIS popup): use 'postmessage'
+    const redirectUri = isMobile ? process.env.GOOGLE_CALLBACK_URL : 'postmessage';
+    const exchangeResult = await client.getToken({ code, redirect_uri: redirectUri });
+    const tokens = exchangeResult.tokens;
     const ticket = await client.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID
