@@ -213,33 +213,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       final reason = await showDialog<String>(
         context: context,
         barrierDismissible: false,
-        builder: (ctx) => Center(
-          child: SizedBox(
-            width: double.maxFinite,
-            child: AlertDialog(
-              title: const Text('Từ chối rút tiền'),
-              content: SizedBox(
-                height: 120,
-                child: TextField(
-                  controller: reasonCtl,
-                  decoration: const InputDecoration(
-                    labelText: 'Lý do từ chối',
-                    hintText: 'Nhập lý do...',
-                    border: OutlineInputBorder(),
-                  ),
-                  maxLines: 3,
-                  autofocus: true,
-                ),
+        builder: (ctx) => AlertDialog(
+          title: const Text('Từ chối rút tiền'),
+          content: SizedBox(
+            height: 120,
+            child: TextField(
+              controller: reasonCtl,
+              decoration: const InputDecoration(
+                labelText: 'Lý do từ chối',
+                hintText: 'Nhập lý do...',
+                border: OutlineInputBorder(),
               ),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
-                  child: const Text('Xác nhận'),
-                ),
-              ],
+              maxLines: 3,
+              autofocus: true,
             ),
           ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
+              child: const Text('Xác nhận'),
+            ),
+          ],
         ),
       );
       if (reason == null || reason.isEmpty) return;
