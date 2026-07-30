@@ -713,27 +713,45 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       itemBuilder: (_, i) {
         final w = _withdrawals[i];
         final bank = w['bankAccount'] ?? {};
+        final status = w['status'] as String? ?? 'pending';
         return Card(
           child: ListTile(
             leading: const Icon(Icons.account_balance_wallet, color: Color(0xFF006C49)),
             title: Text(_fmt(w['amount'])),
-            subtitle: Text('${bank['bankName'] ?? ''} · ${bank['accountNumber'] ?? ''}'
-                '${w['status'] != null ? ' · ${w['status']}' : ''}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.check_circle, color: Color(0xFF006C49)),
-                  tooltip: 'Duyệt',
-                  onPressed: () => _verifyWithdrawal(w['_id'], 'approved'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.cancel, color: Color(0xFFBA1A1A)),
-                  tooltip: 'Từ chối',
-                  onPressed: () => _verifyWithdrawal(w['_id'], 'rejected'),
-                ),
-              ],
-            ),
+            subtitle: Text('${bank['bankName'] ?? ''} · ${bank['accountNumber'] ?? ''}'),
+            trailing: status == 'pending'
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.check_circle, color: Color(0xFF006C49)),
+                        tooltip: 'Duyệt',
+                        onPressed: () => _verifyWithdrawal(w['_id'], 'approved'),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.cancel, color: Color(0xFFBA1A1A)),
+                        tooltip: 'Từ chối',
+                        onPressed: () => _verifyWithdrawal(w['_id'], 'rejected'),
+                      ),
+                    ],
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: status == 'approved'
+                          ? const Color(0xFF006C49).withValues(alpha: 0.12)
+                          : const Color(0xFFBA1A1A).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      status == 'approved' ? 'Đã duyệt' : 'Đã từ chối',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: status == 'approved' ? const Color(0xFF006C49) : const Color(0xFFBA1A1A),
+                      ),
+                    ),
+                  ),
           ),
         );
       },
