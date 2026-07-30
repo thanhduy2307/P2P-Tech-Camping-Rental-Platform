@@ -14,7 +14,6 @@ class _NavItem {
 
 const List<_NavItem> _navItems = [
   _NavItem(Icons.explore_outlined, 'Khám phá', '/browse'),
-  _NavItem(Icons.search_outlined, 'Tìm kiếm', '/browse'),
   _NavItem(Icons.calendar_today_outlined, 'Thuê đồ', '/my-orders'),
   _NavItem(Icons.chat_bubble_outline, 'Tin nhắn', '/conversations'),
   _NavItem(Icons.person_outline, 'Cá nhân', '/profile'),
@@ -105,11 +104,6 @@ class MainScaffold extends StatelessWidget {
   void _onNavTap(BuildContext context, int index) {
     if (index == currentIndex) return;
     final route = _navItems[index].route;
-    if (index == 1) {
-      // Tìm kiếm shares browse route
-      Navigator.pushReplacementNamed(context, route);
-      return;
-    }
     Navigator.pushReplacementNamed(context, route);
   }
 

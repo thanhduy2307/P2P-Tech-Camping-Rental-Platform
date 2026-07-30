@@ -1,5 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:velox_mobile/models/post.dart';
 import 'package:velox_mobile/services/post_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
@@ -33,12 +35,100 @@ class _SocialFeedScreenState extends State<SocialFeedScreen> {
     }
   }
 
+  Future<void> _createPost() async {
+    final titleCtl = TextEditingController();
+    final contentCtl = TextEditingController();
+    final picker = ImagePicker();
+    List<XFile> selected = [];
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDState) => AlertDialog(
+          title: const Text('Tạo bài viết'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleCtl, decoration: const InputDecoration(labelText: 'Tiêu đề', hintText: 'Nhập tiêu đề...')),
+                const SizedBox(height: 8),
+                TextField(controller: contentCtl, decoration: const InputDecoration(labelText: 'Nội dung', hintText: 'Nhập nội dung...'), maxLines: 4),
+                const SizedBox(height: 8),
+                if (selected.isNotEmpty)
+                  SizedBox(
+                    height: 80,
+                    child: ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: selected.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 6),
+                      itemBuilder: (_, i) => ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.file(File(selected[i].path), width: 80, fit: BoxFit.cover),
+                      ),
+                    ),
+                  ),
+                TextButton.icon(
+                  icon: const Icon(Icons.image),
+                  label: const Text('Thêm ảnh'),
+                  onPressed: () async {
+                    final picked = await picker.pickMultiImage();
+                    if (picked.isNotEmpty) setDState(() => selected = picked);
+                  },
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+            ElevatedButton(
+              onPressed: () async {
+                if (titleCtl.text.trim().isEmpty) {
+                  UiHelper.showErrorToast(context, 'Vui lòng nhập tiêu đề');
+                  return;
+                }
+                Navigator.pop(ctx);
+                UiHelper.showLoading(context);
+                try {
+                  List<String> images = [];
+                  if (selected.isNotEmpty) {
+                    images = await UiHelper.imagesToBase64(selected);
+                  }
+                  await PostService.createPost({
+                    'title': titleCtl.text.trim(),
+                    'content': contentCtl.text.trim(),
+                    'images': images,
+                  });
+                  if (!mounted) return;
+                  UiHelper.hideLoading(context);
+                  UiHelper.showSuccessToast(context, 'Đã đăng bài');
+                  _load();
+                } catch (e) {
+                  if (mounted) {
+                    UiHelper.hideLoading(context);
+                    UiHelper.showErrorToast(context, e);
+                  }
+                }
+              },
+              child: const Text('Đăng'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return MainScaffold(
       showTopBar: true,
       showBottomNav: true,
       currentIndex: 0,
+      floatingActionButton: FloatingActionButton(
+        backgroundColor: const Color(0xFF10B981),
+        foregroundColor: const Color(0xFF005236),
+        onPressed: _createPost,
+        child: const Icon(Icons.edit),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: _loading
@@ -129,10 +219,10 @@ class _PostCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  backgroundImage: post.authorAvatar != null
-                      ? CachedNetworkImageProvider(post.authorAvatar!)
+                  backgroundImage: post.authorAvatar != null && !post.authorAvatar!.startsWith('data:')
+                      ? NetworkImage(post.authorAvatar!)
                       : null,
-                  child: post.authorAvatar == null
+                  child: post.authorAvatar == null || post.authorAvatar!.startsWith('data:')
                       ? const Icon(Icons.person, size: 18)
                       : null,
                 ),
@@ -174,19 +264,19 @@ class _PostCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: post.images.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 6),
-                itemBuilder: (_, i) => ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: post.images[i],
-                    width: 200,
-                    fit: BoxFit.cover,
-                    errorWidget: (_, __, ___) => Container(
-                      color: Colors.grey[200],
+                  itemBuilder: (_, i) => ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: AssetImageWidget(
+                      image: post.images[i],
                       width: 200,
-                      child: const Icon(Icons.broken_image),
+                      fit: BoxFit.cover,
+                      errWidget: Container(
+                        color: Colors.grey[200],
+                        width: 200,
+                        child: const Icon(Icons.broken_image),
+                      ),
                     ),
                   ),
-                ),
               ),
             ),
           // Actions
