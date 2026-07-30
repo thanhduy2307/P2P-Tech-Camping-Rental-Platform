@@ -100,7 +100,7 @@ class _LenderInventoryScreenState extends State<LenderInventoryScreen> {
                 ),
                 const SizedBox(height: 8),
                 InkWell(
-                  onTap: () => Navigator.pushNamed(context, '/asset-detail', arguments: asset.id),
+                  onTap: () => Navigator.pushNamed(context, '/lender/post-asset', arguments: asset.id),
                   child: Text(asset.name, maxLines: 2, overflow: TextOverflow.ellipsis,
                       style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: AppTheme.onSurface)),
                 ),
