@@ -10,6 +10,7 @@ import 'package:velox_mobile/screens/auth/register_screen.dart';
 import 'package:velox_mobile/screens/auth/otp_screen.dart';
 import 'package:velox_mobile/screens/auth/renter_ekyc_screen.dart';
 import 'package:velox_mobile/screens/auth/lender_onboarding_screen.dart';
+import 'package:velox_mobile/screens/auth/forgot_password_screen.dart';
 import 'package:velox_mobile/screens/home/browse_screen.dart';
 import 'package:velox_mobile/screens/home/asset_detail_screen.dart';
 import 'package:velox_mobile/screens/orders/my_orders_screen.dart';
@@ -49,6 +50,7 @@ class AppRoutes {
   static const notifications = '/notifications';
   static const socialFeed = '/social-feed';
   static const userProfile = '/user-profile';
+  static const forgotPassword = '/forgot-password';
 
   static String homeForRole(String? role, {String? lenderStatus}) {
     // If user is approved lender, always show lender dashboard even if current role is renter
@@ -139,6 +141,7 @@ class MyApp extends StatelessWidget {
           AppRoutes.notifications: (_) => const NotificationsScreen(),
           AppRoutes.socialFeed: (_) => const SocialFeedScreen(),
           AppRoutes.userProfile: (_) => const UserProfileScreen(),
+          AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
         },
       ),
     );

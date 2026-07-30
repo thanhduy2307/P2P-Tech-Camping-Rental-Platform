@@ -1359,6 +1359,72 @@ exports.verifyRenterApplication = async (req, res) => {
   }
 };
 
+// @desc    Forgot password - send OTP to phone
+// @route   POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại.' });
+    }
+    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
+    const user = await User.findOne({ phoneNumber: cleanPhone });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Số điện thoại chưa được đăng ký.' });
+    }
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.phoneVerificationOtp = otp;
+    user.phoneVerificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+    const smsService = require('../services/smsService');
+    const smsResult = await smsService.sendSMS(cleanPhone, otp);
+    const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
+    const isTelegram = process.env.SMS_PROVIDER === 'telegram';
+    const showOtp = isMock || !smsResult.success;
+    let message = 'Mã OTP đặt lại mật khẩu đã được gửi đến số điện thoại của bạn.';
+    if (isTelegram) message = 'Mã OTP đã được gửi về Telegram Bot.';
+    res.status(200).json({
+      success: true,
+      message: smsResult.success ? message : 'Cổng gửi bị lỗi. Đã chuyển sang chế độ OTP dự phòng.',
+      data: { userId: user._id, otp: showOtp ? otp : undefined, smsSent: smsResult.success }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reset password with OTP
+// @route   POST /api/auth/reset-password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { userId, otp, newPassword } = req.body;
+    if (!userId || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản.' });
+    }
+    if (!user.phoneVerificationOtp || user.phoneVerificationOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
+    }
+    if (new Date() > user.phoneVerificationOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.phoneVerificationOtp = undefined;
+    user.phoneVerificationOtpExpires = undefined;
+    await user.save();
+    res.status(200).json({ success: true, message: 'Mật khẩu đã được đặt lại thành công.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getMyTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find({ user: req.user._id })

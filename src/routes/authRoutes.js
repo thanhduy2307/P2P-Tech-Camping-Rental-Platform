@@ -25,7 +25,9 @@ const {
   getRenterApplications,
   verifyRenterApplication,
   updatePublicProfileInfo,
-  getMyTransactions
+  getMyTransactions,
+  forgotPassword,
+  resetPassword
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -38,6 +40,8 @@ router.post('/verify-otp', verifyOtp);
 router.post('/forgot-password', forgotPasswordRequest);
 router.post('/reset-password', forgotPasswordReset);
 router.post('/login', login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.post('/google/start-mobile', googleStartMobile);
 router.get('/google/session/:sessionId', googlePollSession);
 router.get('/google/callback', googleCallback);

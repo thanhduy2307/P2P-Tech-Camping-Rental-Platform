@@ -318,13 +318,9 @@ const Login = () => {
                 </label>
               </div>
               <div className="text-sm">
-                <button 
-                  type="button" 
-                  onClick={() => setIsForgotModalOpen(true)}
-                  className="font-label-sm text-label-sm text-secondary font-semibold hover:text-secondary-container transition-colors bg-transparent border-none cursor-pointer"
-                >
+<Link className="font-label-sm text-label-sm text-secondary font-semibold hover:text-secondary-container transition-colors" to="/forgot-password">
                   Quên mật khẩu?
-                </button>
+                </Link>
               </div>
             </div>
 

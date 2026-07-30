@@ -143,6 +143,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: auth.loading ? null : _submit,
                     icon: const Icon(Icons.arrow_forward, size: 18),
                   ),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+                      child: const Text('Quên mật khẩu?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0058BE))),
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   const Row(
                     children: [

@@ -46,6 +46,15 @@ class AuthService {
     return res['data'];
   }
 
+  static Future<Map<String, dynamic>> forgotPassword(String phoneNumber) async {
+    final res = await ApiClient.post('/auth/forgot-password', {'phoneNumber': phoneNumber});
+    return res['data'];
+  }
+
+  static Future<void> resetPassword(String userId, String otp, String newPassword) async {
+    await ApiClient.post('/auth/reset-password', {'userId': userId, 'otp': otp, 'newPassword': newPassword});
+  }
+
   static Future<Map<String, dynamic>> login({
     required String emailOrPhone,
     required String password,
