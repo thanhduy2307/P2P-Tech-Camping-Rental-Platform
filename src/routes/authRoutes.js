@@ -1,8 +1,10 @@
 const express = require('express');
 const {
   register,
-  registerPhone,
+  registerWithEmail,
   verifyOtp,
+  forgotPasswordRequest,
+  forgotPasswordReset,
   login,
   googleCallback,
   switchRole,
@@ -31,8 +33,10 @@ const router = express.Router();
 
 router.get('/test-features', runIntegrationTests);
 router.post('/register', register);
-router.post('/register-phone', registerPhone);
+router.post('/register-email', registerWithEmail);
 router.post('/verify-otp', verifyOtp);
+router.post('/forgot-password', forgotPasswordRequest);
+router.post('/reset-password', forgotPasswordReset);
 router.post('/login', login);
 router.get('/google/callback', googleCallback);
 router.get('/me', protect, getMe);
