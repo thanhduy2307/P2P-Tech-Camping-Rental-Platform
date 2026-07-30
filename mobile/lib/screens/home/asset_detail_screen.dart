@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:velox_mobile/models/asset.dart';
+import 'package:velox_mobile/models/review.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/services/order_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
@@ -17,6 +18,7 @@ class AssetDetailScreen extends StatefulWidget {
 
 class _AssetDetailScreenState extends State<AssetDetailScreen> {
   Asset? _asset;
+  List<Review> _reviews = [];
   bool _loading = true;
   final _start = TextEditingController();
   final _end = TextEditingController();
@@ -33,7 +35,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   Future<void> _load(String id) async {
     try {
-      _asset = await AssetService.getAssetById(id);
+      final data = await AssetService.getAssetDetail(id);
+      _asset = data['asset'] as Asset;
+      _reviews = (data['reviews'] as List).cast<Review>();
     } catch (e) {
       if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
@@ -180,18 +184,37 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                             child: Icon(Icons.person, color: Color(0xFF005236))),
                         title: Text(a.lenderName!, style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text('Chủ thiết bị'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.chat, color: Color(0xFF0058BE)),
-                          onPressed: a.lenderId == null
-                              ? null
-                              : () => Navigator.pushNamed(context, '/chat',
-                                  arguments: {
-                                    'peerId': a.lenderId,
-                                    'peerName': a.lenderName
-                                  }),
-                        ),
+                        trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.person, color: Color(0xFF0058BE)),
+                            onPressed: a.lenderId == null
+                                ? null
+                                : () => Navigator.pushNamed(context, '/user-profile',
+                                    arguments: a.lenderId),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.chat, color: Color(0xFF0058BE)),
+                            onPressed: a.lenderId == null
+                                ? null
+                                : () => Navigator.pushNamed(context, '/chat',
+                                    arguments: {
+                                      'peerId': a.lenderId,
+                                      'peerName': a.lenderName
+                                    }),
+                          ),
+                        ],
                       ),
                     ),
+                  ),
+                  if (_reviews.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text('Đánh giá',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans', fontSize: 16)),
+                    const SizedBox(height: 8),
+                    ..._reviews.map((r) => _ReviewTile(review: r)),
+                  ],
                   const Divider(),
                   const Text('Đặt thuê',
                       style: TextStyle(
@@ -256,6 +279,63 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                       child: const Text('Đặt và thanh toán', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
                   ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReviewTile extends StatelessWidget {
+  final Review review;
+  const _ReviewTile({required this.review});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF10B981),
+              backgroundImage: review.renterAvatar != null
+                  ? CachedNetworkImageProvider(review.renterAvatar!)
+                  : null,
+              child: review.renterAvatar == null
+                  ? const Icon(Icons.person, size: 18, color: Color(0xFF005236))
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(review.renterName,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const Spacer(),
+                      Row(
+                        children: List.generate(5, (i) => Icon(
+                          i < review.lenderRating ? Icons.star : Icons.star_border,
+                          size: 16, color: const Color(0xFF0058BE),
+                        )),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(review.lenderComment,
+                      style: const TextStyle(color: Color(0xFF3C4A42), fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(DateFormat('dd/MM/yyyy').format(review.createdAt),
+                      style: const TextStyle(color: Color(0xFF808080), fontSize: 11)),
                 ],
               ),
             ),

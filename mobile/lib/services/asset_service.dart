@@ -1,5 +1,6 @@
 ﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/asset.dart';
+import 'package:velox_mobile/models/review.dart';
 
 class AssetService {
   static const _timeout = Duration(seconds: 180);
@@ -17,6 +18,19 @@ class AssetService {
   static Future<Asset> getAssetById(String id) async {
     final res = await ApiClient.get('/assets/$id');
     return Asset.fromJson(res['data']);
+  }
+
+  static Future<Map<String, dynamic>> getAssetDetail(String id) async {
+    final res = await ApiClient.get('/assets/$id');
+    final data = res['data'] as Map<String, dynamic>;
+    final reviews = (data['reviews'] as List?)
+            ?.map((e) => Review.fromJson(e as Map<String, dynamic>))
+            .toList() ??
+        [];
+    return {
+      'asset': Asset.fromJson(data),
+      'reviews': reviews,
+    };
   }
 
   /// Lender: list own assets.

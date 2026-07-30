@@ -17,6 +17,7 @@ import 'package:velox_mobile/screens/orders/order_detail_screen.dart';
 import 'package:velox_mobile/screens/chat/conversations_screen.dart';
 import 'package:velox_mobile/screens/chat/chat_thread_screen.dart';
 import 'package:velox_mobile/screens/profile/profile_screen.dart';
+import 'package:velox_mobile/screens/profile/user_profile_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_dashboard_screen.dart';
 import 'package:velox_mobile/screens/lender/post_asset_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
@@ -48,6 +49,7 @@ class AppRoutes {
   static const adminDashboard = '/admin/dashboard';
   static const notifications = '/notifications';
   static const socialFeed = '/social-feed';
+  static const userProfile = '/user-profile';
 
   static String homeForRole(String? role, {String? lenderStatus}) {
     // If user is approved lender, always show lender dashboard even if current role is renter
@@ -137,6 +139,7 @@ class MyApp extends StatelessWidget {
           AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
           AppRoutes.notifications: (_) => const NotificationsScreen(),
           AppRoutes.socialFeed: (_) => const SocialFeedScreen(),
+          AppRoutes.userProfile: (_) => const UserProfileScreen(),
         },
       ),
     );
