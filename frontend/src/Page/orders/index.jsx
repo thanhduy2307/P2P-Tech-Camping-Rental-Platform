@@ -965,17 +965,7 @@ const Orders = () => {
                             Đang chờ duyệt gia hạn {order.extensionDays} ngày
                           </div>
                         )}
-                        {order.status !== 'pending_payment' && asset?.depositAmount >= 2000000 && (
-                          <a 
-                            href={`http://localhost:5000/api/orders/${order._id}/contract?token=${localStorage.getItem('token')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="w-full bg-white hover:bg-surface-container-low text-on-surface border border-outline font-semibold text-xs py-2.5 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
-                            Xem Hợp đồng (PDF)
-                          </a>
-                        )}
+
                          <Link 
                           to={`/assets/${asset._id}`} 
                           className="w-full bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5"

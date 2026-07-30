@@ -21,6 +21,9 @@ const LenderOrders = () => {
   const [imgPreview2, setImgPreview2] = useState('');
   const [imgPreview3, setImgPreview3] = useState('');
   
+  const [repairInvoiceFile, setRepairInvoiceFile] = useState(null);
+  const [repairInvoicePreview, setRepairInvoicePreview] = useState('');
+  
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState('');
 
@@ -113,6 +116,7 @@ const LenderOrders = () => {
     setImgFile1(null); setImgPreview1('');
     setImgFile2(null); setImgPreview2('');
     setImgFile3(null); setImgPreview3('');
+    setRepairInvoiceFile(null); setRepairInvoicePreview('');
     setActionError('');
     setActualCashDepositReturned(order.deposit || '');
     setCashDepositDeductionReason('');
@@ -145,6 +149,10 @@ const LenderOrders = () => {
         setActionError('Vui lòng nhập lý do hỏng hóc và khiếu nại.');
         return;
       }
+      if (!repairInvoiceFile) {
+        setActionError('Vui lòng tải lên ảnh báo giá hoặc hóa đơn chi phí sửa chữa thiết bị.');
+        return;
+      }
       if (selectedOrder.depositMethod === 'cash' && !cashDepositHandoverConfirmed) {
         setActionError('Vui lòng đánh dấu xác nhận cam kết giữ đúng tiền đền bù của cọc mặt.');
         return;
@@ -163,10 +171,11 @@ const LenderOrders = () => {
     setActionLoading(true);
     try {
       // Convert files to base64
-      const [b64_1, b64_2, b64_3] = await Promise.all([
+      const [b64_1, b64_2, b64_3, b64_repair] = await Promise.all([
         fileToBase64(imgFile1),
         fileToBase64(imgFile2),
         fileToBase64(imgFile3),
+        fileToBase64(repairInvoiceFile),
       ]);
       const images = [b64_1, b64_2, b64_3];
 
@@ -182,6 +191,9 @@ const LenderOrders = () => {
           payload.disputeNotes = cashDepositDeductionReason;
           payload.requestedDeductionAmount = Number(actualCashDepositReturned);
           payload.disputeType = 'damage_issue';
+          if (b64_repair) {
+            payload.repairQuotationImages = [b64_repair];
+          }
         } else {
           url = `/orders/${selectedOrder._id}/return`;
           payload.returnImages = images;
@@ -495,7 +507,7 @@ const LenderOrders = () => {
                   <th className="px-6 py-3">Thời gian thuê</th>
                   <th className="px-6 py-3">Doanh thu thu về</th>
                   <th className="px-6 py-3">Trạng thái cuối</th>
-                  <th className="px-6 py-3">Báo cáo hợp đồng</th>
+                  <th className="px-6 py-3">Thao tác</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -532,19 +544,7 @@ const LenderOrders = () => {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex flex-col gap-1.5 items-start">
-                        {order.asset?.depositAmount >= 2000000 ? (
-                          <a 
-                            href={`http://localhost:5000/api/orders/${order._id}/contract?token=${localStorage.getItem('token')}`} 
-                            target="_blank" 
-                            rel="noreferrer"
-                            className="text-teal-600 hover:text-teal-700 hover:underline text-xs font-bold flex items-center gap-1"
-                          >
-                            <span className="material-symbols-outlined text-sm">description</span>
-                            Hợp đồng điện tử
-                          </a>
-                        ) : (
-                          <span className="text-slate-400 text-xs italic">Không yêu cầu</span>
-                        )}
+
                         {order.renter && (
                           <button
                             onClick={() => {
@@ -597,7 +597,7 @@ const LenderOrders = () => {
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-10">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-y-auto max-h-[90vh]">
             {/* Header */}
-            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-bold text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-teal-400">
                   {actionType === 'handover' ? 'local_shipping' : 'assignment_turned_in'}
@@ -606,14 +606,14 @@ const LenderOrders = () => {
               </h3>
               <button 
                 onClick={() => setModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center shrink-0"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleActionSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleActionSubmit} className="p-6 space-y-4 overflow-y-auto">
               {actionError && (
                 <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 text-xs font-semibold">
                   {actionError}
@@ -639,7 +639,7 @@ const LenderOrders = () => {
                           <span className="material-symbols-outlined text-sm">warning</span>
                           Cảnh báo trả đồ trễ hạn
                         </p>
-                        <p>Renter đã trả đồ muộn <strong>{lateDays} ngày</strong> so với hợp đồng.</p>
+                        <p>Renter đã trả đồ muộn <strong>{lateDays} ngày</strong> so với thời hạn.</p>
                         {selectedOrder.depositMethod === 'online' ? (
                           <p>Hệ thống sẽ tự động trừ <strong>{lateFee.toLocaleString('vi-VN')} đ</strong> phí phạt từ cọc của Renter và cộng vào ví của bạn.</p>
                         ) : (
@@ -698,6 +698,35 @@ const LenderOrders = () => {
                       value={cashDepositDeductionReason}
                       onChange={(e) => setCashDepositDeductionReason(e.target.value)}
                     />
+                  </div>
+                  <div className="space-y-1 mt-2">
+                    <label className="font-semibold text-slate-700 block mb-1">Ảnh báo giá / Hóa đơn sửa chữa:</label>
+                    <div className="border border-dashed border-red-300 rounded-lg p-2 flex items-center gap-3 bg-white hover:border-red-400 transition-colors">
+                      {repairInvoicePreview ? (
+                        <img src={repairInvoicePreview} alt="preview" className="w-14 h-14 object-cover rounded-md border border-slate-200 flex-shrink-0" />
+                      ) : (
+                        <div className="w-14 h-14 rounded-md border border-slate-200 bg-slate-50 flex items-center justify-center flex-shrink-0">
+                          <span className="material-symbols-outlined text-slate-300 text-2xl">receipt_long</span>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <label
+                          htmlFor="repair-invoice-upload"
+                          className="cursor-pointer inline-flex items-center gap-1 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold px-2.5 py-1 rounded-md transition-colors"
+                        >
+                          <span className="material-symbols-outlined text-sm">upload</span>
+                          {repairInvoiceFile ? 'Đổi ảnh hóa đơn' : 'Tải lên hóa đơn'}
+                        </label>
+                        {repairInvoiceFile && <span className="block text-[9px] text-slate-400 mt-1 truncate">{repairInvoiceFile.name}</span>}
+                        <input
+                          id="repair-invoice-upload"
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => handleFileChange(e, setRepairInvoiceFile, setRepairInvoicePreview)}
+                        />
+                      </div>
+                    </div>
                   </div>
                   {selectedOrder.depositMethod === 'cash' && (
                     <label className="flex items-start gap-2 cursor-pointer mt-2 pt-2 border-t border-red-200/50">
@@ -850,23 +879,23 @@ const LenderOrders = () => {
       {/* Rating & Review Modal for Lender to rate Renter */}
       {ratingModalOpen && selectedOrderForRating && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
             {/* Header */}
-            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
+            <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center shrink-0">
               <h3 className="font-bold text-base flex items-center gap-2">
                 <span className="material-symbols-outlined text-amber-400">star</span>
                 Đánh giá khách thuê (Renter)
               </h3>
               <button 
                 onClick={() => setRatingModalOpen(false)}
-                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-white border-none cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-800 hover:bg-slate-700 transition-colors flex items-center justify-center text-white border-none cursor-pointer shrink-0"
               >
                 <span className="material-symbols-outlined text-sm">close</span>
               </button>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleSubmitRating} className="p-6 space-y-4">
+            <form onSubmit={handleSubmitRating} className="p-6 space-y-4 overflow-y-auto">
               {ratingError && (
                 <div className="bg-red-50 text-red-600 border border-red-200 rounded-lg p-3 text-xs font-semibold">
                   {ratingError}
@@ -944,8 +973,8 @@ const LenderOrders = () => {
       {cancelModalOpen && orderToCancel && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => !cancelLoading && setCancelModalOpen(false)}></div>
-          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+          <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+            <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 shrink-0">
               <h3 className="font-bold text-slate-800 text-lg flex items-center gap-2">
                 <span className="material-symbols-outlined text-red-500">cancel</span>
                 Hủy đơn hàng
@@ -953,13 +982,13 @@ const LenderOrders = () => {
               <button 
                 onClick={() => setCancelModalOpen(false)}
                 disabled={cancelLoading}
-                className="text-slate-400 hover:text-slate-600 transition-colors"
+                className="text-slate-400 hover:text-slate-600 transition-colors shrink-0"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-4 overflow-y-auto">
               <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex gap-3 text-red-700 text-sm">
                 <span className="material-symbols-outlined shrink-0 text-red-500">warning</span>
                 <div>
@@ -985,7 +1014,7 @@ const LenderOrders = () => {
               </div>
             </div>
 
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3">
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex justify-end gap-3 shrink-0">
               <button
                 onClick={() => setCancelModalOpen(false)}
                 disabled={cancelLoading}
