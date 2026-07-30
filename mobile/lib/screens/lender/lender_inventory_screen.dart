@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/models/asset.dart';
@@ -79,8 +78,9 @@ class _LenderInventoryScreenState extends State<LenderInventoryScreen> {
                 aspectRatio: 1.3,
                 child: Stack(fit: StackFit.expand, children: [
                   asset.images.isNotEmpty
-                      ? CachedNetworkImage(imageUrl: asset.images.first, fit: BoxFit.cover, placeholder: (_, __) => Container(color: Colors.grey[200]),
-                          errorWidget: (_, __, ___) => Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)))
+                      ? AssetImageWidget(image: asset.images.first, fit: BoxFit.cover,
+                          placehold: Container(color: Colors.grey[200]),
+                          errWidget: Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)))
                       : Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
                   Positioned(top: 12, right: 12, child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),

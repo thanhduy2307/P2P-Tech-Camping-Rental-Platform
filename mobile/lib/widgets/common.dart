@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:image_picker/image_picker.dart';
@@ -34,9 +35,7 @@ class UiHelper {
           duration: const Duration(seconds: 3),
         ),
       );
-    } catch (_) {
-      // fallback: ignore if no scaffold available
-    }
+    } catch (_) {}
   }
 
   static void showErrorToast(BuildContext context, dynamic e) {
@@ -98,7 +97,6 @@ class UiHelper {
       final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
       final file = File(img.path);
       final originalBytes = await file.readAsBytes();
-      // Compress if > 500KB
       List<int> bytes;
       if (originalBytes.length > 500 * 1024) {
         final compressed = await FlutterImageCompress.compressWithFile(
@@ -117,4 +115,51 @@ class UiHelper {
   }
 }
 
+class AssetImageWidget extends StatelessWidget {
+  final String image;
+  final double? width;
+  final double? height;
+  final BoxFit fit;
+  final Widget? placehold;
+  final Widget? errWidget;
 
+  const AssetImageWidget({
+    super.key,
+    required this.image,
+    this.width,
+    this.height,
+    this.fit = BoxFit.cover,
+    this.placehold,
+    this.errWidget,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (image.startsWith('data:')) {
+      try {
+        final parts = image.split(',');
+        if (parts.length == 2) {
+          final bytes = base64Decode(parts[1]);
+          return Image.memory(bytes, width: width, height: height, fit: fit,
+            errorBuilder: (_, __, ___) => _fallback(),
+          );
+        }
+      } catch (_) {}
+    }
+    return CachedNetworkImage(
+      imageUrl: image,
+      width: width,
+      height: height,
+      fit: fit,
+      placeholder: (_, __) => placehold ?? Container(color: Colors.grey[200]),
+      errorWidget: (_, __, ___) => errWidget ?? _fallback(),
+    );
+  }
+
+  Widget _fallback() {
+    return Container(
+      color: Colors.grey[200],
+      child: const Icon(Icons.image, color: Colors.grey, size: 40),
+    );
+  }
+}
