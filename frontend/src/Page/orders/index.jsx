@@ -188,6 +188,44 @@ const Orders = () => {
     }
   };
 
+  const handleNegotiateDispute = async (orderId, action) => {
+    try {
+      const confirmText = action === 'accept' 
+        ? 'Bạn có chắc chắn đồng ý đền bù số tiền này? Tiền sẽ được trừ tự động và đơn hàng sẽ hoàn tất.' 
+        : 'Bạn muốn yêu cầu Admin can thiệp giải quyết tranh chấp này?';
+        
+      const result = await Swal.fire({
+        title: 'Xác nhận',
+        text: confirmText,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Đồng ý',
+        cancelButtonText: 'Hủy'
+      });
+
+      if (!result.isConfirmed) return;
+
+      const response = await api.put(`/orders/${orderId}/negotiate-dispute`, { action });
+      if (response.data?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Thành công',
+          text: response.data.message
+        });
+        // Re-fetch to update list
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: err.response?.data?.message || 'Không thể thực hiện hành động này.'
+      });
+    }
+  };
+
 
   const token = localStorage.getItem('token');
   const paymentStatus = searchParams.get('payment');
@@ -916,6 +954,45 @@ const Orders = () => {
                           </div>
                         )}
                       </div>
+
+                      {/* Dispute UI for Renter */}
+                      {order.status === 'disputed' && (
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-200 mt-4 flex flex-col gap-2.5">
+                          <h4 className="font-bold text-red-700 text-sm flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-base">warning</span>
+                            Đơn hàng đang có tranh chấp
+                          </h4>
+                          {order.disputeStatus === 'negotiating' && (
+                            <>
+                              <p className="text-xs text-red-800/90 leading-relaxed">
+                                Lender yêu cầu bạn đền bù <strong>{order.requestedDeductionAmount?.toLocaleString('vi-VN')} đ</strong> với lý do: <em>"{order.disputeNotes}"</em>.
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={() => handleNegotiateDispute(order._id, 'accept')}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer border-none shadow-sm"
+                                >
+                                  Đồng ý đền bù
+                                </button>
+                                <button
+                                  onClick={() => handleNegotiateDispute(order._id, 'escalate')}
+                                  className="flex-1 bg-white hover:bg-slate-50 text-red-700 font-bold text-xs py-2 px-3 rounded-lg border border-red-200 transition-colors cursor-pointer shadow-sm"
+                                >
+                                  Yêu cầu Admin xử lý
+                                </button>
+                              </div>
+                              <p className="text-[10px] text-red-600 italic text-center mt-1">
+                                Bạn cũng có thể "Chat với Lender" để thỏa thuận lại mức giá.
+                              </p>
+                            </>
+                          )}
+                          {order.disputeStatus === 'escalated' && (
+                            <div className="text-xs text-red-800 font-medium text-center py-2 bg-red-100 rounded-lg">
+                              Đang chờ Admin xử lý. Vui lòng theo dõi email hoặc thông báo.
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                       {/* Action buttons */}
                       <div className="flex flex-col gap-2.5">

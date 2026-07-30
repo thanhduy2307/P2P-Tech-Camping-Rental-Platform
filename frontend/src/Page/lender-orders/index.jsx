@@ -218,6 +218,35 @@ const LenderOrders = () => {
     }
   };
 
+  const handleUpdateDisputeAmount = async (orderId, currentAmount) => {
+    const { value: newAmount, isConfirmed } = await Swal.fire({
+      title: 'Cập nhật giá đền bù',
+      input: 'number',
+      inputLabel: 'Số tiền đền bù mới (đ)',
+      inputValue: currentAmount || 0,
+      showCancelButton: true,
+      confirmButtonText: 'Cập nhật',
+      cancelButtonText: 'Hủy',
+      inputValidator: (value) => {
+        if (!value || Number(value) <= 0) {
+          return 'Vui lòng nhập số tiền hợp lệ!';
+        }
+      }
+    });
+
+    if (isConfirmed && newAmount) {
+      try {
+        const response = await api.put(`/orders/${orderId}/update-dispute`, { requestedDeductionAmount: Number(newAmount) });
+        if (response.data?.success) {
+          Swal.fire({ icon: 'success', title: 'Thành công', text: response.data.message });
+          fetchOrders();
+        }
+      } catch (error) {
+        Swal.fire({ icon: 'error', title: 'Lỗi', text: error.response?.data?.message || 'Không thể cập nhật giá đền bù' });
+      }
+    }
+  };
+
   const openCancelModal = async (order) => {
     setOrderToCancel(order);
     setCancelReason('');
@@ -538,7 +567,7 @@ const LenderOrders = () => {
                       </span>
                       {order.status === 'disputed' && (
                         <p className="text-[9px] text-red-500 mt-1 font-semibold leading-tight">
-                          Đang chờ Admin phán quyết (SLA 48h)
+                          {order.disputeStatus === 'negotiating' ? 'Đang chờ Renter phản hồi...' : 'Đang chờ Admin phán quyết'}
                         </p>
                       )}
                     </td>
@@ -560,6 +589,15 @@ const LenderOrders = () => {
                           >
                             <span className="material-symbols-outlined text-sm">chat</span>
                             Chat với Renter
+                          </button>
+                        )}
+                        {order.status === 'disputed' && order.disputeStatus === 'negotiating' && (
+                          <button
+                            onClick={() => handleUpdateDisputeAmount(order._id, order.requestedDeductionAmount)}
+                            className="bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold text-[10px] px-2.5 py-1 rounded shadow-sm border border-blue-200 transition-colors cursor-pointer flex items-center gap-0.5 mt-1"
+                          >
+                            <span className="material-symbols-outlined text-xs">edit</span>
+                            Sửa giá đền bù
                           </button>
                         )}
                         {order.status === 'completed' && !order.renterRating && (

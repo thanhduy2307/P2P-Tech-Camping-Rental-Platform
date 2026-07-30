@@ -441,7 +441,7 @@ exports.raiseDispute = async (req, res) => {
       order.requestedDeductionAmount = Number(requestedDeductionAmount);
     }
 
-    order.disputeStatus = 'open';
+    order.disputeStatus = 'negotiating';
     order.disputedAt = new Date();
     
     await order.save();
@@ -535,6 +535,8 @@ exports.resolveDispute = async (req, res) => {
       let lenderPayout = order.totalRent - platformFee;
 
       if (action === 'force_compensation') {
+        const debt = req.body.renterDebt ? Number(req.body.renterDebt) : 0;
+        
         if (order.depositMethod === 'online') {
           lender.balance += (lenderPayout + Number(lenderCompensation));
           renter.balance += Number(renterRefund);
@@ -543,7 +545,13 @@ exports.resolveDispute = async (req, res) => {
           order.actualCashDepositReturned = order.deposit - Number(lenderCompensation);
           order.cashDepositDeductionReason = 'Bị trừ tiền đền bù hư hỏng';
         }
-        message = 'Đã cưỡng chế trừ cọc của Renter để đền bù cho Lender.';
+        
+        if (debt > 0) {
+          renter.debtAmount += debt;
+          // Có thể thêm logic khóa tài khoản ở đây, ví dụ renter.isBanned = true;
+        }
+        
+        message = debt > 0 ? `Đã cưỡng chế trừ cọc và ghi nợ Renter ${debt.toLocaleString('vi-VN')} đ.` : 'Đã cưỡng chế trừ cọc của Renter để đền bù cho Lender.';
       } else if (action === 'reject_lender_dispute') {
         if (order.depositMethod === 'online') {
           lender.balance += lenderPayout;
@@ -1106,92 +1114,98 @@ exports.getDisputedOrders = async (req, res) => {
   }
 };
 
-// @desc    Inspector reviews dispute and requests Renter confirmation
-// @route   PUT /api/orders/:id/dispute-request-confirmation
-// @access  Private (Admin/Inspector)
-exports.requestRenterDeductionConfirmation = async (req, res) => {
+// @desc    Lender updates requested deduction amount
+// @route   PUT /api/orders/:id/update-dispute
+// @access  Private (Lender)
+exports.updateDispute = async (req, res) => {
   try {
-    const { approvedDeductionAmount } = req.body;
-    const order = await Order.findById(req.params.id);
+    const { requestedDeductionAmount } = req.body;
+    const order = await Order.findById(req.params.id).populate('asset');
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-    if (order.status !== 'disputed') {
-      return res.status(400).json({ success: false, message: 'Order is not disputed' });
+    if (order.status !== 'disputed' || order.disputeStatus !== 'negotiating') {
+      return res.status(400).json({ success: false, message: 'Cannot update dispute at this stage' });
     }
 
-    order.requestedDeductionAmount = Number(approvedDeductionAmount);
-    order.disputeStatus = 'inspector_reviewed';
+    if (req.user._id.toString() !== order.asset.lender.toString()) {
+      return res.status(403).json({ success: false, message: 'Only Lender can update dispute amount' });
+    }
+
+    order.requestedDeductionAmount = Number(requestedDeductionAmount);
     await order.save();
 
-    res.status(200).json({ success: true, message: 'Đã gửi yêu cầu xác nhận đền bù cho Renter.', data: order });
+    res.status(200).json({ success: true, message: 'Cập nhật số tiền yêu cầu thành công.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Renter accepts deduction
-// @route   PUT /api/orders/:id/accept-deduction
+// @desc    Renter accepts deduction or escalates
+// @route   PUT /api/orders/:id/negotiate-dispute
 // @access  Private (Renter)
-exports.acceptDeduction = async (req, res) => {
+exports.negotiateDispute = async (req, res) => {
   try {
+    const { action } = req.body; // 'accept' or 'escalate'
     const order = await Order.findById(req.params.id).populate('asset');
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-    if (order.status !== 'disputed' || order.disputeStatus !== 'inspector_reviewed') {
-      return res.status(400).json({ success: false, message: 'Cannot accept deduction at this stage' });
+    if (order.status !== 'disputed' || order.disputeStatus !== 'negotiating') {
+      return res.status(400).json({ success: false, message: 'Cannot negotiate at this stage' });
     }
 
     if (req.user._id.toString() !== order.renter.toString()) {
-      return res.status(403).json({ success: false, message: 'Only Renter can accept deduction' });
+      return res.status(403).json({ success: false, message: 'Only Renter can negotiate' });
     }
 
-    order.deductionConfirmedByRenter = true;
-    
-    // Process financial transfer automatically since Renter agreed
-    const platformFeePercent = 0.1;
-    const platformFee = order.totalRent * platformFeePercent;
-    order.platformFee = platformFee;
-    
-    const lender = await User.findById(order.asset.lender);
-    const renter = await User.findById(order.renter);
-
-    let lenderPayout = (order.totalRent - platformFee);
-    const deduction = order.requestedDeductionAmount;
-
-    if (order.depositMethod === 'online') {
-      lender.balance += (lenderPayout + deduction);
+    if (action === 'escalate') {
+      order.disputeStatus = 'escalated';
+      await order.save();
+      return res.status(200).json({ success: true, message: 'Đã yêu cầu Admin can thiệp.', data: order });
+    } else if (action === 'accept') {
+      // Process financial transfer automatically since Renter agreed
+      const platformFeePercent = 0.1;
+      const platformFee = order.totalRent * platformFeePercent;
+      order.platformFee = platformFee;
       
-      const remainingDeposit = Math.max(0, order.deposit - deduction);
-      renter.balance += remainingDeposit;
+      const User = require('../models/User');
+      const Transaction = require('../models/Transaction');
+      
+      const lender = await User.findById(order.asset.lender);
+      const renter = await User.findById(order.renter);
+
+      let lenderPayout = (order.totalRent - platformFee);
+      const deduction = order.requestedDeductionAmount;
+
+      if (order.depositMethod === 'online') {
+        lender.balance += (lenderPayout + deduction);
+        
+        const remainingDeposit = Math.max(0, order.deposit - deduction);
+        renter.balance += remainingDeposit;
+      } else {
+        lender.balance += lenderPayout;
+        order.actualCashDepositReturned = Math.max(0, order.deposit - deduction);
+        order.cashDepositDeductionReason = 'Đã trừ tiền đền bù theo xác nhận của Renter';
+      }
+
+      order.status = 'completed';
+      order.disputeStatus = 'resolved';
+      
+      await lender.save();
+      await renter.save();
+      await order.save();
+      
+      await Transaction.create({
+        user: lender._id,
+        order: order._id,
+        amount: deduction,
+        type: 'addition',
+        reason: 'Được đền bù thiệt hại do Renter đồng ý'
+      });
+      
+      return res.status(200).json({ success: true, message: 'Đã đồng ý đền bù. Đơn hàng hoàn tất.', data: order });
     } else {
-      lender.balance += lenderPayout;
-      order.actualCashDepositReturned = Math.max(0, order.deposit - deduction);
-      order.cashDepositDeductionReason = 'Đã trừ tiền đền bù theo xác nhận của Renter';
+      return res.status(400).json({ success: false, message: 'Hành động không hợp lệ' });
     }
-
-    await lender.save();
-    await renter.save();
-    
-    await Transaction.create({
-      user: lender._id,
-      order: order._id,
-      amount: deduction,
-      type: 'addition',
-      reason: 'Được đền bù thiệt hại từ Renter'
-    });
-    await Transaction.create({
-      user: renter._id,
-      order: order._id,
-      amount: -deduction,
-      type: 'deduction',
-      reason: 'Đền bù thiệt hại cho Lender'
-    });
-
-    order.status = 'completed';
-    order.disputeStatus = 'resolved';
-    await order.save();
-
-    res.status(200).json({ success: true, message: 'Bạn đã đồng ý đền bù. Đơn hàng hoàn tất.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
