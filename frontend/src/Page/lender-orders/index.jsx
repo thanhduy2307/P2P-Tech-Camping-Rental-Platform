@@ -594,8 +594,8 @@ const LenderOrders = () => {
 
       {/* OTP verification modal for Handover/Return */}
       {modalOpen && selectedOrder && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-hidden">
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-start justify-center p-4 pt-10">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md border border-slate-100 overflow-y-auto max-h-[90vh]">
             {/* Header */}
             <div className="px-6 py-4 bg-slate-900 text-white flex justify-between items-center">
               <h3 className="font-bold text-lg flex items-center gap-2">
