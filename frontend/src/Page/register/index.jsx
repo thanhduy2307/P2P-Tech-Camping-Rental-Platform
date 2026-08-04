@@ -59,7 +59,6 @@ const Register = () => {
     try {
       const response = await api.post('/auth/register-email', {
         name: fullname,
-        email,
         password,
         role: 'renter'
       });
@@ -69,7 +68,6 @@ const Register = () => {
         setVerificationUserId(userId);
         setOtpVerificationOpen(true);
       } else {
-        setErrorMsg('Đăng ký email thất bại.');
       }
     } catch (err) {
       console.error(err);
@@ -160,8 +158,6 @@ const Register = () => {
           {otpVerificationOpen ? (
             <form className="space-y-5" onSubmit={handleVerifyOtp}>
               <div className="text-center bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
-                <span className="material-symbols-outlined text-amber-500 text-3xl mb-1 animate-pulse">lock_open</span>
-                <h4 className="text-xs font-bold text-slate-800">Xác thực OTP email</h4>
                 <p className="text-[10px] text-slate-450 mt-1 leading-relaxed">
                   Mã xác thực đã được gửi đến email: <strong className="text-slate-800">{email}</strong>
                 </p>

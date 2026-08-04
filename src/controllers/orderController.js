@@ -441,7 +441,7 @@ exports.raiseDispute = async (req, res) => {
       order.requestedDeductionAmount = Number(requestedDeductionAmount);
     }
 
-    order.disputeStatus = 'open';
+    order.disputeStatus = 'negotiating';
     order.disputedAt = new Date();
     
     await order.save();
@@ -535,6 +535,8 @@ exports.resolveDispute = async (req, res) => {
       let lenderPayout = order.totalRent - platformFee;
 
       if (action === 'force_compensation') {
+        const debt = req.body.renterDebt ? Number(req.body.renterDebt) : 0;
+        
         if (order.depositMethod === 'online') {
           lender.balance += (lenderPayout + Number(lenderCompensation));
           renter.balance += Number(renterRefund);
@@ -543,7 +545,13 @@ exports.resolveDispute = async (req, res) => {
           order.actualCashDepositReturned = order.deposit - Number(lenderCompensation);
           order.cashDepositDeductionReason = 'Bị trừ tiền đền bù hư hỏng';
         }
-        message = 'Đã cưỡng chế trừ cọc của Renter để đền bù cho Lender.';
+        
+        if (debt > 0) {
+          renter.debtAmount += debt;
+          // Có thể thêm logic khóa tài khoản ở đây, ví dụ renter.isBanned = true;
+        }
+        
+        message = debt > 0 ? `Đã cưỡng chế trừ cọc và ghi nợ Renter ${debt.toLocaleString('vi-VN')} đ.` : 'Đã cưỡng chế trừ cọc của Renter để đền bù cho Lender.';
       } else if (action === 'reject_lender_dispute') {
         if (order.depositMethod === 'online') {
           lender.balance += lenderPayout;
@@ -1024,213 +1032,7 @@ exports.submitRating = async (req, res) => {
   }
 };
 
-// @desc    Get Auto-Generated Rental E-Contract (Renter/Lender)
-// @route   GET /api/orders/:id/contract
-// @access  Private (Renter/Lender)
-exports.getContract = async (req, res) => {
-  try {
-    const order = await Order.findById(req.params.id)
-      .populate('asset')
-      .populate('renter')
-      .populate({
-        path: 'asset',
-        populate: { path: 'lender' }
-      });
 
-    if (!order) {
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(404).send(`
-        <div style="font-family: sans-serif; text-align: center; margin-top: 50px; padding: 20px;">
-          <h2 style="color: #e53e3e;">Không tìm thấy đơn hàng</h2>
-          <p>Không tìm thấy thông tin đơn hàng trong hệ thống.</p>
-        </div>
-      `);
-    }
-
-    const isRenter = req.user._id.toString() === order.renter._id.toString();
-    const isLender = req.user._id.toString() === order.asset.lender._id.toString();
-
-    if (!isRenter && !isLender) {
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(403).send(`
-        <div style="font-family: sans-serif; text-align: center; margin-top: 50px; padding: 20px;">
-          <h2 style="color: #e53e3e;">Lỗi xác thực</h2>
-          <p>Bạn không có quyền truy cập hợp đồng của đơn hàng này.</p>
-        </div>
-      `);
-    }
-
-    if (order.status === 'pending_payment') {
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(400).send(`
-        <div style="font-family: sans-serif; text-align: center; margin-top: 50px; padding: 20px;">
-          <h2 style="color: #dd6b20;">Đơn hàng chưa thanh toán</h2>
-          <p>Đơn hàng chưa thanh toán tiền cọc và thuê nên chưa thể khởi tạo Hợp đồng điện tử.</p>
-        </div>
-      `);
-    }
-
-    const isHighValue = order.asset && order.asset.depositAmount >= 2000000;
-    if (!isHighValue) {
-      res.setHeader('Content-Type', 'text/html');
-      return res.status(400).send(`
-        <div style="font-family: sans-serif; text-align: center; margin-top: 50px; padding: 20px;">
-          <h2 style="color: #4a5568;">Không yêu cầu hợp đồng</h2>
-          <p>Đơn hàng này không thuộc diện thiết bị giá trị cao (tiền cọc từ 2.000.000 đ trở lên) nên không yêu cầu Hợp đồng điện tử.</p>
-        </div>
-      `);
-    }
-
-    const contractId = `VELOX-CONTRACT-${order._id.toString().toUpperCase()}`;
-    const dateCreated = new Date(order.createdAt).toLocaleDateString('vi-VN');
-    const rentStart = new Date(order.startDate).toLocaleDateString('vi-VN');
-    const rentEnd = new Date(order.endDate).toLocaleDateString('vi-VN');
-
-    const renterName = order.renter.name;
-    const renterPhone = order.renter.phoneNumber || 'Đang cập nhật';
-    const renterCCCD = order.renter.lenderOnboarding?.cccdFront ? 'ĐÃ XÁC THỰC EKYC CCCD' : 'ĐÃ LIÊN KẾT TÀI KHOẢN';
-    const renterAddress = order.renter.address?.street
-      ? `${order.renter.address.street}, ${order.renter.address.ward}, ${order.renter.address.district}, ${order.renter.address.province}`
-      : 'Hệ thống định vị thực tế';
-
-    const lenderName = order.asset.lender.name;
-    const lenderPhone = order.asset.lender.phoneNumber || 'Đang cập nhật';
-    const lenderCCCD = order.asset.lender.lenderOnboarding?.cccdFront ? 'ĐÃ XÁC THỰC EKYC CCCD' : 'ĐÃ LIÊN KẾT TÀI KHOẢN';
-    const lenderAddress = order.asset.lender.address?.street
-      ? `${order.asset.lender.address.street}, ${order.asset.lender.address.ward}, ${order.asset.lender.address.district}, ${order.asset.lender.address.province}`
-      : 'Hệ thống định vị thực tế';
-
-    const assetName = order.asset.name;
-    const pricePerDay = order.asset.pricePerDay;
-    const rentalDays = order.rentalDays;
-    const totalRent = order.totalRent;
-    const deposit = order.deposit;
-    const vnpayTxnRef = order.vnpayTxnRef || 'SYSTEM_SIGN';
-
-    const contractHtml = `
-      <div style="font-family: 'Helvetica Neue', Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 40px; border: 1px solid #e0e0e0; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); color: #333333; line-height: 1.6;">
-        <div style="text-align: center; border-bottom: 2px solid #2B6CB0; padding-bottom: 20px; margin-bottom: 30px;">
-          <h2 style="margin: 0; color: #2B6CB0; text-transform: uppercase; font-size: 24px; letter-spacing: 1px;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h2>
-          <h4 style="margin: 5px 0 0 0; font-weight: normal; font-size: 14px; letter-spacing: 0.5px;">Độc lập - Tự do - Hạnh phúc</h4>
-          <div style="width: 150px; height: 1px; background-color: #a0aec0; margin: 15px auto 0 auto;"></div>
-          <h1 style="margin: 25px 0 5px 0; color: #1a202c; font-size: 22px; text-transform: uppercase;">HỢP ĐỒNG THUÊ THIẾT BỊ ĐIỆN TỬ & CẮM TRẠI P2P</h1>
-          <p style="margin: 0; color: #718096; font-size: 12px;">Mã số hợp đồng: <strong>${contractId}</strong></p>
-        </div>
-
-        <p style="font-style: italic; color: #4a5568; font-size: 14px; margin-bottom: 25px;">
-          - Căn cứ Bộ luật Dân sự nước Cộng hòa Xã hội Chủ nghĩa Việt Nam số 91/2015/QH13 có hiệu lực từ ngày 01/01/2017;<br>
-          - Căn cứ nhu cầu và khả năng tự thỏa thuận của các bên trên nền tảng P2P VeloX.
-        </p>
-
-        <p style="font-size: 14px; margin-bottom: 25px;">Hôm nay, ngày ${dateCreated}, hai Bên gồm có:</p>
-
-        <!-- BÊN CHO THUÊ (LENDER) -->
-        <div style="background-color: #f7fafc; padding: 15px; border-left: 4px solid #4a5568; margin-bottom: 20px; border-radius: 0 4px 4px 0;">
-          <h3 style="margin-top: 0; color: #2d3748; font-size: 16px; text-transform: uppercase; border-bottom: 1px dashed #cbd5e0; padding-bottom: 5px;">BÊN A: BÊN CHO THUÊ (LENDER)</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <tr>
-              <td style="width: 30%; font-weight: bold; padding: 4px 0;">Họ tên:</td>
-              <td style="padding: 4px 0;">${lenderName}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Số điện thoại:</td>
-              <td style="padding: 4px 0;">${lenderPhone}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Trạng thái eKYC:</td>
-              <td style="padding: 4px 0; color: #38a169; font-weight: bold;">${lenderCCCD}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Địa chỉ:</td>
-              <td style="padding: 4px 0;">${lenderAddress}</td>
-            </tr>
-          </table>
-        </div>
-
-        <!-- BÊN THUÊ (RENTER) -->
-        <div style="background-color: #f7fafc; padding: 15px; border-left: 4px solid #2B6CB0; margin-bottom: 30px; border-radius: 0 4px 4px 0;">
-          <h3 style="margin-top: 0; color: #2d3748; font-size: 16px; text-transform: uppercase; border-bottom: 1px dashed #cbd5e0; padding-bottom: 5px;">BÊN B: BÊN THUÊ (RENTER)</h3>
-          <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <tr>
-              <td style="width: 30%; font-weight: bold; padding: 4px 0;">Họ tên:</td>
-              <td style="padding: 4px 0;">${renterName}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Số điện thoại:</td>
-              <td style="padding: 4px 0;">${renterPhone}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Trạng thái eKYC:</td>
-              <td style="padding: 4px 0; color: #38a169; font-weight: bold;">${renterCCCD}</td>
-            </tr>
-            <tr>
-              <td style="font-weight: bold; padding: 4px 0;">Địa chỉ:</td>
-              <td style="padding: 4px 0;">${renterAddress}</td>
-            </tr>
-          </table>
-        </div>
-
-        <h3 style="color: #2d3748; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px;">ĐIỀU 1: ĐỐI TƯỢNG VÀ THỜI GIAN THUÊ THIẾT BỊ</h3>
-        <p style="font-size: 14px; margin: 10px 0;">
-          1.1. Bên A đồng ý cho Bên B thuê, và Bên B đồng ý thuê thiết bị: <strong>${assetName}</strong>.<br>
-          1.2. Thời gian thuê bắt đầu từ ngày <strong>${rentStart}</strong> đến hết ngày <strong>${rentEnd}</strong> (Tổng cộng <strong>${rentalDays} ngày</strong>).
-        </p>
-
-        <h3 style="color: #2d3748; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px;">ĐIỀU 2: GIÁ TRỊ HỢP ĐỒNG VÀ PHƯƠNG THỨC THANH TOÁN</h3>
-        <p style="font-size: 14px; margin: 10px 0;">
-          2.1. Đơn giá thuê thiết bị: <strong>${pricePerDay.toLocaleString('vi-VN')} đ/ngày</strong>.<br>
-          2.2. Tổng tiền thuê: <strong>${totalRent.toLocaleString('vi-VN')} đ</strong>.<br>
-          2.3. Số tiền đặt cọc tài sản (ký quỹ đảm bảo): <strong>${deposit.toLocaleString('vi-VN')} đ</strong>.<br>
-          2.4. Phương thức thanh toán: <strong>Thanh toán trực tuyến qua Ví điện tử / Cổng VNPay Sandbox và đóng băng tài sản cọc trên hệ thống VeloX</strong>. Tiền cọc sẽ tự động hoàn trả Bên B sau khi hoàn tất nghĩa vụ trả hàng mà không có tranh chấp phát sinh.
-        </p>
-
-        <h3 style="color: #2d3748; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px;">ĐIỀU 3: MINH CHỨNG HÌNH ẢNH VÀ QUY TRÌNH GIAO NHẬN THỰC TẾ</h3>
-        <p style="font-size: 14px; margin: 10px 0;">
-          3.1. Hai bên đồng ý tuân thủ quy trình kiểm tra và lưu lại hình ảnh đối chứng để giải quyết tranh chấp pháp lý:<br>
-          - <strong>Lúc bàn giao thiết bị</strong>: Bên A nhập mã OTP bàn giao và bắt buộc tải lên từ 3 - 5 ảnh hiện trạng.<br>
-          - <strong>Lúc nhận lại thiết bị</strong>: Bên A nhập mã OTP trả đồ và bắt buộc tải lên từ 3 - 5 ảnh hiện trạng lúc thu hồi.<br>
-          3.2. Ảnh đối chứng là bằng chứng pháp lý cao nhất để hệ thống phân định thiệt hại khi xảy ra trầy xước, mất tem niêm phong hoặc hư hỏng linh kiện.
-        </p>
-
-        <h3 style="color: #2d3748; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; margin-top: 25px;">ĐIỀU 4: ĐIỀU KHOẢN CAM KẾT VÀ CHỮ KÝ SỐ XÁC NHẬN</h3>
-        <p style="font-size: 14px; margin: 10px 0;">
-          4.1. Bên B cam kết bảo quản tài sản thuê cẩn thận, sử dụng đúng mục đích kỹ thuật của thiết bị.<br>
-          4.2. Trách nhiệm Bên A bàn giao đúng thời hạn, tình trạng thiết bị hoạt động bình thường như cam kết.<br>
-          4.3. Hợp đồng điện tử này có giá trị pháp lý tương đương văn bản giấy từ thời điểm Renter thanh toán ký quỹ đặt cọc thành công.
-        </p>
-
-        <div style="margin-top: 40px; display: flex; justify-content: space-between; text-align: center;">
-          <div style="width: 45%;">
-            <p style="font-size: 14px; margin-bottom: 60px;"><strong>Đại diện Bên A (Lender)</strong></p>
-            <p style="color: #2b6cb0; border: 2px dashed #2b6cb0; padding: 10px; display: inline-block; border-radius: 4px; font-family: monospace; font-size: 12px; background-color: #ebf8ff;">
-               KÝ SỐ VELOX - LENDER<br>
-              <strong>${lenderName}</strong><br>
-              Mã GD: ${vnpayTxnRef}
-            </p>
-          </div>
-          <div style="width: 45%;">
-            <p style="font-size: 14px; margin-bottom: 60px;"><strong>Đại diện Bên B (Renter)</strong></p>
-            <p style="color: #2b6cb0; border: 2px dashed #2b6cb0; padding: 10px; display: inline-block; border-radius: 4px; font-family: monospace; font-size: 12px; background-color: #ebf8ff;">
-               KÝ SỐ VELOX - RENTER<br>
-              <strong>${renterName}</strong><br>
-              Mã GD: ${vnpayTxnRef}
-            </p>
-          </div>
-        </div>
-
-        <div style="margin-top: 40px; border-top: 1px solid #cbd5e0; padding-top: 15px; text-align: center; color: #a0aec0; font-size: 11px;">
-          Hợp đồng được lập và lưu giữ điện tử trên hệ thống P2P VeloX Platform.<br>
-          Bản quyền thuộc về Công ty Công nghệ P2P VeloX Việt Nam.
-        </div>
-      </div>
-    `;
-
-    res.setHeader('Content-Type', 'text/html');
-    res.send(contractHtml);
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message });
-  }
-};
 
 // @desc    Get current renter's rental history
 // @route   GET /api/orders/my-rentals
@@ -1312,92 +1114,98 @@ exports.getDisputedOrders = async (req, res) => {
   }
 };
 
-// @desc    Inspector reviews dispute and requests Renter confirmation
-// @route   PUT /api/orders/:id/dispute-request-confirmation
-// @access  Private (Admin/Inspector)
-exports.requestRenterDeductionConfirmation = async (req, res) => {
+// @desc    Lender updates requested deduction amount
+// @route   PUT /api/orders/:id/update-dispute
+// @access  Private (Lender)
+exports.updateDispute = async (req, res) => {
   try {
-    const { approvedDeductionAmount } = req.body;
-    const order = await Order.findById(req.params.id);
+    const { requestedDeductionAmount } = req.body;
+    const order = await Order.findById(req.params.id).populate('asset');
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-    if (order.status !== 'disputed') {
-      return res.status(400).json({ success: false, message: 'Order is not disputed' });
+    if (order.status !== 'disputed' || order.disputeStatus !== 'negotiating') {
+      return res.status(400).json({ success: false, message: 'Cannot update dispute at this stage' });
     }
 
-    order.requestedDeductionAmount = Number(approvedDeductionAmount);
-    order.disputeStatus = 'inspector_reviewed';
+    if (req.user._id.toString() !== order.asset.lender.toString()) {
+      return res.status(403).json({ success: false, message: 'Only Lender can update dispute amount' });
+    }
+
+    order.requestedDeductionAmount = Number(requestedDeductionAmount);
     await order.save();
 
-    res.status(200).json({ success: true, message: 'Đã gửi yêu cầu xác nhận đền bù cho Renter.', data: order });
+    res.status(200).json({ success: true, message: 'Cập nhật số tiền yêu cầu thành công.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
 };
 
-// @desc    Renter accepts deduction
-// @route   PUT /api/orders/:id/accept-deduction
+// @desc    Renter accepts deduction or escalates
+// @route   PUT /api/orders/:id/negotiate-dispute
 // @access  Private (Renter)
-exports.acceptDeduction = async (req, res) => {
+exports.negotiateDispute = async (req, res) => {
   try {
+    const { action } = req.body; // 'accept' or 'escalate'
     const order = await Order.findById(req.params.id).populate('asset');
     if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
 
-    if (order.status !== 'disputed' || order.disputeStatus !== 'inspector_reviewed') {
-      return res.status(400).json({ success: false, message: 'Cannot accept deduction at this stage' });
+    if (order.status !== 'disputed' || order.disputeStatus !== 'negotiating') {
+      return res.status(400).json({ success: false, message: 'Cannot negotiate at this stage' });
     }
 
     if (req.user._id.toString() !== order.renter.toString()) {
-      return res.status(403).json({ success: false, message: 'Only Renter can accept deduction' });
+      return res.status(403).json({ success: false, message: 'Only Renter can negotiate' });
     }
 
-    order.deductionConfirmedByRenter = true;
-    
-    // Process financial transfer automatically since Renter agreed
-    const platformFeePercent = 0.1;
-    const platformFee = order.totalRent * platformFeePercent;
-    order.platformFee = platformFee;
-    
-    const lender = await User.findById(order.asset.lender);
-    const renter = await User.findById(order.renter);
-
-    let lenderPayout = (order.totalRent - platformFee);
-    const deduction = order.requestedDeductionAmount;
-
-    if (order.depositMethod === 'online') {
-      lender.balance += (lenderPayout + deduction);
+    if (action === 'escalate') {
+      order.disputeStatus = 'escalated';
+      await order.save();
+      return res.status(200).json({ success: true, message: 'Đã yêu cầu Admin can thiệp.', data: order });
+    } else if (action === 'accept') {
+      // Process financial transfer automatically since Renter agreed
+      const platformFeePercent = 0.1;
+      const platformFee = order.totalRent * platformFeePercent;
+      order.platformFee = platformFee;
       
-      const remainingDeposit = Math.max(0, order.deposit - deduction);
-      renter.balance += remainingDeposit;
+      const User = require('../models/User');
+      const Transaction = require('../models/Transaction');
+      
+      const lender = await User.findById(order.asset.lender);
+      const renter = await User.findById(order.renter);
+
+      let lenderPayout = (order.totalRent - platformFee);
+      const deduction = order.requestedDeductionAmount;
+
+      if (order.depositMethod === 'online') {
+        lender.balance += (lenderPayout + deduction);
+        
+        const remainingDeposit = Math.max(0, order.deposit - deduction);
+        renter.balance += remainingDeposit;
+      } else {
+        lender.balance += lenderPayout;
+        order.actualCashDepositReturned = Math.max(0, order.deposit - deduction);
+        order.cashDepositDeductionReason = 'Đã trừ tiền đền bù theo xác nhận của Renter';
+      }
+
+      order.status = 'completed';
+      order.disputeStatus = 'resolved';
+      
+      await lender.save();
+      await renter.save();
+      await order.save();
+      
+      await Transaction.create({
+        user: lender._id,
+        order: order._id,
+        amount: deduction,
+        type: 'addition',
+        reason: 'Được đền bù thiệt hại do Renter đồng ý'
+      });
+      
+      return res.status(200).json({ success: true, message: 'Đã đồng ý đền bù. Đơn hàng hoàn tất.', data: order });
     } else {
-      lender.balance += lenderPayout;
-      order.actualCashDepositReturned = Math.max(0, order.deposit - deduction);
-      order.cashDepositDeductionReason = 'Đã trừ tiền đền bù theo xác nhận của Renter';
+      return res.status(400).json({ success: false, message: 'Hành động không hợp lệ' });
     }
-
-    await lender.save();
-    await renter.save();
-    
-    await Transaction.create({
-      user: lender._id,
-      order: order._id,
-      amount: deduction,
-      type: 'addition',
-      reason: 'Được đền bù thiệt hại từ Renter'
-    });
-    await Transaction.create({
-      user: renter._id,
-      order: order._id,
-      amount: -deduction,
-      type: 'deduction',
-      reason: 'Đền bù thiệt hại cho Lender'
-    });
-
-    order.status = 'completed';
-    order.disputeStatus = 'resolved';
-    await order.save();
-
-    res.status(200).json({ success: true, message: 'Bạn đã đồng ý đền bù. Đơn hàng hoàn tất.', data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

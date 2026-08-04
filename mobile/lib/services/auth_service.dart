@@ -91,7 +91,7 @@ class AuthService {
       'cccdFront': cccdFront,
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
-    });
+    }, longRunning: true);
     return res['data'];
   }
 
@@ -106,13 +106,17 @@ class AuthService {
       'cccdBack': cccdBack,
       'cccdSelfie': cccdSelfie,
       'bankAccount': bankAccount,
-    });
+    }, longRunning: true);
     return res['data'];
   }
 
   static Future<double> getBalance() async {
     final res = await ApiClient.get('/auth/balance');
     return (res['data']['balance'] as num).toDouble();
+  }
+
+  static Future<void> updateAvatar(String base64DataUri) async {
+    await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
 
   /// Persist token + user after a successful auth response.

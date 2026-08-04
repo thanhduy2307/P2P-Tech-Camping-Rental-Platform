@@ -28,7 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       Navigator.pushNamed(context, '/otp',
           arguments: {'userId': data['userId'], 'phone': _phone.text.trim()});
     } catch (e) {
-      UiHelper.showError(context, e);
+      UiHelper.showErrorToast(context, e);
     }
   }
 

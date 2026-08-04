@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:velox_mobile/core/storage.dart';
@@ -60,11 +62,35 @@ class AppRoutes {
   }
 }
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await Storage.init();
-  runApp(const MyApp());
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    _lastError = details.exception.toString();
+  };
+  runZonedGuarded(
+    () async {
+      await Storage.init();
+      runApp(const MyApp());
+    },
+    (error, stack) {
+      _lastError = error.toString();
+      runApp(MaterialApp(
+        home: Scaffold(
+          body: SafeArea(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Text('EquipPeer lỗi khởi động:\n\n$error\n\n$stack',
+                  style: const TextStyle(fontSize: 13, color: Colors.red)),
+            ),
+          ),
+        ),
+      ));
+    },
+  );
 }
+
+String? _lastError;
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});

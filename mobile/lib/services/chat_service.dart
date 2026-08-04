@@ -1,4 +1,4 @@
-import 'package:velox_mobile/core/api_client.dart';
+﻿import 'package:velox_mobile/core/api_client.dart';
 import 'package:velox_mobile/models/message.dart';
 
 class ChatService {
@@ -7,7 +7,7 @@ class ChatService {
     required String content,
   }) async {
     final res = await ApiClient.post('/chats', {
-      'receiver': receiverId,
+      'receiverId': receiverId,
       'content': content,
     });
     return Message.fromJson(res['data']);
@@ -15,13 +15,13 @@ class ChatService {
 
   static Future<List<Message>> getMessages(String peerId) async {
     final res = await ApiClient.get('/chats/$peerId');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Message.fromJson(e)).toList();
   }
 
   static Future<List<Conversation>> getConversations() async {
     final res = await ApiClient.get('/chats/conversations');
-    final list = res['data'] as List;
+    final list = res['data'] as List? ?? [];
     return list.map((e) => Conversation.fromJson(e)).toList();
   }
 
@@ -29,3 +29,4 @@ class ChatService {
     await ApiClient.put('/chats/read/$peerId', {});
   }
 }
+

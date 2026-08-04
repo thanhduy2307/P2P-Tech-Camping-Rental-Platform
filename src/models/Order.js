@@ -95,10 +95,7 @@ const orderSchema = new mongoose.Schema({
     type: Number,
     default: 0
   },
-  contractPdfUrl: {
-    type: String,
-    default: ''
-  },
+
   depositMethod: {
     type: String,
     enum: ['online', 'cash'],

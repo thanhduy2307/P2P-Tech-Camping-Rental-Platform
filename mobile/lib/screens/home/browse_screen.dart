@@ -1,4 +1,7 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:http/http.dart' as http;
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/widgets/asset_card.dart';
@@ -45,16 +48,63 @@ class BrowseScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
           TextButton(
             onPressed: () async {
+              if (ctrl.text.trim().isEmpty) {
+                UiHelper.showErrorToast(context, 'Vui lòng nhập nhu cầu của bạn');
+                return;
+              }
               Navigator.pop(context);
+              UiHelper.showLoading(context);
               try {
-                final data = await AssetService.recommend(ctrl.text);
+                double? lat, lng;
+                String? addressString;
+                final perm = await Geolocator.checkPermission();
+                if (perm == LocationPermission.denied) {
+                  final req = await Geolocator.requestPermission();
+                  if (req == LocationPermission.whileInUse || req == LocationPermission.always) {
+                    final pos = await Geolocator.getCurrentPosition();
+                    lat = pos.latitude;
+                    lng = pos.longitude;
+                  }
+                } else if (perm == LocationPermission.whileInUse || perm == LocationPermission.always) {
+                  final pos = await Geolocator.getCurrentPosition();
+                  lat = pos.latitude;
+                  lng = pos.longitude;
+                }
+                if (lat != null && lng != null) {
+                  try {
+                    final uri = Uri.parse('https://nominatim.openstreetmap.org/reverse?lat=$lat&lon=$lng&format=json&accept-language=vi');
+                    final httpRes = await http.get(uri, headers: {'User-Agent': 'EquipPeer/1.0'});
+                    if (httpRes.statusCode == 200) {
+                      final data = jsonDecode(httpRes.body);
+                      final addr = data['address'] ?? {};
+                      final parts = [addr['quarter'] ?? addr['suburb'], addr['city'] ?? addr['town'] ?? addr['county'], addr['state']];
+                      addressString = parts.where((p) => p != null && p.toString().isNotEmpty).join(', ');
+                      if (addressString!.isEmpty) addressString = data['display_name'] ?? '';
+                    }
+                  } catch (_) {}
+                }
+                final data = await AssetService.recommend(ctrl.text, lat: lat, lng: lng, addressString: addressString);
                 if (!context.mounted) return;
+                UiHelper.hideLoading(context);
                 showDialog(
                   context: context,
                   builder: (_) => AlertDialog(
                     title: const Text('Gợi ý từ AI'),
                     content: SingleChildScrollView(
-                      child: Text(data['recommendations']?.toString() ?? 'Không có gợi ý.'),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(data['recommendations']?.toString() ?? 'Không có gợi ý.'),
+                          if (data['suggestedPlan']?.toString().isNotEmpty == true) ...[
+                            const SizedBox(height: 12),
+                            const Divider(),
+                            Text('Kế hoạch đề xuất:', style: TextStyle(fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 4),
+                            Text(data['suggestedPlan'].toString()),
+                          ],
+                        ],
+                      ),
                     ),
                     actions: [
                       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Đóng')),
@@ -62,7 +112,10 @@ class BrowseScreen extends StatelessWidget {
                   ),
                 );
               } catch (e) {
-                UiHelper.showError(context, e);
+                if (context.mounted) {
+                  UiHelper.hideLoading(context);
+                  UiHelper.showErrorToast(context, e);
+                }
               }
             },
             child: const Text('Gợi ý'),
@@ -101,7 +154,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
     try {
       _assets = await AssetService.getVerifiedAssets();
     } catch (e) {
-      if (mounted) UiHelper.showError(context, e);
+      if (mounted) UiHelper.showErrorToast(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }

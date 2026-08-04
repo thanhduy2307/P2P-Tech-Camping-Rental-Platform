@@ -42,8 +42,9 @@ class Asset {
   });
 
   factory Asset.fromJson(Map<String, dynamic> json) {
-    final location = json['location'] as Map<String, dynamic>?;
-    final lender = json['lender'] as Map<String, dynamic>?;
+    final location = _asMap(json['location']);
+    final lenderMap = _asMap(json['lender']);
+    final lenderIsMap = lenderMap != null;
     return Asset(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
@@ -57,9 +58,9 @@ class Asset {
       lat: location != null ? _toDouble(location['lat']) : null,
       lng: location != null ? _toDouble(location['lng']) : null,
       addressString: location?['addressString'],
-      lenderId: lender?['_id']?.toString(),
-      lenderName: lender?['name'],
-      lenderAvatar: lender?['avatar'],
+      lenderId: lenderIsMap ? lenderMap!['_id']?.toString() : json['lender']?.toString(),
+      lenderName: lenderIsMap ? lenderMap!['name'] : null,
+      lenderAvatar: lenderIsMap ? lenderMap!['avatar'] : null,
       distance: json['distance'] != null
           ? (json['distance'] as num).toDouble()
           : null,
@@ -73,6 +74,9 @@ class Asset {
 
   static double _toDouble(dynamic v) =>
       (v is num) ? v.toDouble() : 0.0;
+
+  static Map<String, dynamic>? _asMap(dynamic v) =>
+      (v is Map<String, dynamic>) ? v : null;
 
   static List<String> _toStringList(dynamic v) {
     if (v is List) return v.map((e) => e.toString()).toList();

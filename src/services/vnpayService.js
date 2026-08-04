@@ -14,10 +14,10 @@ exports.createPaymentUrl = (req, orderId, amount, orderInfo) => {
   let returnUrl = process.env.vnp_ReturnUrl;
 
   let date = new Date();
-  let createDate = moment(date).format('YYYYMMDDHHmmss');
-  
-  // Set expire date to 15 mins later
-  let expireDate = moment(date).add(15, 'minutes').format('YYYYMMDDHHmmss');
+  let createDate = moment(date).utcOffset('+07:00').format('YYYYMMDDHHmmss');
+
+  // Set expire date to 15 mins later (Vietnam time)
+  let expireDate = moment(date).utcOffset('+07:00').add(15, 'minutes').format('YYYYMMDDHHmmss');
 
   let vnp_Params = {};
   vnp_Params['vnp_Version'] = '2.1.0';

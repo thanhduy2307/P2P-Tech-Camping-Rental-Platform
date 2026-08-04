@@ -15,7 +15,7 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: ENV_FILE
+          envs: ENV_FILE,VNPay_TMNCODE,VNPay_HASHSECRET,VNPay_URL,VNPay_RETURN_URL,FRONTEND_URL
           script: |
             set -e
             cd /var/www/equippeer
@@ -24,5 +24,29 @@ jobs:
             if [ -n "$ENV_FILE" ]; then
               printf '%s\n' "$ENV_FILE" > .env
             fi
-            pm2 restart equippeer
+            # Ensure critical vars exist with correct values (case-insensitive mapping)
+            ensure_var() {
+              local key="$1"; local val="$2"
+              if grep -qi "^${key}=" .env; then
+                sed -i "s|^${key}=.*|${key}=${val}|" .env
+              else
+                printf '%s=%s\n' "$key" "$val" >> .env
+              fi
+            }
+            # Normalize VNPay keys (secret may use VNPay_* uppercase prefix)
+            [ -n "$VNPay_TMNCODE" ] && ensure_var "vnp_TmnCode" "$VNPay_TMNCODE"
+            [ -n "$VNPay_HASHSECRET" ] && ensure_var "vnp_HashSecret" "$VNPay_HASHSECRET"
+            [ -n "$VNPay_URL" ] && ensure_var "vnp_Url" "$VNPay_URL"
+            [ -n "$VNPay_RETURN_URL" ] && ensure_var "vnp_ReturnUrl" "$VNPay_RETURN_URL"
+            # Force correct callback + frontend URLs
+            ensure_var "vnp_ReturnUrl" "http://150.136.248.214/api/orders/vnpay_return"
+            ensure_var "FRONTEND_URL" "https://p2-p-tech-camping-rental-platform.vercel.app"
+            # Debug: list var names only (values hidden)
+            echo "== .env keys present =="
+            grep -o '^[^=]*' .env | sort | tr '\n' ' '
+            echo ""
+            pm2 delete equippeer 2>/dev/null || true
+            pm2 cleardump 2>/dev/null || true
+            rm -f ~/.pm2/dump.pm2 2>/dev/null || true
+            pm2 start src/index.js --name equippeer
             pm2 save
