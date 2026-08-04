@@ -3,9 +3,9 @@ const User = require('../models/User');
 
 exports.sendMessage = async (req, res) => {
   try {
-    const { receiverId, content } = req.body;
-    if (!receiverId || !content) {
-      return res.status(400).json({ success: false, message: 'Receiver and content are required' });
+    const { receiverId, content, imageUrl } = req.body;
+    if (!receiverId || (!content && !imageUrl)) {
+      return res.status(400).json({ success: false, message: 'Receiver and either content or imageUrl are required' });
     }
 
     const receiver = await User.findById(receiverId);
@@ -16,7 +16,8 @@ exports.sendMessage = async (req, res) => {
     const message = await Message.create({
       sender: req.user._id,
       receiver: receiverId,
-      content
+      content: content || '',
+      imageUrl: imageUrl || ''
     });
 
     res.status(201).json({ success: true, data: message });

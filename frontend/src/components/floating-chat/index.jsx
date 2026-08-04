@@ -8,6 +8,7 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
   const [inputText, setInputText] = useState('');
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const token = localStorage.getItem('token');
 
   // Fetch messages
@@ -58,19 +59,59 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
     }
   }, [messages, isMinimized]);
 
-  const handleSend = async (e) => {
-    e.preventDefault();
-    if (!inputText.trim() || sending) return;
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+      };
+    });
+  };
+
+  const handleSend = async (e, customImageUrl = null) => {
+    if (e) e.preventDefault();
+    if ((!inputText.trim() && !customImageUrl) || sending) return;
 
     const textToSend = inputText.trim();
-    setInputText('');
+    if (!customImageUrl) setInputText('');
     setSending(true);
 
     try {
-      const res = await api.post('/chats', {
+      const payload = {
         receiverId: userId,
         content: textToSend
-      });
+      };
+      if (customImageUrl) {
+        payload.imageUrl = customImageUrl;
+      }
+
+      const res = await api.post('/chats', payload);
       if (res.data?.success) {
         setMessages(prev => [...prev, res.data.data]);
         // Trigger global conversation update if main chat page is open
@@ -81,6 +122,33 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
       Swal.fire("Không thể gửi tin nhắn.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handleImagePick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // reset value
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+      const compressedBase64 = await compressImage(file);
+      Swal.close();
+      await handleSend(null, compressedBase64);
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
     }
   };
 
@@ -173,7 +241,12 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
                       : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
                   }`}
                 >
-                  <p className="break-words">{msg.content}</p>
+                  {msg.imageUrl && (
+                    <div className="mb-1 rounded overflow-hidden">
+                      <img src={msg.imageUrl} alt="Chat image" className="max-w-full max-h-40 object-contain cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.imageUrl, '_blank')} />
+                    </div>
+                  )}
+                  {msg.content && <p className="break-words">{msg.content}</p>}
                 </div>
               </div>
             );
@@ -185,13 +258,28 @@ const ChatWindow = ({ userId, name, role, isMinimized, onClose, onToggleMinimize
       {/* Input Form */}
       <form onSubmit={handleSend} className="p-2 border-t border-slate-100 bg-white flex items-center gap-1.5">
         <input 
+          type="file" 
+          ref={fileInputRef} 
+          onChange={handleFileChange} 
+          accept="image/*" 
+          className="hidden" 
+        />
+        <button 
+          type="button"
+          onClick={handleImagePick}
+          disabled={sending}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-2 rounded-lg transition-colors flex items-center justify-center disabled:opacity-50 flex-shrink-0"
+          title="Gửi ảnh"
+        >
+          <span className="material-symbols-outlined text-[16px]">image</span>
+        </button>
+        <input 
           type="text"
           placeholder="Nhập tin nhắn..."
           className="flex-grow border border-slate-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           disabled={sending}
-          required
         />
         <button 
           type="submit"

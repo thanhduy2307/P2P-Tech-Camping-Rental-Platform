@@ -37,6 +37,42 @@ exports.getStats = async (req, res) => {
     const pendingLenderAppsCount = await User.countDocuments({ lenderStatus: 'pending' });
     const pendingRenterAppsCount = await User.countDocuments({ renterStatus: 'pending' });
 
+    // Top users by total withdrawal amount (approved requests only)
+    const topWithdrawalUsers = await WithdrawalRequest.aggregate([
+      { $match: { status: 'approved' } },
+      {
+        $group: {
+          _id: '$lender',
+          totalWithdrawn: { $sum: '$amount' },
+          withdrawalCount: { $sum: 1 },
+          lastWithdrawnAt: { $max: '$transferredAt' }
+        }
+      },
+      { $sort: { totalWithdrawn: -1 } },
+      { $limit: 5 },
+      {
+        $lookup: {
+          from: 'users',
+          localField: '_id',
+          foreignField: '_id',
+          as: 'userInfo'
+        }
+      },
+      { $unwind: '$userInfo' },
+      {
+        $project: {
+          _id: 1,
+          totalWithdrawn: 1,
+          withdrawalCount: 1,
+          lastWithdrawnAt: 1,
+          name: '$userInfo.name',
+          email: '$userInfo.email',
+          avatar: '$userInfo.avatar',
+          role: '$userInfo.role'
+        }
+      }
+    ]);
+
     res.status(200).json({
       success: true,
       data: {
@@ -52,7 +88,8 @@ exports.getStats = async (req, res) => {
           withdrawals: pendingWithdrawalsCount,
           lenderApplications: pendingLenderAppsCount,
           renterApplications: pendingRenterAppsCount
-        }
+        },
+        topWithdrawalUsers
       }
     });
   } catch (error) {
@@ -154,6 +191,40 @@ exports.getOrders = async (req, res) => {
       .populate('renter', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: orders });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+// @desc    Lấy danh sách STK của Admin để dùng cho dropdown khi duyệt rút tiền
+// @route   GET /api/admin/bank-accounts
+// @access  Private (Admin)
+exports.getAdminBankAccounts = async (req, res) => {
+  try {
+    const bankAccounts = [
+      {
+        id: 1,
+        bankName: 'Vietcombank',
+        accountNumber: '0123456789',
+        accountHolder: 'NGUYEN VAN ADMIN',
+        shortName: 'VCB - 0123456789'
+      },
+      {
+        id: 2,
+        bankName: 'Techcombank',
+        accountNumber: '190366668888',
+        accountHolder: 'NGUYEN VAN ADMIN',
+        shortName: 'TCB - 190366668888'
+      },
+      {
+        id: 3,
+        bankName: 'MBBank',
+        accountNumber: '888899990000',
+        accountHolder: 'NGUYEN VAN ADMIN',
+        shortName: 'MB - 888899990000'
+      }
+    ];
+
+    res.status(200).json({ success: true, data: bankAccounts });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

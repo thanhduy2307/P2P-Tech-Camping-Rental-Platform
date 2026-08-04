@@ -20,6 +20,7 @@ const Chat = () => {
   const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   // Auto-scroll helper
   const scrollToBottom = () => {
@@ -165,19 +166,24 @@ const Chat = () => {
   }, [token, activeUser]);
 
   // 5. Send message
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!inputText.trim() || !activeUser || sending) return;
+  const handleSendMessage = async (e, customImageUrl = null) => {
+    if (e) e.preventDefault();
+    if ((!inputText.trim() && !customImageUrl) || !activeUser || sending) return;
 
     setSending(true);
     const textToSend = inputText.trim();
-    setInputText('');
+    if (!customImageUrl) setInputText('');
 
     try {
-      const response = await api.post('/chats', {
+      const payload = {
         receiverId: activeUser._id,
         content: textToSend
-      });
+      };
+      if (customImageUrl) {
+        payload.imageUrl = customImageUrl;
+      }
+
+      const response = await api.post('/chats', payload);
 
       if (response.data?.success) {
         const newMsg = response.data.data;
@@ -201,6 +207,68 @@ const Chat = () => {
       Swal.fire("Không thể gửi tin nhắn. Vui lòng thử lại.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6));
+        };
+      };
+    });
+  };
+
+  const handleImagePick = () => {
+    if (fileInputRef.current) {
+      fileInputRef.current.value = null; // reset value
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      allowOutsideClick: false,
+      didOpen: () => Swal.showLoading()
+    });
+    
+    try {
+      const compressedBase64 = await compressImage(file);
+      Swal.close();
+      await handleSendMessage(null, compressedBase64);
+    } catch (err) {
+      console.error(err);
+      Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
     }
   };
 
@@ -360,7 +428,12 @@ const Chat = () => {
                               : 'bg-white border border-slate-200 text-slate-800 rounded-bl-none'
                           }`}
                         >
-                          <p className="break-words">{msg.content}</p>
+                          {msg.imageUrl && (
+                            <div className="mb-2 rounded overflow-hidden">
+                              <img src={msg.imageUrl} alt="Chat image" className="max-w-full max-h-60 object-contain cursor-pointer hover:opacity-90 transition-opacity" onClick={() => window.open(msg.imageUrl, '_blank')} />
+                            </div>
+                          )}
+                          {msg.content && <p className="break-words">{msg.content}</p>}
                           <span 
                             className={`block text-[9px] mt-1.5 text-right ${
                               isMsgFromMe ? 'text-teal-200/90' : 'text-slate-400'
@@ -379,13 +452,28 @@ const Chat = () => {
               {/* Message Input Box */}
               <form onSubmit={handleSendMessage} className="p-4 border-t border-slate-150 bg-white flex items-center gap-3">
                 <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  onChange={handleFileChange} 
+                  accept="image/*" 
+                  className="hidden" 
+                />
+                <button 
+                  type="button"
+                  onClick={handleImagePick}
+                  disabled={sending}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-600 p-3 rounded-xl shadow-sm transition-colors flex items-center justify-center disabled:opacity-50"
+                  title="Gửi ảnh"
+                >
+                  <span className="material-symbols-outlined text-[20px]">image</span>
+                </button>
+                <input 
                   type="text"
                   placeholder="Nhập nội dung tin nhắn..."
                   className="flex-grow border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500"
                   value={inputText}
                   onChange={(e) => setInputText(e.target.value)}
                   disabled={sending}
-                  required
                 />
                 <button 
                   type="submit"

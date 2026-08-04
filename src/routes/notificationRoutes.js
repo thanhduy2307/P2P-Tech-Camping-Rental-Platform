@@ -11,7 +11,7 @@ router.get('/', protect, async (req, res) => {
     const notifications = await Notification.find({ recipient: req.user._id })
       .sort({ createdAt: -1 })
       .limit(50);
-    
+
     res.json({ success: true, data: notifications });
   } catch (error) {
     console.error('Error fetching notifications:', error);
@@ -29,11 +29,11 @@ router.put('/:id/read', protect, async (req, res) => {
       { isRead: true },
       { new: true }
     );
-    
+
     if (!notification) {
       return res.status(404).json({ success: false, message: 'Không tìm thấy thông báo' });
     }
-    
+
     res.json({ success: true, data: notification });
   } catch (error) {
     console.error('Error marking notification as read:', error);
@@ -50,7 +50,7 @@ router.put('/read-all', protect, async (req, res) => {
       { recipient: req.user._id, isRead: false },
       { isRead: true }
     );
-    
+
     res.json({ success: true, message: 'Đã đánh dấu tất cả là đã đọc' });
   } catch (error) {
     console.error('Error marking all notifications as read:', error);

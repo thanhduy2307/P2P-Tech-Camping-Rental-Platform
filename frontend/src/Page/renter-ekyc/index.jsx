@@ -97,7 +97,7 @@ const RenterEkyc = () => {
     }
 
     if (!cccdFrontPreview || !cccdBackPreview || !cccdSelfiePreview) {
-      setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chụp selfie.');
+      setErrorMessage('Vui lòng tải lên đầy đủ hình ảnh CCCD mặt trước, mặt sau và ảnh chân dung.');
       return;
     }
 
@@ -127,7 +127,7 @@ const RenterEkyc = () => {
         const freshUser = response.data.data;
         setUser(freshUser);
         dispatch(updateProfile(freshUser));
-        setSuccessMessage('Nộp đơn xác thực Renter eKYC thành công! Đang chờ Admin duyệt.');
+        setSuccessMessage(response.data.message || 'Hồ sơ đã được gửi để xử lý.');
         setCccdFrontFile(null);
         setCccdBackFile(null);
         setCccdSelfieFile(null);
@@ -216,7 +216,7 @@ const RenterEkyc = () => {
             Nội dung kiểm tra bao gồm:
           </p>
           <p>• Tính rõ nét, không mờ nhòe của ảnh mặt trước và mặt sau CCCD.</p>
-          <p>• Ảnh chân dung selfie khớp khuôn mặt với ảnh trên CCCD.</p>
+          <p>• Ảnh chân dung khớp khuôn mặt với ảnh trên CCCD.</p>
           <p>• Không có dấu hiệu chỉnh sửa ảnh kỹ thuật số.</p>
         </div>
         <div className="pt-4 flex flex-col sm:flex-row gap-3 justify-center">
@@ -285,7 +285,7 @@ const RenterEkyc = () => {
             Lý do từ chối từ Ban quản trị:
           </p>
           <div className="bg-white/80 p-3 rounded-lg border border-red-100 font-semibold text-slate-850 leading-relaxed italic">
-            "{user.renterOnboarding?.rejectReason || 'Ảnh CCCD bị mờ, lóa hoặc ảnh chân dung tự chụp cầm giấy tờ không khớp mặt.'}"
+            "{user.renterOnboarding?.rejectReason || 'Ảnh CCCD bị mờ, lóa hoặc ảnh chân dung không khớp mặt.'}"
           </div>
         </div>
 
@@ -338,7 +338,7 @@ const RenterEkyc = () => {
             <div>
               <h4 className="font-bold text-xs text-slate-800">Cung cấp giấy tờ định danh</h4>
               <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                Vui lòng tải lên 3 hình ảnh chụp rõ nét (Mặt trước CCCD, Mặt sau CCCD và Ảnh chân dung bạn cầm CCCD). Hãy đảm bảo ảnh đủ sáng, rõ mặt và rõ chữ số trên thẻ.
+                Vui lòng tải lên 3 hình ảnh chụp rõ nét (Mặt trước CCCD, Mặt sau CCCD và Ảnh chân dung). Hãy đảm bảo ảnh đủ sáng, rõ mặt và rõ chữ số trên thẻ.
               </p>
             </div>
           </div>
@@ -392,7 +392,7 @@ const RenterEkyc = () => {
 
             {/* CCCD Selfie */}
             <div className="flex flex-col items-center">
-              <span className="text-[11px] font-bold text-slate-600 mb-2">Ảnh Selfie cầm CCCD <span className="text-red-500">*</span></span>
+              <span className="text-[11px] font-bold text-slate-600 mb-2">Ảnh chân dung <span className="text-red-500">*</span></span>
               <div className="w-full aspect-[4/3] rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:border-teal-500 transition-all relative overflow-hidden flex flex-col items-center justify-center cursor-pointer group">
                 {cccdSelfiePreview ? (
                   <img src={cccdSelfiePreview} alt="CCCD Selfie Preview" className="w-full h-full object-cover" />

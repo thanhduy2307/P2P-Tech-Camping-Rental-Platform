@@ -188,6 +188,44 @@ const Orders = () => {
     }
   };
 
+  const handleNegotiateDispute = async (orderId, action) => {
+    try {
+      const confirmText = action === 'accept' 
+        ? 'Bạn có chắc chắn đồng ý đền bù số tiền này? Tiền sẽ được trừ tự động và đơn hàng sẽ hoàn tất.' 
+        : 'Bạn muốn yêu cầu Admin can thiệp giải quyết tranh chấp này?';
+        
+      const result = await Swal.fire({
+        title: 'Xác nhận',
+        text: confirmText,
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonText: 'Đồng ý',
+        cancelButtonText: 'Hủy'
+      });
+
+      if (!result.isConfirmed) return;
+
+      const response = await api.put(`/orders/${orderId}/negotiate-dispute`, { action });
+      if (response.data?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Thành công',
+          text: response.data.message
+        });
+        // Re-fetch to update list
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: err.response?.data?.message || 'Không thể thực hiện hành động này.'
+      });
+    }
+  };
+
 
   const token = localStorage.getItem('token');
   const paymentStatus = searchParams.get('payment');
@@ -230,6 +268,41 @@ const Orders = () => {
     fetchOrders();
   }, [token]);
 
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = (event) => {
+        const img = new Image();
+        img.src = event.target.result;
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1000;
+          const MAX_HEIGHT = 1000;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height *= MAX_WIDTH / width;
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width *= MAX_HEIGHT / height;
+              height = MAX_HEIGHT;
+            }
+          }
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', 0.6)); // 60% quality JPEG
+        };
+      };
+    });
+  };
+
   const handlePickSingleImage = (orderId, type, index) => {
     const input = document.createElement('input');
     input.type = 'file';
@@ -238,53 +311,90 @@ const Orders = () => {
     input.onchange = async () => {
       const file = input.files[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
+      
+      Swal.fire({
+        title: 'Đang xử lý ảnh...',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+      
+      try {
+        const compressedBase64 = await compressImage(file);
+        
         if (type === 'handover') {
           setHandoverDrafts(prev => {
             const current = prev[orderId] || ['', '', ''];
             const next = [...current];
-            next[index] = reader.result;
+            next[index] = compressedBase64;
             return { ...prev, [orderId]: next };
           });
         } else {
           setReturnDrafts(prev => {
             const current = prev[orderId] || ['', '', ''];
             const next = [...current];
-            next[index] = reader.result;
+            next[index] = compressedBase64;
             return { ...prev, [orderId]: next };
           });
         }
-      };
-      reader.readAsDataURL(file);
+        Swal.close();
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh', 'error');
+      }
     };
   };
 
   const handleSubmitHandoverImages = async (orderId) => {
     const images = handoverDrafts[orderId] || [];
     if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      text: 'Vui lòng không đóng trang này',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       const res = await api.put(`/orders/${orderId}/renter-handover-images`, { images });
       if (res.data?.success) {
-        Swal.fire('Tải ảnh thành công! Bạn có thể xem mã OTP.');
-        window.location.reload();
+        Swal.fire('Thành công!', 'Tải ảnh thành công! Bạn có thể xem mã OTP.', 'success').then(() => {
+          window.location.reload();
+        });
       }
     } catch (err) {
-      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+      console.error(err);
+      Swal.fire('Lỗi', err.response?.data?.message || 'Có lỗi xảy ra hoặc timeout. Vui lòng tải lại trang.', 'error');
     }
   };
 
   const handleSubmitReturnImages = async (orderId) => {
     const images = returnDrafts[orderId] || [];
     if (images.filter(i => i).length < 3) return Swal.fire('Vui lòng tải đủ 3 ảnh.');
+    
+    Swal.fire({
+      title: 'Đang tải ảnh lên...',
+      text: 'Vui lòng không đóng trang này',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       const res = await api.put(`/orders/${orderId}/renter-return-images`, { images });
       if (res.data?.success) {
-        Swal.fire('Tải ảnh trả đồ thành công! Bạn có thể xem mã OTP.');
-        window.location.reload();
+        Swal.fire('Thành công!', 'Tải ảnh trả đồ thành công! Bạn có thể xem mã OTP.', 'success').then(() => {
+          window.location.reload();
+        });
       }
     } catch (err) {
-      Swal.fire(err.response?.data?.message || 'Có lỗi xảy ra');
+      console.error(err);
+      Swal.fire('Lỗi', err.response?.data?.message || 'Có lỗi xảy ra hoặc timeout. Vui lòng tải lại trang.', 'error');
     }
   };
 
@@ -845,6 +955,45 @@ const Orders = () => {
                         )}
                       </div>
 
+                      {/* Dispute UI for Renter */}
+                      {order.status === 'disputed' && (
+                        <div className="bg-red-50 p-4 rounded-xl border border-red-200 mt-4 flex flex-col gap-2.5">
+                          <h4 className="font-bold text-red-700 text-sm flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-base">warning</span>
+                            Đơn hàng đang có tranh chấp
+                          </h4>
+                          {order.disputeStatus === 'negotiating' && (
+                            <>
+                              <p className="text-xs text-red-800/90 leading-relaxed">
+                                Lender yêu cầu bạn đền bù <strong>{order.requestedDeductionAmount?.toLocaleString('vi-VN')} đ</strong> với lý do: <em>"{order.disputeNotes}"</em>.
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <button
+                                  onClick={() => handleNegotiateDispute(order._id, 'accept')}
+                                  className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2 px-3 rounded-lg transition-colors cursor-pointer border-none shadow-sm"
+                                >
+                                  Đồng ý đền bù
+                                </button>
+                                <button
+                                  onClick={() => handleNegotiateDispute(order._id, 'escalate')}
+                                  className="flex-1 bg-white hover:bg-slate-50 text-red-700 font-bold text-xs py-2 px-3 rounded-lg border border-red-200 transition-colors cursor-pointer shadow-sm"
+                                >
+                                  Yêu cầu Admin xử lý
+                                </button>
+                              </div>
+                              <p className="text-[10px] text-red-600 italic text-center mt-1">
+                                Bạn cũng có thể "Chat với Lender" để thỏa thuận lại mức giá.
+                              </p>
+                            </>
+                          )}
+                          {order.disputeStatus === 'escalated' && (
+                            <div className="text-xs text-red-800 font-medium text-center py-2 bg-red-100 rounded-lg">
+                              Đang chờ Admin xử lý. Vui lòng theo dõi email hoặc thông báo.
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       {/* Action buttons */}
                       <div className="flex flex-col gap-2.5">
                         {order.status === 'pending_payment' && (
@@ -893,17 +1042,7 @@ const Orders = () => {
                             Đang chờ duyệt gia hạn {order.extensionDays} ngày
                           </div>
                         )}
-                        {order.status !== 'pending_payment' && asset?.depositAmount >= 2000000 && (
-                          <a 
-                            href={`http://localhost:5000/api/orders/${order._id}/contract?token=${localStorage.getItem('token')}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer" 
-                            className="w-full bg-white hover:bg-surface-container-low text-on-surface border border-outline font-semibold text-xs py-2.5 px-4 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5"
-                          >
-                            <span className="material-symbols-outlined text-sm">picture_as_pdf</span>
-                            Xem Hợp đồng (PDF)
-                          </a>
-                        )}
+
                          <Link 
                           to={`/assets/${asset._id}`} 
                           className="w-full bg-surface-container-low hover:bg-surface-container text-on-surface font-semibold text-xs py-2.5 px-4 rounded-xl transition-all flex items-center justify-center gap-1.5"

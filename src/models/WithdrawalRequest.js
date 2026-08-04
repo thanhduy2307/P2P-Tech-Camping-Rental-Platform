@@ -23,6 +23,21 @@ const withdrawalRequestSchema = new mongoose.Schema({
   rejectReason: {
     type: String,
     default: ''
+  },
+  transactionReference: {
+    type: String,
+    default: ''
+  },
+  adminTransferInfo: {
+    type: String,
+    default: ''
+  },
+  transferReceiptImage: {
+    type: String,
+    default: ''
+  },
+  transferredAt: {
+    type: Date
   }
 }, { timestamps: true });
 

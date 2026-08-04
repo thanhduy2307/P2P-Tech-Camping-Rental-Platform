@@ -2,6 +2,7 @@ import Swal from 'sweetalert2';
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import api from '../../configs/axios';
+import WithdrawalApprovalModal from './WithdrawalApprovalModal';
 
 const DashboardAdmin = () => {
   // Navigation & UI States
@@ -29,6 +30,7 @@ const DashboardAdmin = () => {
 
   // Modal / Interaction States
   const [rejectionModal, setRejectionModal] = useState({ open: false, type: null, id: null });
+  const [withdrawalApproveModal, setWithdrawalApproveModal] = useState({ open: false, req: null });
   const [rejectReason, setRejectReason] = useState('');
   const [lightbox, setLightbox] = useState({ open: false, imgUrl: '', title: '' });
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
@@ -319,19 +321,10 @@ const DashboardAdmin = () => {
   };
 
   // Withdrawal verification approvals
-  const handleVerifyWithdrawal = async (id, status) => {
+  const handleVerifyWithdrawal = async (id, status, req = null) => {
     if (status === 'approved') {
-      const _swalRes = await Swal.fire({title: 'Xác nhận duyệt yêu cầu rút tiền này? Số dư ví người dùng đã được trừ.', showCancelButton: true, confirmButtonText: "Đồng ý", cancelButtonText: "Hủy"});
-    if (!_swalRes.isConfirmed) return;
-      try {
-        const res = await api.put(`/auth/withdrawals/${id}/verify`, { status });
-        if (res.data && res.data.success) {
-          showToast('Duyệt yêu cầu rút tiền thành công.');
-          fetchWithdrawals();
-          fetchStats();
-        }
-      } catch (err) {
-        showToast(err.response?.data?.message || 'Thao tác thất bại.', 'error');
+      if (req) {
+        setWithdrawalApproveModal({ open: true, req });
       }
     } else {
       // open rejection modal
@@ -577,7 +570,96 @@ const DashboardAdmin = () => {
           </div>
         </div>
 
+        {/* Top Withdrawal Users Leaderboard */}
+        <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm">
+          <h4 className="font-bold text-slate-800 text-lg mb-6 flex items-center gap-2">
+            <span className="material-symbols-outlined text-amber-500">emoji_events</span>
+            Top người rút tiền nhiều nhất
+            <span className="ml-auto text-xs font-normal text-slate-400 bg-slate-100 px-2 py-1 rounded-full">Chỉ tính giao dịch đã duyệt</span>
+          </h4>
+
+          {!stats.topWithdrawalUsers || stats.topWithdrawalUsers.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-slate-400 gap-3">
+              <span className="material-symbols-outlined text-5xl text-slate-200">account_balance_wallet</span>
+              <p className="text-sm font-medium">Chưa có giao dịch rút tiền nào được duyệt.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {stats.topWithdrawalUsers.map((user, idx) => {
+                const medals = ['🥇', '🥈', '🥉', '4', '5'];
+                const medalColors = [
+                  'bg-gradient-to-r from-amber-400 to-yellow-300 text-white',
+                  'bg-gradient-to-r from-slate-400 to-slate-300 text-white',
+                  'bg-gradient-to-r from-orange-400 to-amber-300 text-white',
+                  'bg-slate-100 text-slate-600',
+                  'bg-slate-100 text-slate-600'
+                ];
+                const barWidths = stats.topWithdrawalUsers.length > 0
+                  ? Math.round((user.totalWithdrawn / stats.topWithdrawalUsers[0].totalWithdrawn) * 100)
+                  : 0;
+
+                return (
+                  <div key={user._id} className="flex items-center gap-4 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
+                    {/* Rank Badge */}
+                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 shadow-sm ${medalColors[idx]}`}>
+                      {medals[idx]}
+                    </div>
+
+                    {/* Avatar */}
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 flex items-center justify-center font-bold text-base flex-shrink-0">
+                      {user.avatar
+                        ? <img src={user.avatar} alt={user.name} className="w-full h-full rounded-full object-cover" />
+                        : user.name?.charAt(0)?.toUpperCase()
+                      }
+                    </div>
+
+                    {/* Name & Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-slate-800 text-sm truncate">{user.name}</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 font-bold flex-shrink-0">
+                          {user.role === 'lender' ? 'Lender' : user.role}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className={`h-1.5 rounded-full transition-all duration-700 ${idx === 0 ? 'bg-amber-400' : idx === 1 ? 'bg-slate-400' : idx === 2 ? 'bg-orange-400' : 'bg-teal-400'}`}
+                            style={{ width: `${barWidths}%` }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-slate-400 flex-shrink-0">{user.withdrawalCount} lần rút</span>
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-slate-900 text-sm">{formatCurrency(user.totalWithdrawn)}</p>
+                      {user.lastWithdrawnAt && (
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {new Date(user.lastWithdrawnAt).toLocaleDateString('vi-VN')}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Total approved withdrawals summary */}
+          <div className="mt-6 pt-4 border-t border-slate-100 flex justify-between items-center text-sm">
+            <span className="text-slate-500">Tổng tiền đã rút (toàn hệ thống):</span>
+            <span className="font-bold text-slate-900">
+              {formatCurrency(
+                (stats.topWithdrawalUsers || []).reduce((s, u) => s + u.totalWithdrawn, 0)
+              )}
+            </span>
+          </div>
+        </div>
+
         {/* Quick Actions Panel */}
+
         <div className="bg-slate-900 text-white rounded-xl p-6 shadow-md border border-slate-800">
           <h4 className="font-bold text-lg mb-2 flex items-center gap-2 text-emerald-400">
             <span className="material-symbols-outlined">rocket_launch</span>
@@ -1198,7 +1280,7 @@ const DashboardAdmin = () => {
                         {req.status === 'pending' ? (
                           <div className="flex gap-2 justify-end">
                             <button
-                              onClick={() => handleVerifyWithdrawal(req._id, 'approved')}
+                              onClick={() => handleVerifyWithdrawal(req._id, 'approved', req)}
                               className="px-2.5 py-1.5 bg-emerald-600 text-white font-semibold text-xs rounded hover:bg-emerald-700 transition-colors cursor-pointer flex items-center gap-0.5"
                             >
                               <span className="material-symbols-outlined text-[15px]">check_circle</span> Duyệt
@@ -1839,6 +1921,13 @@ const DashboardAdmin = () => {
           </div>
         </div>
       )}
+      {/* Render Modal Duyệt Rút Tiền */}
+      <WithdrawalApprovalModal 
+        open={withdrawalApproveModal.open} 
+        req={withdrawalApproveModal.req} 
+        onClose={() => setWithdrawalApproveModal({ open: false, req: null })} 
+        onRefresh={() => { fetchWithdrawals(); fetchStats(); }} 
+      />
     </div>
   );
 };

@@ -74,6 +74,8 @@ exports.createAsset = async (req, res) => {
     }
 
     // 4. AI Metadata Extraction & Content Moderation (Anti-Fraud & NSFW Check)
+    // Tạm thời tắt tính năng AI check khi up sản phẩm của lender theo yêu cầu
+    /*
     const scanResult = await aiService.scanImageForFraud(images[0]);
     if (scanResult.isCopied) {
       return res.status(400).json({
@@ -81,6 +83,8 @@ exports.createAsset = async (req, res) => {
         message: `Đăng ký thiết bị bị từ chối do phát hiện hình ảnh không hợp lệ (Gian lận hoặc Nhạy cảm). Lý do AI: ${scanResult.reason}`
       });
     }
+    */
+    const scanResult = { isCopied: false, reason: 'AI Check Disabled' };
 
     let finalDepositAmount = depositAmount;
     if (depositCalculationMode === 'auto') {
@@ -666,7 +670,7 @@ exports.aiEstimateDeposit = async (req, res) => {
 // @access  Public / Renter
 exports.recommendAssetsByNeed = async (req, res) => {
   try {
-    const { query } = req.body;
+    const { query, lat, lng, addressString } = req.body;
 
     if (!query) {
       return res.status(400).json({ success: false, message: 'Vui lòng nhập nhu cầu cắm trại dã ngoại của bạn.' });
@@ -675,7 +679,8 @@ exports.recommendAssetsByNeed = async (req, res) => {
     // Get all verified assets to match against
     const availableAssets = await Asset.find({ status: 'verified' });
 
-    const aiRecommendation = await aiService.generateCampingRecommendation(query, availableAssets);
+    const location = (lat != null && lng != null) ? { lat: parseFloat(lat), lng: parseFloat(lng), addressString: addressString || '' } : null;
+    const aiRecommendation = await aiService.generateCampingRecommendation(query, availableAssets, location);
 
     // Populate the recommended assets from database using the IDs returned by AI
     let recommendedAssets = [];

@@ -1,8 +1,9 @@
 const express = require('express');
 const {
   register,
-  registerPhone,
   verifyOtp,
+  forgotPasswordRequest,
+  forgotPasswordReset,
   login,
   googleCallback,
   switchRole,
@@ -21,7 +22,8 @@ const {
   applyRenterEkyc,
   getRenterApplications,
   verifyRenterApplication,
-  updatePublicProfileInfo
+  updatePublicProfileInfo,
+  getMyTransactions
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -30,8 +32,9 @@ const router = express.Router();
 
 router.get('/test-features', runIntegrationTests);
 router.post('/register', register);
-router.post('/register-phone', registerPhone);
 router.post('/verify-otp', verifyOtp);
+router.post('/forgot-password', forgotPasswordRequest);
+router.post('/reset-password', forgotPasswordReset);
 router.post('/login', login);
 router.get('/google/callback', googleCallback);
 router.get('/me', protect, getMe);
@@ -57,6 +60,7 @@ router.put('/lender-applications/:id/verify', protect, authorize('admin'), verif
 // Wallet & Withdrawals
 router.post('/withdraw', protect, authorize('renter', 'lender'), createWithdrawal);
 router.get('/my-withdrawals', protect, authorize('renter', 'lender'), getMyWithdrawals);
+router.get('/my-transactions', protect, authorize('renter', 'lender'), getMyTransactions);
 router.get('/withdrawals', protect, authorize('admin'), getWithdrawals);
 router.put('/withdrawals/:id/verify', protect, authorize('admin'), verifyWithdrawal);
 

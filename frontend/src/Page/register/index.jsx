@@ -10,7 +10,7 @@ const Register = () => {
   const dispatch = useDispatch();
 
   const [fullname, setFullname] = useState('');
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
@@ -22,11 +22,27 @@ const Register = () => {
   const [otpVerificationOpen, setOtpVerificationOpen] = useState(false);
   const [otpCode, setOtpCode] = useState('');
   const [verificationUserId, setVerificationUserId] = useState('');
-  const [mockOtp, setMockOtp] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrorMsg('');
+
+    const trimmedName = fullname.trim();
+    if (trimmedName.length < 2) {
+      setErrorMsg('Họ và tên phải có ít nhất 2 ký tự.');
+      return;
+    }
+
+    const cleanEmail = email.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setErrorMsg('Email không hợp lệ.');
+      return;
+    }
+
+    if (password.length < 6) {
+      setErrorMsg('Mật khẩu phải có ít nhất 6 ký tự.');
+      return;
+    }
 
     if (password !== confirmPassword) {
       setErrorMsg('Mật khẩu xác nhận không trùng khớp.');
@@ -41,27 +57,24 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/register-phone', {
+      const response = await api.post('/auth/register-email', {
         name: fullname,
-        phoneNumber,
         password,
         role: 'renter'
       });
 
       if (response.data && response.data.success) {
-        const { userId, phoneNumber: uPhone, otp } = response.data.data;
+        const { userId } = response.data.data;
         setVerificationUserId(userId);
-        setMockOtp(otp);
         setOtpVerificationOpen(true);
       } else {
-        setErrorMsg('Đăng ký số điện thoại thất bại.');
       }
     } catch (err) {
       console.error(err);
       if (err.response && err.response.data && err.response.data.message) {
         setErrorMsg(err.response.data.message);
       } else {
-        setErrorMsg('Số điện thoại đã tồn tại hoặc không hợp lệ.');
+        setErrorMsg('Email đã tồn tại hoặc không hợp lệ.');
       }
     } finally {
       setLoading(false);
@@ -74,18 +87,18 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/verify-otp', {
+      const response = await api.post('/auth/verify-email-otp', {
         userId: verificationUserId,
         otp: otpCode
       });
 
       if (response.data && response.data.success) {
-        const { token, role, name, email: uEmail, phoneNumber: uPhone, _id, isProfileCompleted } = response.data.data;
+        const { token, role, name, email: uEmail, _id, isProfileCompleted } = response.data.data;
         
         dispatch(loginSuccess({
           token,
           role,
-          user: { name, email: uEmail, phoneNumber: uPhone, _id, isProfileCompleted }
+          user: { name, email: uEmail, _id, isProfileCompleted }
         }));
         
         Swal.fire('Đăng ký tài khoản thành công!');
@@ -132,7 +145,7 @@ const Register = () => {
               <h1 className="font-display-lg text-title-md font-extrabold text-primary tracking-tight">EquipPeer</h1>
             </div>
             <h2 className="font-headline-lg-mobile md:font-headline-lg text-headline-lg-mobile md:text-headline-lg text-on-surface mb-2">Đăng ký tài khoản</h2>
-            <p className="font-body-md text-body-md text-on-surface-variant">Bắt đầu hành trình chia sẻ và khám phá bằng Số điện thoại.</p>
+            <p className="font-body-md text-body-md text-on-surface-variant">Bắt đầu hành trình chia sẻ và khám phá bằng Email.</p>
           </div>
 
           {errorMsg && (
@@ -145,16 +158,9 @@ const Register = () => {
           {otpVerificationOpen ? (
             <form className="space-y-5" onSubmit={handleVerifyOtp}>
               <div className="text-center bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
-                <span className="material-symbols-outlined text-amber-500 text-3xl mb-1 animate-pulse">lock_open</span>
-                <h4 className="text-xs font-bold text-slate-800">Xác thực OTP số điện thoại</h4>
                 <p className="text-[10px] text-slate-450 mt-1 leading-relaxed">
-                  Mã xác thực đã được gửi đến số điện thoại: <strong className="text-slate-800">{phoneNumber}</strong>
+                  Mã xác thực đã được gửi đến email: <strong className="text-slate-800">{email}</strong>
                 </p>
-                {mockOtp && (
-                  <div className="bg-teal-50 border border-teal-100 text-teal-800 text-[10px] font-bold py-1.5 px-3 rounded-lg mt-3 inline-block">
-                    Dành cho Tester: Mã OTP của bạn là: <span className="text-xs font-extrabold font-mono tracking-wider">{mockOtp}</span>
-                  </div>
-                )}
               </div>
 
               <div>
@@ -216,22 +222,22 @@ const Register = () => {
                 </div>
               </div>
 
-              {/* Phone Field */}
+              {/* Email Field */}
               <div className="space-y-2">
-                <label className="font-label-sm text-label-sm text-on-surface" htmlFor="phone">Số điện thoại</label>
+                <label className="font-label-sm text-label-sm text-on-surface" htmlFor="email">Email</label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span className="material-symbols-outlined text-outline">phone_iphone</span>
+                    <span className="material-symbols-outlined text-outline">mail</span>
                   </span>
                   <input 
                     className="w-full pl-10 pr-3 py-3 border border-outline-variant rounded-lg bg-surface-container-lowest focus:ring-2 focus:ring-secondary-container focus:border-secondary-container transition-shadow text-on-surface font-body-md text-body-md" 
-                    id="phone" 
-                    name="phone" 
-                    placeholder="Số điện thoại của bạn" 
+                    id="email" 
+                    name="email" 
+                    placeholder="Email của bạn" 
                     required 
-                    type="tel"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
               </div>

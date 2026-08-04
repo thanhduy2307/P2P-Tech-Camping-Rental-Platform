@@ -17,8 +17,8 @@ const router = express.Router();
 
 // Public routes
 router.get('/', getAllPosts);
-router.get('/:id', getPostById);
 router.get('/user/:userId', getUserPosts);
+router.get('/:id', getPostById);
 
 // Protected routes (require login)
 router.post('/', protect, createPost);

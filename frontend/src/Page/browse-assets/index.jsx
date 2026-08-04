@@ -88,7 +88,9 @@ const BrowseAssets = () => {
           const addr = data.address || {};
           const short = [addr.quarter || addr.suburb, addr.city || addr.town || addr.county, addr.state]
             .filter(Boolean).join(', ');
-          setLocationLabel(short || data.display_name || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+          const label = short || data.display_name || `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`;
+          setLocationLabel(label);
+          window.dispatchEvent(new CustomEvent('location-updated', { detail: { lat: latitude, lng: longitude, addressLabel: label } }));
         } catch {
           setLocationLabel(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
         }
@@ -108,6 +110,7 @@ const BrowseAssets = () => {
     setGpsError('');
     setMaxRadius('');
     if (sortBy === 'distance') setSortBy('suggested');
+    window.dispatchEvent(new CustomEvent('location-updated', { detail: null }));
   };
 
   // Fetch assets from API

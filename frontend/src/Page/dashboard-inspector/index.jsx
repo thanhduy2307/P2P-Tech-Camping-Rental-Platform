@@ -21,6 +21,7 @@ const DashboardInspector = () => {
   const [isDisputeModalOpen, setIsDisputeModalOpen] = useState(false);
   const [lenderCompensation, setLenderCompensation] = useState('');
   const [renterRefund, setRenterRefund] = useState('');
+  const [renterDebt, setRenterDebt] = useState('');
   const [resolveLoading, setResolveLoading] = useState(false);
   
   // Modal & Form States
@@ -32,15 +33,10 @@ const DashboardInspector = () => {
   const [modalImageIndex, setModalImageIndex] = useState(0);
 
   // Checklist States for In-person Inspections
-  const [techChecklist, setTechChecklist] = useState({
-    shutterCountTest: '',
-    deadPixelSensorCheck: false,
-    lensMoldCheck: false
-  });
-  const [campingChecklist, setCampingChecklist] = useState({
-    zipperWearCheck: false,
-    frameElasticityCheck: false,
-    tentHolesCheck: false
+  const [generalChecklist, setGeneralChecklist] = useState({
+    appearanceCheck: false,
+    functionCheck: false,
+    accessoriesCheck: false
   });
 
   // Fetch pending inspection tasks
@@ -92,6 +88,7 @@ const DashboardInspector = () => {
     setSelectedDispute(order);
     setLenderCompensation('');
     setRenterRefund('');
+    setRenterDebt('');
     setIsDisputeModalOpen(true);
   };
 
@@ -110,7 +107,8 @@ const DashboardInspector = () => {
       const payload = {
         action: actionStr,
         lenderCompensation: lenderCompensation ? Number(lenderCompensation) : 0,
-        renterRefund: renterRefund ? Number(renterRefund) : 0
+        renterRefund: renterRefund ? Number(renterRefund) : 0,
+        renterDebt: renterDebt ? Number(renterDebt) : 0
       };
       const response = await api.put(`/orders/${selectedDispute._id}/resolve-dispute`, payload);
       if (response.data && response.data.success) {
@@ -126,20 +124,6 @@ const DashboardInspector = () => {
     }
   };
 
-  const handleRequestRenterConfirmation = async (orderId, amount) => {
-    try {
-      const payload = { approvedDeductionAmount: amount };
-      const response = await api.put(`/orders/${orderId}/dispute-request-confirmation`, payload);
-      if (response.data?.success) {
-        Swal.fire('Thành công', 'Đã gửi yêu cầu xác nhận đền bù cho Renter.', 'success');
-        setIsDisputeModalOpen(false);
-        fetchDisputes();
-      }
-    } catch (err) {
-      console.error(err);
-      Swal.fire(err.response?.data?.message || 'Không thể gửi yêu cầu xác nhận đền bù.');
-    }
-  };
 
   // Open modal
   const handleOpenReview = (asset) => {
@@ -147,15 +131,10 @@ const DashboardInspector = () => {
     setStatus('verified');
     setVerificationNotes('');
     setModalImageIndex(0);
-    setTechChecklist({
-      shutterCountTest: '',
-      deadPixelSensorCheck: false,
-      lensMoldCheck: false
-    });
-    setCampingChecklist({
-      zipperWearCheck: false,
-      frameElasticityCheck: false,
-      tentHolesCheck: false
+    setGeneralChecklist({
+      appearanceCheck: false,
+      functionCheck: false,
+      accessoriesCheck: false
     });
     setIsModalOpen(true);
   };
@@ -177,23 +156,16 @@ const DashboardInspector = () => {
 
     const isOffline = selectedAsset.taskDetails && !selectedAsset.taskDetails.isRemote;
     if (status === 'verified' && isOffline) {
-      if (selectedAsset.category === 'Tech') {
-        if (techChecklist.shutterCountTest === '') {
-          Swal.fire('Vui lòng nhập số shot đã test của thiết bị.');
-          return;
-        }
-        payload.inspectionChecklist = {
-          shutterCountTest: parseInt(techChecklist.shutterCountTest),
-          deadPixelSensorCheck: techChecklist.deadPixelSensorCheck,
-          lensMoldCheck: techChecklist.lensMoldCheck
-        };
-      } else if (selectedAsset.category === 'Camping') {
-        payload.inspectionChecklist = {
-          zipperWearCheck: campingChecklist.zipperWearCheck,
-          frameElasticityCheck: campingChecklist.frameElasticityCheck,
-          tentHolesCheck: campingChecklist.tentHolesCheck
-        };
+      if (!generalChecklist.functionCheck || !generalChecklist.appearanceCheck) {
+        Swal.fire('Vui lòng đảm bảo thiết bị hoạt động bình thường và đúng như mô tả.');
+        return;
       }
+      
+      payload.inspectionChecklist = {
+        appearanceCheck: generalChecklist.appearanceCheck,
+        functionCheck: generalChecklist.functionCheck,
+        accessoriesCheck: generalChecklist.accessoriesCheck,
+      };
     }
 
     setSubmitLoading(true);
@@ -783,75 +755,37 @@ const DashboardInspector = () => {
                       <span className="material-symbols-outlined text-primary text-sm">fact_check</span>
                       Biên bản thẩm định thực tế (Bắt buộc cho Offline)
                     </h5>
-                    
-                    {selectedAsset.category === 'Tech' ? (
-                      <div className="space-y-3">
-                        <div className="flex flex-col gap-1">
-                          <label className="text-xs font-semibold text-slate-700">Test số shot (máy ảnh) *</label>
-                          <input 
-                            type="number"
-                            placeholder="Nhập số shot đếm được (e.g. 12500)"
-                            className="bg-white border border-slate-250 rounded-lg px-3 py-2 text-xs font-medium focus:outline-none focus:border-primary w-full md:w-1/2"
-                            value={techChecklist.shutterCountTest}
-                            onChange={(e) => setTechChecklist(prev => ({ ...prev, shutterCountTest: e.target.value }))}
-                          />
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.appearanceCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, appearanceCheck: e.target.checked }))}
+                        />
+                        <span>Ngoại hình đúng như mô tả và hình ảnh</span>
+                      </label>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
-                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                            <input 
-                              type="checkbox"
-                              className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.deadPixelSensorCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, deadPixelSensorCheck: e.target.checked }))}
-                            />
-                            <span>Sensor hoạt động tốt, không chết pixel</span>
-                          </label>
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.functionCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, functionCheck: e.target.checked }))}
+                        />
+                        <span>Hoạt động bình thường, không lỗi chức năng</span>
+                      </label>
 
-                          <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                            <input 
-                              type="checkbox"
-                              className="text-primary focus:ring-primary rounded"
-                              checked={techChecklist.lensMoldCheck}
-                              onChange={(e) => setTechChecklist(prev => ({ ...prev, lensMoldCheck: e.target.checked }))}
-                            />
-                            <span>Kính lens sạch, không mốc rễ tre</span>
-                          </label>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.zipperWearCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, zipperWearCheck: e.target.checked }))}
-                          />
-                          <span>Khóa kéo tốt, trơn tru không rách mòn</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.frameElasticityCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, frameElasticityCheck: e.target.checked }))}
-                          />
-                          <span>Khung lều đàn hồi tốt, không cong gãy</span>
-                        </label>
-
-                        <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
-                          <input 
-                            type="checkbox"
-                            className="text-primary focus:ring-primary rounded"
-                            checked={campingChecklist.tentHolesCheck}
-                            onChange={(e) => setCampingChecklist(prev => ({ ...prev, tentHolesCheck: e.target.checked }))}
-                          />
-                          <span>Màng chống muỗi kín, không lỗ thủng</span>
-                        </label>
-                      </div>
-                    )}
+                      <label className="flex items-center gap-2 cursor-pointer bg-white p-2.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700 md:col-span-2">
+                        <input 
+                          type="checkbox"
+                          className="text-primary focus:ring-primary rounded"
+                          checked={generalChecklist.accessoriesCheck}
+                          onChange={(e) => setGeneralChecklist(prev => ({ ...prev, accessoriesCheck: e.target.checked }))}
+                        />
+                        <span>Phụ kiện đi kèm đầy đủ như mô tả</span>
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -919,8 +853,17 @@ const DashboardInspector = () => {
                 <h4 className="font-bold text-orange-800 text-xs uppercase mb-2">Thông tin khiếu nại (Từ {selectedDispute.disputeCreator === 'lender' ? 'Lender' : 'Renter'})</h4>
                 <p className="text-sm text-slate-700">{selectedDispute.disputeNotes}</p>
                 {selectedDispute.requestedDeductionAmount > 0 && (
-                  <p className="text-sm font-bold text-red-600 mt-2">Mức yêu cầu bồi thường: {selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ</p>
+                  <p className="text-sm font-bold text-red-600 mt-2">Mức yêu cầu bồi thường (Từ Lender): {selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ</p>
                 )}
+
+                {/* --- FINANCIAL CONTEXT --- */}
+                <div className="mt-4 bg-white border border-orange-100 rounded-lg p-3 grid grid-cols-2 gap-2 text-xs">
+                  <div className="text-slate-600 font-semibold">Tổng tiền thuê:</div>
+                  <div className="font-bold text-slate-800 text-right">{selectedDispute.totalRent?.toLocaleString('vi-VN')} đ</div>
+                  
+                  <div className="text-slate-600 font-semibold">Tiền cọc ({selectedDispute.depositMethod === 'cash' ? 'Tiền mặt' : 'Online'}):</div>
+                  <div className="font-bold text-slate-800 text-right">{selectedDispute.deposit?.toLocaleString('vi-VN')} đ</div>
+                </div>
 
                 {/* --- LENDER IMAGES --- */}
                 <div className="mt-4 border-t border-orange-200/50 pt-3">
@@ -1034,9 +977,9 @@ const DashboardInspector = () => {
                     - Nhập số tiền bồi thường để Cưỡng chế trừ cọc Renter.<br/>
                     - Hoặc Bác bỏ nếu yêu cầu vô lý.
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền bồi thường cho Lender (đ)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền bồi thường (cho Lender)</label>
                       <input 
                         type="number" 
                         min="0"
@@ -1047,7 +990,7 @@ const DashboardInspector = () => {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền hoàn trả cho Renter (đ)</label>
+                      <label className="block text-xs font-bold text-slate-700 mb-1.5">Tiền hoàn trả (cho Renter)</label>
                       <input 
                         type="number" 
                         min="0"
@@ -1057,22 +1000,25 @@ const DashboardInspector = () => {
                         className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
                       />
                     </div>
+                    {selectedDispute.depositMethod === 'online' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">Renter nợ thêm (Nếu thiếu)</label>
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={renterDebt}
+                          onChange={(e) => setRenterDebt(e.target.value)}
+                          placeholder="VD: 100000"
+                          className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:bg-white focus:border-red-500 focus:outline-none"
+                        />
+                      </div>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500 italic">
                     * Tổng số tiền bồi thường và hoàn trả phải được phân bổ hợp lý dựa trên tổng giá trị cọc và thuê của đơn hàng.
                   </div>
 
                   <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 flex-wrap">
-                    {selectedDispute.requestedDeductionAmount > 0 && selectedDispute.disputeStatus !== 'inspector_reviewed' && (
-                      <button 
-                        type="button" 
-                        onClick={() => handleRequestRenterConfirmation(selectedDispute._id, selectedDispute.requestedDeductionAmount)}
-                        className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs py-2.5 px-4 rounded-xl transition-all shadow flex items-center gap-1.5"
-                      >
-                        <span className="material-symbols-outlined text-sm">forward_to_inbox</span>
-                        Gửi Renter xác nhận đền bù ({selectedDispute.requestedDeductionAmount.toLocaleString('vi-VN')} đ)
-                      </button>
-                    )}
                     <button 
                       type="button" 
                       onClick={() => setIsDisputeModalOpen(false)}

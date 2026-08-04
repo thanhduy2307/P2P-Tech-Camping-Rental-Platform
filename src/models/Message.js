@@ -13,7 +13,11 @@ const messageSchema = new mongoose.Schema({
   },
   content: {
     type: String,
-    required: true
+    required: false
+  },
+  imageUrl: {
+    type: String,
+    required: false
   },
   isRead: {
     type: Boolean,

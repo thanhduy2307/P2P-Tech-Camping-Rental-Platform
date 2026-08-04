@@ -21,5 +21,6 @@ router.put('/users/:id/role', updateUserRole);
 router.put('/users/:id/ban', toggleUserBan);
 router.get('/assets', getAssets);
 router.get('/orders', getOrders);
+router.get('/bank-accounts', require('../controllers/adminController').getAdminBankAccounts);
 
 module.exports = router;
