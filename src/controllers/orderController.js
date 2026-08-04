@@ -23,19 +23,19 @@ const haversineMeters = (lat1, lng1, lat2, lng2) => {
   return 2 * R * Math.asin(Math.sqrt(a));
 };
 
-// Helper to auto-expire unpaid orders older than 1 minute
+// Helper to auto-expire unpaid orders older than 10 minutes
 const expireOldPendingOrders = async () => {
   try {
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000);
     await Order.updateMany(
       { 
         status: 'pending_payment', 
-        createdAt: { $lt: oneMinuteAgo } 
+        createdAt: { $lt: cutoff } 
       },
       { 
         $set: { 
           status: 'cancelled', 
-          disputeNotes: 'Hệ thống tự động hủy đơn do không thanh toán trong vòng 1 phút.' 
+          disputeNotes: 'Hệ thống tự động hủy đơn do không thanh toán trong vòng 10 phút.' 
         } 
       }
     );
