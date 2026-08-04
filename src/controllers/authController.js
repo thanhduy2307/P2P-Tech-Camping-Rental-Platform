@@ -19,6 +19,118 @@ const generateToken = (id) => {
   });
 };
 
+exports.registerEmail = async (req, res) => {
+  try {
+    const { name, email, password, role } = req.body;
+
+    if (!name || !email || !password) {
+      return res.status(400).json({ success: false, message: 'Vui lòng điền đầy đủ Họ tên, Email và Mật khẩu.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ success: false, message: 'Email không đúng định dạng.' });
+    }
+
+    const userExists = await User.findOne({ email: cleanEmail });
+    if (userExists) {
+      if (userExists.isEmailVerified) {
+        return res.status(400).json({ success: false, message: 'Email này đã được đăng ký và xác thực.' });
+      }
+      await User.deleteMany({ email: cleanEmail, isEmailVerified: false });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(password, salt);
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const user = await User.create({
+      name,
+      email: cleanEmail,
+      password: hashedPassword,
+      role: role || 'renter',
+      isEmailVerified: false,
+      emailVerificationOtp: otp,
+      emailVerificationOtpExpires: new Date(Date.now() + 10 * 60 * 1000)
+    });
+
+    const emailService = require('../services/emailService');
+    const emailResult = await emailService.sendOtpEmail(cleanEmail, otp);
+
+    const isMock = !process.env.EMAIL_HOST;
+    const showOtp = isMock || !emailResult.success;
+
+    res.status(201).json({
+      success: true,
+      message: emailResult.success
+        ? 'Mã OTP xác thực đã được gửi đến email của bạn.'
+        : 'Cổng gửi email bị lỗi. Đã chuyển sang chế độ OTP dự phòng trên màn hình.',
+      data: {
+        userId: user._id,
+        email: user.email,
+        otp: showOtp ? otp : undefined,
+        emailSent: emailResult.success
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+exports.verifyEmailOtp = async (req, res) => {
+  try {
+    const { userId, otp } = req.body;
+
+    if (!userId || !otp) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp mã OTP.' });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản người dùng.' });
+    }
+
+    if (user.isEmailVerified) {
+      return res.status(400).json({ success: false, message: 'Email đã được xác minh.' });
+    }
+
+    if (!user.emailVerificationOtp || user.emailVerificationOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
+    }
+
+    if (new Date() > user.emailVerificationOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationOtp = undefined;
+    user.emailVerificationOtpExpires = undefined;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Xác thực email thành công!',
+      data: {
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        avatar: user.avatar,
+        isProfileCompleted: user.isProfileCompleted,
+        renterStatus: user.renterStatus,
+        renterOnboarding: user.renterOnboarding,
+        lenderStatus: user.lenderStatus,
+        lenderOnboarding: user.lenderOnboarding,
+        token: generateToken(user._id)
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.register = async (req, res) => {
   try {
     const { name, email, password, role } = req.body;

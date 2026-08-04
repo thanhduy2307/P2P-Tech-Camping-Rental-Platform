@@ -1,6 +1,8 @@
 const express = require('express');
 const {
   register,
+  registerEmail,
+  verifyEmailOtp,
   registerPhone,
   verifyOtp,
   login,
@@ -31,6 +33,8 @@ const router = express.Router();
 
 router.get('/test-features', runIntegrationTests);
 router.post('/register', register);
+router.post('/register-email', registerEmail);
+router.post('/verify-email-otp', verifyEmailOtp);
 router.post('/register-phone', registerPhone);
 router.post('/verify-otp', verifyOtp);
 router.post('/login', login);

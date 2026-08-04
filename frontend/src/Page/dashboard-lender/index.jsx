@@ -122,7 +122,13 @@ const DashboardLender = () => {
   const totalAssets = assets.length;
   const activeRentals = orders.filter(o => o.status === 'active').length;
   const pendingOrders = orders.filter(o => ['pending_payment', 'reserved'].includes(o.status)).length;
-  
+
+  // Total revenue: (totalRent - platformFee) from completed orders
+  // This matches what backend actually credits to lender.balance
+  const totalRevenue = orders
+    .filter(o => o.status === 'completed')
+    .reduce((sum, o) => sum + ((o.totalRent ?? 0) - (o.platformFee ?? 0)), 0);
+
   // Recent incoming orders
   const recentOrders = orders.slice(0, 5);
 
@@ -141,7 +147,7 @@ const DashboardLender = () => {
   return (
     <div className="space-y-8">
       {/* Top Banner (Stats Row) */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
         {/* Wallet Balance Card */}
         <div className="bg-gradient-to-br from-teal-500 to-emerald-600 text-white rounded-xl shadow-lg p-6 flex flex-col justify-between relative overflow-hidden group hover:scale-[1.01] transition-transform duration-300">
           <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
@@ -191,6 +197,20 @@ const DashboardLender = () => {
             <span className="text-slate-400 text-xs font-semibold uppercase tracking-wider block">Đang được thuê</span>
             <span className="text-2xl font-bold text-slate-800">{activeRentals} đơn</span>
           </div>
+        </div>
+
+        {/* Total Revenue Card */}
+        <div className="bg-gradient-to-br from-violet-500 to-purple-600 text-white rounded-xl shadow-lg p-6 flex flex-col justify-between relative overflow-hidden group hover:scale-[1.01] transition-transform duration-300">
+          <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
+            <span className="material-symbols-outlined text-[90px]">trending_up</span>
+          </div>
+          <div>
+            <span className="text-xs uppercase font-bold tracking-wider text-violet-200">Tổng doanh thu</span>
+            <h2 className="text-2xl font-extrabold mt-2 tracking-tight leading-tight">{formatCurrency(totalRevenue)}</h2>
+          </div>
+          <p className="mt-4 text-xs text-violet-200 font-medium">
+            Từ {orders.filter(o => o.status === 'completed').length} đơn hoàn thành
+          </p>
         </div>
       </div>
 

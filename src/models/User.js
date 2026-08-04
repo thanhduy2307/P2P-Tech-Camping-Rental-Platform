@@ -92,6 +92,16 @@ const userSchema = new mongoose.Schema({
     },
     rejectReason: { type: String, default: '' }
   },
+  isEmailVerified: {
+    type: Boolean,
+    default: false
+  },
+  emailVerificationOtp: {
+    type: String
+  },
+  emailVerificationOtpExpires: {
+    type: Date
+  },
   isPhoneVerified: {
     type: Boolean,
     default: false
