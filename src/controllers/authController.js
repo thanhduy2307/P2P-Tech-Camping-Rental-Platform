@@ -1431,3 +1431,48 @@ exports.getMyTransactions = async (req, res) => {
   }
 };
 
+// @desc    Lender earnings summary
+// @route   GET /api/auth/lender-stats
+exports.getLenderStats = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
+
+    const [aggregate] = await Transaction.aggregate([
+      { $match: { user: user._id, type: 'addition' } },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [monthAgg] = await Transaction.aggregate([
+      { $match: { user: user._id, type: 'addition', createdAt: { $gte: startOfMonth } } },
+      { $group: { _id: null, monthEarnings: { $sum: '$amount' } } }
+    ]);
+
+    const [withdrawAgg] = await WithdrawalRequest.aggregate([
+      { $match: { lender: user._id, status: 'approved' } },
+      { $group: { _id: null, totalWithdrawn: { $sum: '$amount' } } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        balance: user.balance,
+        totalEarnings: aggregate ? aggregate.totalEarnings : 0,
+        transactionCount: aggregate ? aggregate.count : 0,
+        monthEarnings: monthAgg ? monthAgg.monthEarnings : 0,
+        totalWithdrawn: withdrawAgg ? withdrawAgg.totalWithdrawn : 0
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+

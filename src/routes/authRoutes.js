@@ -27,7 +27,8 @@ const {
   updatePublicProfileInfo,
   getMyTransactions,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  getLenderStats
 } = require('../controllers/authController');
 const { runIntegrationTests } = require('../controllers/testController');
 const { protect, authorize } = require('../middleware/auth');
@@ -50,6 +51,7 @@ router.put('/switch-role', protect, switchRole);
 router.put('/complete-profile', protect, completeProfile);
 router.put('/update-avatar', protect, updateAvatar);
 router.get('/balance', protect, authorize('renter', 'lender'), getBalance);
+router.get('/lender-stats', protect, authorize('renter', 'lender'), getLenderStats);
 
 // Public User profile (Personal page summary)
 router.get('/users/:id/profile', getPublicProfile);

@@ -140,6 +140,11 @@ class AuthService {
     return (res['data']['balance'] as num).toDouble();
   }
 
+  static Future<Map<String, dynamic>> getLenderStats() async {
+    final res = await ApiClient.get('/auth/lender-stats');
+    return (res['data'] as Map<String, dynamic>?) ?? {};
+  }
+
   static Future<void> updateAvatar(String base64DataUri) async {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
@@ -160,7 +165,7 @@ class AuthService {
       final res = await ApiClient.get('/auth/google/session/$sessionId');
       final data = res['data'] as Map<String, dynamic>?;
       if (data == null) return null;
-      if (data['status'] as String? == 'pending') return null;
+      if ((data['status'] as String?) == 'pending') return null;
       return data;
     } catch (_) { return null; }
   }
