@@ -4,6 +4,7 @@ import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/services/auth_service.dart';
+import 'package:velox_mobile/services/order_service.dart';
 import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
 
@@ -17,6 +18,7 @@ class LenderDashboardScreen extends StatefulWidget {
 class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
   int _assetCount = 0;
   int _activeRentals = 0;
+  int _newRequests = 0;
   bool _loadingStats = true;
   Map<String, dynamic> _revenue = {};
   bool _loadingRevenue = true;
@@ -29,11 +31,20 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
 
   Future<void> _loadStats() async {
     try {
-      final assets = await AssetService.getMyAssets();
+      final results = await Future.wait([
+        AssetService.getMyAssets(),
+        OrderService.getIncoming(),
+      ]);
       if (!mounted) return;
       setState(() {
+        final assets = results[0] as List<dynamic>;
+        final orders = results[1] as List<dynamic>;
         _assetCount = assets.length;
-        _activeRentals = assets.where((a) => a.status == 'rented').length;
+        _activeRentals = assets.where((a) => a['status'] == 'rented').length;
+        _newRequests = orders
+            .where((o) =>
+                (o['status'] == 'pending_payment' || o['status'] == 'reserved'))
+            .length;
         _loadingStats = false;
       });
     } catch (_) {
@@ -134,6 +145,12 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
             child: Row(
               children: [
                 _statItem(Icons.inventory_2, _loadingStats ? '...' : '$_assetCount', 'Tổng thiết bị'),
+                Container(
+                  width: 1,
+                  height: 40,
+                  color: Colors.white.withValues(alpha: 0.3),
+                ),
+                _statItem(Icons.pending_actions, '$_newRequests', 'Yêu cầu mới'),
                 Container(
                   width: 1,
                   height: 40,
@@ -248,6 +265,9 @@ class _LenderDashboardScreenState extends State<LenderDashboardScreen> {
           const SizedBox(height: 8),
           _menuTile(Icons.receipt_long, 'Đơn cho thuê đến',
               () => Navigator.pushNamed(context, '/my-orders')),
+          const SizedBox(height: 8),
+          _menuTile(Icons.account_balance_wallet, 'Ví tiền & Rút tiền',
+              () => Navigator.pushNamed(context, '/wallet')),
         ],
       ),
     );

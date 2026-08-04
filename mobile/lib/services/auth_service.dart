@@ -145,6 +145,11 @@ class AuthService {
     return (res['data'] as Map<String, dynamic>?) ?? {};
   }
 
+  static Future<List<dynamic>> getMyTransactions() async {
+    final res = await ApiClient.get('/auth/my-transactions');
+    return res['data'] ?? [];
+  }
+
   static Future<void> updateAvatar(String base64DataUri) async {
     await ApiClient.put('/auth/update-avatar', {'avatar': base64DataUri});
   }
