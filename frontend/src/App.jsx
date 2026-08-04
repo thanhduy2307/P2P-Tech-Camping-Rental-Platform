@@ -24,6 +24,7 @@ import Reviews from './Page/reviews';
 import Blogs from './Page/blogs';
 import Notifications from './Page/notifications';
 import DashboardLender from './Page/dashboard-lender';
+import LenderTopAssets from './Page/lender-top-assets';
 import DashboardInspector from './Page/dashboard-inspector';
 import DashboardAdmin from './Page/dashboard-admin';
 import Login from './Page/login';
@@ -66,6 +67,7 @@ function App() {
         <Route element={<ProtectedRoute allowedRoles={['lender']} />}>
           <Route element={<DashboardLayout role="lender"><Outlet /></DashboardLayout>}>
             <Route path="/dashboard-lender" element={<DashboardLender />} />
+            <Route path="/lender-top-assets" element={<LenderTopAssets />} />
             <Route path="/lender-inventory" element={<LenderInventory />} />
             <Route path="/lender-orders" element={<LenderOrders />} />
             <Route path="/lender-chat" element={<Chat />} />

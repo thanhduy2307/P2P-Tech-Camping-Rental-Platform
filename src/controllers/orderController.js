@@ -1072,6 +1072,64 @@ exports.getIncomingOrders = async (req, res) => {
   }
 };
 
+// @desc    Get lender's top products by rental count & revenue
+// @route   GET /api/orders/top-assets
+// @access  Private (Lender)
+exports.getTopAssets = async (req, res) => {
+  try {
+    const assets = await Asset.find({ lender: req.user._id }).select('_id');
+    const assetIds = assets.map(a => a._id);
+
+    const empty = { success: true, data: { mostRented: null, mostRevenue: null, topAssets: [] } };
+    if (assetIds.length === 0) {
+      return res.status(200).json(empty);
+    }
+
+    const stats = await Order.aggregate([
+      {
+        $match: {
+          asset: { $in: assetIds },
+          status: { $nin: ['cancelled', 'pending_payment'] }
+        }
+      },
+      {
+        $group: {
+          _id: '$asset',
+          rentalCount: { $sum: 1 },
+          totalRevenue: {
+            $sum: { $subtract: [{ $ifNull: ['$totalRent', 0] }, { $ifNull: ['$platformFee', 0] }] }
+          }
+        }
+      },
+      { $sort: { rentalCount: -1, totalRevenue: -1 } }
+    ]);
+
+    if (stats.length === 0) {
+      return res.status(200).json(empty);
+    }
+
+    const assetMap = {};
+    const populatedAssets = await Asset.find({ _id: { $in: stats.map(s => s._id) } });
+    populatedAssets.forEach(a => { assetMap[a._id.toString()] = a; });
+
+    const topAssets = stats
+      .filter(s => assetMap[s._id.toString()])
+      .map(s => ({
+        asset: assetMap[s._id.toString()],
+        rentalCount: s.rentalCount,
+        totalRevenue: Math.round(s.totalRevenue)
+      }))
+      .sort((a, b) => b.rentalCount - a.rentalCount || b.totalRevenue - a.totalRevenue);
+
+    const mostRented = topAssets[0] || null;
+    const mostRevenue = [...topAssets].sort((a, b) => b.totalRevenue - a.totalRevenue || b.rentalCount - a.rentalCount)[0] || null;
+
+    res.status(200).json({ success: true, data: { mostRented, mostRevenue, topAssets } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get VNPay payment URL for an existing pending_payment order
 // @route   GET /api/orders/:id/pay
 // @access  Private (Renter)
