@@ -6,6 +6,23 @@ const { createPaymentUrl, verifyReturnUrl } = require('../services/vnpayService'
 const { notifyUser } = require('../utils/notificationHelper');
 const { differenceInDays, parseISO } = require('date-fns');
 
+// Radius (meters) a renter must be within the asset pickup location
+// for a lender_no_show claim to be considered valid.
+const PICKUP_RADIUS_METERS = 200;
+
+// Haversine distance in meters between two coordinates.
+const haversineMeters = (lat1, lng1, lat2, lng2) => {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
+
 // Helper to auto-expire unpaid orders older than 1 minute
 const expireOldPendingOrders = async () => {
   try {
@@ -690,7 +707,7 @@ exports.cancelOrder = async (req, res) => {
       let penalty = 0;
       let message = '';
       
-      const isLenderNoShow = reason === 'lender_no_show' || 
+const isLenderNoShow = reason === 'lender_no_show' || 
         (typeof reason === 'string' && (
           reason.toLowerCase().includes('lender') || 
           reason.toLowerCase().includes('chủ đồ') ||
@@ -699,7 +716,7 @@ exports.cancelOrder = async (req, res) => {
         ));
 
       if (isLenderNoShow) {
-        let proofImgs = req.body.cancellationProofImages || req.body.proofImages || req.body.images;
+        let proofImgs = req.body.renterNoShowEvidence || req.body.cancellationProofImages || req.body.proofImages || req.body.images;
         if (typeof proofImgs === 'string') {
           try {
             proofImgs = JSON.parse(proofImgs);
@@ -717,34 +734,80 @@ exports.cancelOrder = async (req, res) => {
           });
         }
 
-        // Renter reports Lender did not show up
-        refundRent = order.totalRent;
-        const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
-        
-        const lender = await User.findById(order.asset.lender);
-        lender.balance -= penaltyToLender; // Can be negative
-        lender.reputationScore = Math.max(0, lender.reputationScore - 0.5);
-        await lender.save();
-        
-        await Transaction.create({
-          user: lender._id,
-          order: order._id,
-          amount: -penaltyToLender,
-          type: 'deduction',
-          reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
-        });
+        // Verify the renter was actually at the pickup location before penalizing the Lender.
+        const renterLoc = req.body.renterLocation;
+        const assetLoc = order.asset && order.asset.location;
+        let distance = null;
+        if (
+          renterLoc &&
+          typeof renterLoc.lat === 'number' &&
+          typeof renterLoc.lng === 'number' &&
+          assetLoc &&
+          typeof assetLoc.lat === 'number' &&
+          typeof assetLoc.lng === 'number'
+        ) {
+          distance = haversineMeters(renterLoc.lat, renterLoc.lng, assetLoc.lat, assetLoc.lng);
+        }
 
-        order.cancellationProofImages = validProofArray;
-        message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Hệ thống đã ghi nhận ảnh bằng chứng và áp dụng mức phạt đối với chủ đồ.`;
-        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Đã gửi ${validProofArray.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+        if (distance !== null && distance <= PICKUP_RADIUS_METERS) {
+          // Renter is at/near the pickup spot -> Lender at fault
+          refundRent = order.totalRent;
+          const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
+          
+          const lender = await User.findById(order.asset.lender);
+          lender.balance -= penaltyToLender; // Can be negative
+          lender.reputationScore = Math.max(0, lender.reputationScore - 0.5);
+          await lender.save();
+          
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: -penaltyToLender,
+            type: 'deduction',
+            reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
+          });
 
-        notifyUser(
-          order.asset.lender,
-          'order',
-          'Đơn hàng bị hủy do Lender không xuất hiện',
-          `Đơn hàng #${order._id.toString().slice(-6)} đã bị Renter hủy với lý do không liên hệ/gặp được Lender. Bạn bị phạt 5% tiền thuê.`,
-          '/lender-orders'
-        );
+          order.renterNoShowEvidence = validProofArray;
+          order.noShowDistanceMeters = Math.round(distance);
+          message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
+          order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Renter đã có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m). Đã gửi ${validProofArray.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+
+          notifyUser(
+            order.asset.lender,
+            'order',
+            'Đơn hàng bị hủy do Lender không xuất hiện',
+            `Đơn hàng #${order._id.toString().slice(-6)} đã bị Renter hủy với lý do không liên hệ/gặp được Lender. Bạn bị phạt 5% tiền thuê.`,
+            '/lender-orders'
+          );
+        } else {
+          // Renter NOT at pickup location -> treat as normal renter cancel, no Lender penalty
+          if (distance !== null) {
+            order.disputeNotes = `Renter hủy (lender_no_show) nhưng KHÔNG có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m, ngưỡng ${PICKUP_RADIUS_METERS}m). Chuyển sang hủy tự nguyện, không phạt Lender. `;
+          }
+          if (hoursToStart >= 48) {
+            refundRent = order.totalRent;
+            message = 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền.';
+          } else {
+            penalty = Math.round(order.totalRent * 0.3);
+            refundRent = order.totalRent - penalty;
+            message = `Bạn không có mặt tại địa điểm nhận đồ nên không được xác nhận là Lender không đến. Hủy đơn sát ngày: bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ).`;
+          }
+
+          if (penalty > 0) {
+            const lender = await User.findById(order.asset.lender);
+            lender.balance += penalty;
+            await lender.save();
+            
+            await Transaction.create({
+              user: lender._id,
+              order: order._id,
+              amount: penalty,
+              type: 'addition',
+              reason: 'Người thuê hủy đơn sát ngày, đền bù 30%.'
+            });
+          }
+          order.disputeNotes = `${order.disputeNotes || ''}Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
+        }
       } else {
         // Normal Renter cancel
         if (hoursToStart >= 48) {

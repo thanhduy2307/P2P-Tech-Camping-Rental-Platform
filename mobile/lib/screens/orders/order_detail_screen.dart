@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -122,6 +123,45 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       UiHelper.hideLoading(context);
       EquipDialog.success(context, 'Đã hủy đơn');
+      _reload();
+    } catch (e) {
+      if (mounted) UiHelper.hideLoading(context);
+      UiHelper.showErrorToast(context, e);
+    }
+  }
+
+  Future<void> _cancelNoShow() async {
+    final ok = await EquipDialog.confirm(context, 'Không liên hệ được Lender',
+        'Hệ thống sẽ lấy vị trí GPS của bạn để kiểm tra bạn có đúng mặt tại địa điểm nhận đồ hay không, nhằm xác định đúng bên có lỗi. Tiếp tục?');
+    if (ok != true) return;
+
+    UiHelper.showLoading(context);
+    try {
+      Position pos;
+      final perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.denied ||
+          perm == LocationPermission.deniedForever) {
+        final req = await Geolocator.requestPermission();
+        if (req == LocationPermission.denied ||
+            req == LocationPermission.deniedForever) {
+          if (!mounted) return;
+          UiHelper.hideLoading(context);
+          EquipDialog.info(context,
+              'Không thể xác nhận vị trí vì bạn chưa cấp quyền GPS. Hãy bật quyền vị trí rồi thử lại. Nếu bạn không có mặt tại địa điểm nhận đồ, đơn sẽ bị hủy như hủy thường và bạn có thể bị phạt 30%.');
+          return;
+        }
+      }
+      pos = await Geolocator.getCurrentPosition(
+          locationSettings: const LocationSettings(
+              accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 15)));
+      if (!mounted) return;
+      final result = await OrderService.cancelOrder(_order!.id,
+          reason: 'lender_no_show',
+          renterLocation: {'lat': pos.latitude, 'lng': pos.longitude});
+      if (!mounted) return;
+      UiHelper.hideLoading(context);
+      final msg = result['message']?.toString() ?? 'Đã hủy đơn';
+      EquipDialog.info(context, msg);
       _reload();
     } catch (e) {
       if (mounted) UiHelper.hideLoading(context);
@@ -328,6 +368,14 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               onPressed: _cancelOrder,
               child: const Text('Hủy đơn'),
             )),
+            if (s == 'reserved' && !_isLender) ...[
+              const SizedBox(height: 8),
+              SizedBox(width: double.infinity, child: OutlinedButton.icon(
+                onPressed: _cancelNoShow,
+                icon: const Icon(Icons.location_searching),
+                label: const Text('Không liên hệ được Lender'),
+              )),
+            ],
           ]),
         ],
 

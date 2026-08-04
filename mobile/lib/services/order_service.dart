@@ -59,9 +59,11 @@ class OrderService {
   }
 
   static Future<Map<String, dynamic>> cancelOrder(String id,
-      {String? reason}) async {
-    final res =
-        await ApiClient.put('/orders/$id/cancel', {'reason': reason});
+      {String? reason, Map<String, double>? renterLocation}) async {
+    final res = await ApiClient.put('/orders/$id/cancel', {
+      'reason': reason,
+      if (renterLocation != null) 'renterLocation': renterLocation,
+    });
     return res;
   }
 
