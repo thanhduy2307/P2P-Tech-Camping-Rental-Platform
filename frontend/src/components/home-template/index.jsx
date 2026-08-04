@@ -477,7 +477,7 @@ const HomeTemplate = ({ children }) => {
       </main>
 
       {/* Footer */}
-      <footer className="bg-surface-container-lowest dark:bg-inverse-surface w-full mt-auto border-t border-outline-variant/50 pb-20 md:pb-0">
+      <footer className="bg-[#F8FAFC] dark:bg-inverse-surface w-full mt-auto border-t border-outline-variant/50 pb-20 md:pb-0">
         <div className="grid grid-cols-2 md:grid-cols-4 gap-gutter px-margin-desktop py-12 max-w-container-max mx-auto">
           <div className="col-span-2 md:col-span-1 flex flex-col mb-8 md:mb-0">
             <Link to="/" className="font-display-lg text-headline-lg text-primary dark:text-primary-fixed mb-4 flex items-center gap-2">

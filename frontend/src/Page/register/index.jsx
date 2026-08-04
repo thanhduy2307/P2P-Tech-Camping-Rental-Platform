@@ -59,7 +59,6 @@ const Register = () => {
     try {
       const response = await api.post('/auth/register-email', {
         name: fullname,
-        email: cleanEmail,
         password,
         role: 'renter'
       });
@@ -69,7 +68,6 @@ const Register = () => {
         setVerificationUserId(userId);
         setOtpVerificationOpen(true);
       } else {
-        setErrorMsg('Đăng ký tài khoản thất bại.');
       }
     } catch (err) {
       console.error(err);
@@ -89,18 +87,18 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const response = await api.post('/auth/verify-otp', {
+      const response = await api.post('/auth/verify-email-otp', {
         userId: verificationUserId,
         otp: otpCode
       });
 
       if (response.data && response.data.success) {
-        const { token, role, name, email: uEmail, phoneNumber: uPhone, _id, isProfileCompleted } = response.data.data;
+        const { token, role, name, email: uEmail, _id, isProfileCompleted } = response.data.data;
         
         dispatch(loginSuccess({
           token,
           role,
-          user: { name, email: uEmail, phoneNumber: uPhone, _id, isProfileCompleted }
+          user: { name, email: uEmail, _id, isProfileCompleted }
         }));
         
         Swal.fire('Đăng ký tài khoản thành công!');
@@ -160,8 +158,6 @@ const Register = () => {
           {otpVerificationOpen ? (
             <form className="space-y-5" onSubmit={handleVerifyOtp}>
               <div className="text-center bg-slate-50 border border-slate-200 p-4 rounded-xl mb-4">
-                <span className="material-symbols-outlined text-amber-500 text-3xl mb-1 animate-pulse">mail</span>
-                <h4 className="text-xs font-bold text-slate-800">Xác thực OTP Email</h4>
                 <p className="text-[10px] text-slate-450 mt-1 leading-relaxed">
                   Mã xác thực đã được gửi đến email: <strong className="text-slate-800">{email}</strong>
                 </p>

@@ -1,5 +1,4 @@
 const nodemailer = require('nodemailer');
-
 class EmailService {
   constructor() {
     this.transporter = nodemailer.createTransport({
@@ -49,3 +48,4 @@ class EmailService {
 }
 
 module.exports = new EmailService();
+
