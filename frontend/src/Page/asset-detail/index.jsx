@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import api from '../../configs/axios';
+import PreDepositModal from '../../components/PreDepositModal';
 
 const AssetDetail = () => {
   const { id } = useParams();
@@ -25,6 +26,7 @@ const AssetDetail = () => {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState('');
   const [depositMethod, setDepositMethod] = useState('online');
+  const [isPreDepositModalOpen, setIsPreDepositModalOpen] = useState(false);
 
   // Fetch asset details
   useEffect(() => {
@@ -113,7 +115,7 @@ const AssetDetail = () => {
   const originalDeposit = asset ? asset.depositAmount : 0;
   const hasReputationDiscount = user && user.reputationScore >= 4.8;
   const deposit = hasReputationDiscount ? Math.round(originalDeposit * 0.8) : originalDeposit;
-  const totalAmount = depositMethod === 'cash' ? totalRent : (totalRent + deposit);
+  const totalAmount = totalRent + deposit;
 
   // Format price helper (e.g. 120,000 -> 120k, 1,200,000 -> 1.2tr)
   const formatPrice = (price) => {
@@ -126,8 +128,8 @@ const AssetDetail = () => {
     return price.toLocaleString('vi-VN');
   };
 
-  // Handle Booking Submit
-  const handleBooking = async () => {
+  // Step 1: Handle Initial Booking Action (Opens Pre-Deposit Confirmation Modal)
+  const handleBooking = () => {
     if (!token) {
       Swal.fire('Vui lòng đăng nhập trước khi thuê đồ.');
       navigate('/login');
@@ -177,6 +179,13 @@ const AssetDetail = () => {
       return;
     }
 
+    setBookingError('');
+    // Open modal for TOS confirmation & breakdown review
+    setIsPreDepositModalOpen(true);
+  };
+
+  // Step 2: Handle Final Order & Payment Gateway Redirect after Modal Confirmation
+  const handleConfirmBooking = async () => {
     setBookingLoading(true);
     setBookingError('');
 
@@ -185,7 +194,7 @@ const AssetDetail = () => {
         assetId: asset._id,
         startDate,
         endDate,
-        depositMethod
+        depositMethod: 'online'
       });
 
       if (response.data && response.data.success) {
@@ -195,6 +204,7 @@ const AssetDetail = () => {
           window.location.href = paymentUrl;
         } else {
           setBookingError('Tạo đơn hàng thành công nhưng không tìm thấy link thanh toán VNPay.');
+          setIsPreDepositModalOpen(false);
         }
       }
     } catch (err) {
@@ -204,6 +214,7 @@ const AssetDetail = () => {
       } else {
         setBookingError('Không thể tạo đơn thuê đồ. Vui lòng thử lại sau.');
       }
+      setIsPreDepositModalOpen(false);
     } finally {
       setBookingLoading(false);
     }
@@ -727,58 +738,37 @@ const AssetDetail = () => {
                 <span className="material-symbols-outlined text-outline">expand_more</span>
               </div>
 
-              {/* Deposit Method Selection */}
+              {/* Deposit Method Selection (Online Payment Methods Only) */}
               <div className="border border-outline-variant rounded-xl p-4 mb-6 bg-surface-container-low">
-                <label className="block text-xs font-bold text-on-surface-variant uppercase mb-3">Hình thức đặt cọc</label>
-                <div className="space-y-3">
-                  {/* Online Deposit */}
-                  <label className="flex items-start gap-2.5 cursor-pointer">
-                    <input 
-                      type="radio" 
-                      name="depositMethod" 
-                      value="online" 
-                      checked={depositMethod === 'online'}
-                      onChange={() => setDepositMethod('online')}
-                      className="mt-0.5 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <span className="font-bold text-on-surface flex items-center gap-1">
-                        Ký quỹ online qua sàn
-                        <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-bold">Khuyên dùng</span>
-                      </span>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5 leading-relaxed">
-                        Tạm giữ an toàn qua VNPay, tự động hoàn trả 100% về ví ngay khi trả đồ thành công. Hỗ trợ giải quyết tranh chấp.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* Cash Deposit */}
-                  <label className="flex items-start gap-2.5 cursor-pointer border-t border-outline-variant/35 pt-3">
-                    <input 
-                      type="radio" 
-                      name="depositMethod" 
-                      value="cash" 
-                      checked={depositMethod === 'cash'}
-                      onChange={() => setDepositMethod('cash')}
-                      className="mt-0.5 text-primary focus:ring-primary h-4 w-4 cursor-pointer"
-                    />
-                    <div className="text-xs">
-                      <span className="font-bold text-on-surface">Cọc tiền mặt trực tiếp</span>
-                      <p className="text-[10px] text-on-surface-variant mt-0.5 leading-relaxed">
-                        Chỉ thanh toán trước tiền thuê online. Tự giao nhận tiền cọc mặt với chủ đồ khi gặp mặt.
-                      </p>
-                    </div>
-                  </label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="block text-xs font-bold text-on-surface-variant uppercase">Phương thức thanh toán & đặt cọc</label>
+                  <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold flex items-center gap-1">
+                    <span className="material-symbols-outlined text-xs">verified_user</span>
+                    Thanh toán online
+                  </span>
                 </div>
 
-                {depositMethod === 'cash' && (
-                  <div className="bg-amber-50 border border-amber-250 text-amber-900 p-3 rounded-lg text-[10px] font-semibold mt-3 leading-relaxed flex gap-1.5">
-                    <span className="material-symbols-outlined text-sm text-amber-600 shrink-0">warning</span>
-                    <span>
-                      Bạn chọn cọc tiền mặt trực tiếp. Sàn miễn trừ mọi trách nhiệm pháp lý nếu xảy ra mất mát, lừa đảo tiền cọc mặt ngoài hệ thống.
+                <div className="bg-surface-container-lowest p-3 rounded-xl border border-outline-variant/60 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-on-surface flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-primary text-base">account_balance_wallet</span>
+                      Ký quỹ online qua cổng thanh toán
                     </span>
+                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded font-bold">100% An toàn</span>
                   </div>
-                )}
+                  <p className="text-[11px] text-on-surface-variant leading-relaxed">
+                    Tạm giữ an toàn qua sàn EquipPeer. Tự động hoàn trả 100% tiền cọc về ví/tài khoản ngay sau khi giao trả thiết bị thành công.
+                  </p>
+                  
+                  {/* Supported Payment Channels */}
+                  <div className="pt-2 border-t border-outline-variant/40 flex items-center gap-2 text-[10px] text-slate-500">
+                    <span className="font-semibold text-slate-700">Kênh hỗ trợ:</span>
+                    <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200 font-bold text-slate-700">VNPay QR</span>
+                    <span className="px-2 py-0.5 bg-pink-50 text-pink-700 rounded border border-pink-200 font-bold">MoMo</span>
+                    <span className="px-2 py-0.5 bg-blue-50 text-blue-700 rounded border border-blue-200 font-bold">ZaloPay</span>
+                    <span className="px-2 py-0.5 bg-slate-100 rounded border border-slate-200 font-bold text-slate-700">ATM / Visa</span>
+                  </div>
+                </div>
               </div>
 
               {/* Summary Details */}
@@ -790,7 +780,7 @@ const AssetDetail = () => {
                   </div>
                   <div className="flex justify-between items-center font-body-md text-sm text-on-surface-variant">
                     <span className="underline cursor-pointer flex items-center gap-1">
-                      {depositMethod === 'cash' ? 'Đặt cọc trực tiếp (Tiền mặt)' : 'Ký quỹ đặt cọc online'}
+                      Ký quỹ đặt cọc online
                       <span className="material-symbols-outlined text-xs text-outline cursor-help" title="Số tiền này sẽ được hoàn trả 100% sau khi giao trả đồ thành công">help</span>
                       {hasReputationDiscount && (
                         <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200 font-bold ml-1.5 flex items-center gap-0.5">
@@ -815,9 +805,7 @@ const AssetDetail = () => {
                     <span className="text-primary">{totalAmount.toLocaleString('vi-VN')} đ</span>
                   </div>
                   <p className="text-center font-body-md text-[10px] text-on-surface-variant mt-2 italic">
-                    {depositMethod === 'cash' 
-                      ? '* Tiền cọc sẽ tự bàn giao & hoàn lại bằng tiền mặt trực tiếp giữa hai bên khi giao trả đồ.'
-                      : `* Renter sẽ được hoàn lại ${deposit.toLocaleString('vi-VN')} đ tiền đặt cọc sau khi kết thúc đơn hàng.`}
+                    * Renter sẽ được hoàn lại {deposit.toLocaleString('vi-VN')} đ tiền đặt cọc sau khi kết thúc đơn hàng.
                   </p>
                 </div>
               )}
@@ -837,7 +825,7 @@ const AssetDetail = () => {
               </button>
 
               <p className="text-center font-body-md text-xs text-on-surface-variant mt-4">
-                Bạn chưa bị trừ tiền ngay. Tiền đặt cọc được đảm bảo hoàn trả.
+                Bạn chưa bị trừ tiền ngay. Xem điều khoản & xác nhận ở bước tiếp theo.
               </p>
             </div>
 
@@ -853,6 +841,28 @@ const AssetDetail = () => {
 
         </div>
       </main>
+
+      {/* Pre-deposit Confirmation TOS Modal */}
+      <PreDepositModal
+        isOpen={isPreDepositModalOpen}
+        onClose={() => setIsPreDepositModalOpen(false)}
+        onConfirm={handleConfirmBooking}
+        bookingData={{
+          assetTitle: asset.name,
+          assetImage: asset.images && asset.images.length > 0 ? asset.images[0] : null,
+          category: asset.category,
+          startDate,
+          endDate,
+          rentalDays,
+          pricePerDay: asset.pricePerDay,
+          totalRent,
+          depositAmount: deposit,
+          totalAmount,
+          hasReputationDiscount,
+          originalDeposit
+        }}
+        loading={bookingLoading}
+      />
     </div>
   );
 };
