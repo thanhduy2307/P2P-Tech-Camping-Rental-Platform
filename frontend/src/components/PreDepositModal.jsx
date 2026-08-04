@@ -149,7 +149,7 @@ const PreDepositModal = ({ isOpen, onClose, onConfirm, bookingData, loading = fa
               <li className="flex items-start gap-2">
                 <span className="material-symbols-outlined text-amber-600 text-base shrink-0 mt-0.5">warning</span>
                 <span>
-                  <strong>Hủy đơn trong vòng 24h trước khi nhận:</strong> Hoàn trả <strong>100% tiền cọc</strong>, tính phí hủy 50% tiền thuê để bồi thường cho chủ đồ.
+                  <strong>Hủy đơn trong vòng 24h trước khi nhận:</strong> Hoàn trả <strong>100% tiền cọc</strong>, tính phí hủy 30% tiền thuê để bồi thường cho chủ đồ.
                 </span>
               </li>
               <li className="flex items-start gap-2">
