@@ -1077,55 +1077,74 @@ exports.getIncomingOrders = async (req, res) => {
 // @access  Private (Lender)
 exports.getTopAssets = async (req, res) => {
   try {
-    const assets = await Asset.find({ lender: req.user._id }).select('_id');
+    const assets = await Asset.find({ lender: req.user._id, status: { $ne: 'deleted' } });
+    if (assets.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { mostRented: null, mostRevenue: null, topAssets: [] }
+      });
+    }
+
     const assetIds = assets.map(a => a._id);
-
-    const empty = { success: true, data: { mostRented: null, mostRevenue: null, topAssets: [] } };
-    if (assetIds.length === 0) {
-      return res.status(200).json(empty);
-    }
-
-    const stats = await Order.aggregate([
-      {
-        $match: {
-          asset: { $in: assetIds },
-          status: { $nin: ['cancelled', 'pending_payment'] }
-        }
-      },
-      {
-        $group: {
-          _id: '$asset',
-          rentalCount: { $sum: 1 },
-          totalRevenue: {
-            $sum: { $subtract: [{ $ifNull: ['$totalRent', 0] }, { $ifNull: ['$platformFee', 0] }] }
-          }
-        }
-      },
-      { $sort: { rentalCount: -1, totalRevenue: -1 } }
-    ]);
-
-    if (stats.length === 0) {
-      return res.status(200).json(empty);
-    }
-
     const assetMap = {};
-    const populatedAssets = await Asset.find({ _id: { $in: stats.map(s => s._id) } });
-    populatedAssets.forEach(a => { assetMap[a._id.toString()] = a; });
+    const statsMap = {};
 
-    const topAssets = stats
-      .filter(s => assetMap[s._id.toString()])
-      .map(s => ({
-        asset: assetMap[s._id.toString()],
-        rentalCount: s.rentalCount,
-        totalRevenue: Math.round(s.totalRevenue)
+    assets.forEach(a => {
+      const idStr = a._id.toString();
+      assetMap[idStr] = a;
+      statsMap[idStr] = {
+        asset: a,
+        rentalCount: 0,
+        totalRevenue: 0
+      };
+    });
+
+    const orders = await Order.find({
+      asset: { $in: assetIds },
+      status: { $nin: ['cancelled', 'pending_payment'] }
+    }).select('asset totalRent platformFee');
+
+    orders.forEach(order => {
+      const idStr = order.asset ? order.asset.toString() : null;
+      if (idStr && statsMap[idStr]) {
+        statsMap[idStr].rentalCount += 1;
+        const totalRent = Number(order.totalRent) || 0;
+        const platformFee = Number(order.platformFee) || 0;
+        const revenue = Math.max(0, totalRent - platformFee);
+        statsMap[idStr].totalRevenue += revenue;
+      }
+    });
+
+    const topAssets = Object.values(statsMap)
+      .map(item => ({
+        ...item,
+        totalRevenue: Math.round(item.totalRevenue)
       }))
       .sort((a, b) => b.rentalCount - a.rentalCount || b.totalRevenue - a.totalRevenue);
 
-    const mostRented = topAssets[0] || null;
-    const mostRevenue = [...topAssets].sort((a, b) => b.totalRevenue - a.totalRevenue || b.rentalCount - a.rentalCount)[0] || null;
+    const rentedItems = topAssets.filter(item => item.rentalCount > 0);
+    
+    let mostRented = null;
+    let mostRevenue = null;
 
-    res.status(200).json({ success: true, data: { mostRented, mostRevenue, topAssets } });
+    if (rentedItems.length > 0) {
+      mostRented = rentedItems[0];
+      mostRevenue = [...rentedItems].sort((a, b) => b.totalRevenue - a.totalRevenue || b.rentalCount - a.rentalCount)[0];
+    } else if (topAssets.length > 0) {
+      mostRented = topAssets[0];
+      mostRevenue = topAssets[0];
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        mostRented,
+        mostRevenue,
+        topAssets
+      }
+    });
   } catch (error) {
+    console.error('Error in getTopAssets:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };
