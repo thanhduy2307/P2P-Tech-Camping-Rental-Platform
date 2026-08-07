@@ -16,6 +16,7 @@ const {
   getMyRentals,
   getIncomingOrders,
   getTopAssets,
+  getMyRefunds,
   getPaymentUrl,
   getDisputedOrders,
   uploadRenterHandoverImages,
@@ -31,6 +32,7 @@ router.post('/', protect, authorize('renter'), checkProfileCompleted, checkRente
 router.get('/vnpay_return', vnpayReturn); // Public endpoint for VNPay callback
 
 router.get('/my-rentals', protect, getMyRentals);
+router.get('/my-refunds', protect, getMyRefunds);
 router.get('/incoming', protect, authorize('lender'), getIncomingOrders);
 router.get('/top-assets', protect, authorize('lender'), getTopAssets);
 router.get('/disputed', protect, authorize('admin', 'inspector'), getDisputedOrders);

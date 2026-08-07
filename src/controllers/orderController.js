@@ -1339,3 +1339,61 @@ exports.negotiateDispute = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Get user's real refund & financial transaction history for profile
+// @route   GET /api/orders/my-refunds
+// @access  Private
+exports.getMyRefunds = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const transactions = await Transaction.find({ user: userId })
+      .populate({
+        path: 'order',
+        populate: { path: 'asset', select: 'name' }
+      })
+      .sort({ createdAt: -1 });
+
+    const formattedList = transactions.map(t => {
+      const isAdd = t.type === 'addition';
+      const absAmount = Math.abs(t.amount);
+      const reasonLower = (t.reason || '').toLowerCase();
+      
+      let refundType = 'other';
+      if (reasonLower.includes('cọc') || reasonLower.includes('hoàn cọc') || reasonLower.includes('khấu trừ cọc')) {
+        refundType = 'deposit_return';
+      } else if (reasonLower.includes('hủy đơn') || reasonLower.includes('hủy')) {
+        refundType = 'order_cancelled';
+      } else if (reasonLower.includes('tranh chấp') || reasonLower.includes('khiếu nại') || reasonLower.includes('bồi thường') || reasonLower.includes('đền bù')) {
+        refundType = 'dispute_settled';
+      } else if (reasonLower.includes('phạt')) {
+        refundType = 'penalty';
+      } else if (reasonLower.includes('rút tiền')) {
+        refundType = 'withdrawal';
+      }
+
+      return {
+        refundId: `REF-${t._id.toString().slice(-6).toUpperCase()}`,
+        orderId: t.order ? `ORD-${t.order._id.toString().slice(-6).toUpperCase()}` : 'N/A',
+        assetTitle: t.order?.asset?.name || 'Giao dịch EquipPeer',
+        requestDate: t.createdAt,
+        type: t.type,
+        isAddition: isAdd,
+        refundType,
+        refundAmount: absAmount,
+        signedAmount: isAdd ? absAmount : -absAmount,
+        refundMethod: 'Ví EquipPeer Wallet',
+        reason: t.reason,
+        status: 'success'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formattedList
+    });
+  } catch (error) {
+    console.error('Error in getMyRefunds:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
