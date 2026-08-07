@@ -1,11 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:velox_mobile/core/storage.dart';
 import 'package:velox_mobile/models/asset.dart';
+import 'package:velox_mobile/models/review.dart';
 import 'package:velox_mobile/services/asset_service.dart';
-import 'package:velox_mobile/services/order_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
-import 'package:velox_mobile/widgets/velox_button.dart';
 
 class AssetDetailScreen extends StatefulWidget {
   const AssetDetailScreen({super.key});
@@ -16,10 +15,9 @@ class AssetDetailScreen extends StatefulWidget {
 
 class _AssetDetailScreenState extends State<AssetDetailScreen> {
   Asset? _asset;
+  List<Review> _reviews = [];
   bool _loading = true;
-  final _start = TextEditingController();
-  final _end = TextEditingController();
-  String _depositMethod = 'online';
+  int _imageIndex = 0;
 
   @override
   void initState() {
@@ -32,46 +30,20 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
 
   Future<void> _load(String id) async {
     try {
-      _asset = await AssetService.getAssetById(id);
-    } catch (e) {
-      if (mounted) UiHelper.showErrorToast(context, e);
-    } finally {
-      if (mounted) setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _pickDate(TextEditingController c) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now().add(const Duration(days: 1)),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (picked != null) {
-      c.text = DateFormat('yyyy-MM-dd').format(picked);
-    }
-  }
-
-  Future<void> _book() async {
-    if (_asset == null || _start.text.isEmpty || _end.text.isEmpty) {
-      UiHelper.showErrorToast(context, 'Chọn ngày bắt đầu và kết thúc.');
-      return;
-    }
-    try {
-      final res = await OrderService.createOrder(
-        assetId: _asset!.id,
-        startDate: _start.text,
-        endDate: _end.text,
-        depositMethod: _depositMethod,
-      );
-      final url = res['paymentUrl'];
+      final data = await AssetService.getAssetDetail(id);
+      final asset = data['asset'] as Asset;
+      final reviews = (data['reviews'] as List).cast<Review>();
       if (!mounted) return;
-      showDialog(
-        context: context,
-        builder: (_) => AlertRequestPayment(url: url),
-      );
+      setState(() {
+        _asset = asset;
+        _reviews = reviews;
+        _loading = false;
+      });
     } catch (e) {
-      UiHelper.showErrorToast(context, e);
+      if (mounted) {
+        setState(() => _loading = false);
+        UiHelper.showErrorToast(context, e);
+      }
     }
   }
 
@@ -98,6 +70,9 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
       );
     }
     final a = _asset!;
+    final storedUser = Storage.getUser();
+    final myId = storedUser?['_id']?.toString();
+    final isOwner = a.lenderId != null && myId == a.lenderId;
     return Scaffold(
       appBar: AppBar(title: Text(a.name, style: const TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w800))),
       body: SingleChildScrollView(
@@ -105,21 +80,39 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (a.images.isNotEmpty)
-              SizedBox(
-                height: 260,
-                child: PageView(
-                  children: a.images
-                      .map((u) => CachedNetworkImage(
-                            imageUrl: u,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) =>
-                                const Center(child: CircularProgressIndicator()),
-                            errorWidget: (_, __, ___) =>
-                                const Icon(Icons.image, size: 60),
-                          ))
-                      .toList(),
-                ),
+      Column(
+        children: [
+          SizedBox(
+            height: 260,
+            child: PageView(
+              onPageChanged: (i) => setState(() => _imageIndex = i),
+              children: a.images
+                  .map((u) => AssetImageWidget(
+                        image: u,
+                        fit: BoxFit.cover,
+                        placehold: const Center(child: CircularProgressIndicator()),
+                        errWidget: const Icon(Icons.image, size: 60),
+                      ))
+                  .toList(),
+            ),
+          ),
+          if (a.images.length > 1)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(a.images.length, (i) => Container(
+                  width: 8, height: 8,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: i == _imageIndex ? const Color(0xFF006C49) : const Color(0xFFBBCABF),
+                  ),
+                )),
               ),
+            ),
+        ],
+      ),
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -179,82 +172,55 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
                             child: Icon(Icons.person, color: Color(0xFF005236))),
                         title: Text(a.lenderName!, style: const TextStyle(fontWeight: FontWeight.w600)),
                         subtitle: const Text('Chủ thiết bị'),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.chat, color: Color(0xFF0058BE)),
-                          onPressed: a.lenderId == null
-                              ? null
-                              : () => Navigator.pushNamed(context, '/chat',
-                                  arguments: {
-                                    'peerId': a.lenderId,
-                                    'peerName': a.lenderName
-                                  }),
-                        ),
-                      ),
-                    ),
-                  const Divider(),
-                  const Text('Đặt thuê',
-                      style: TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans')),
-                  const SizedBox(height: 8),
-                  VeloxTextField(
-                    label: 'Ngày bắt đầu',
-                    hint: 'Chọn ngày',
-                    controller: _start,
-                    readOnly: true,
-                    onTap: () => _pickDate(_start),
-                    prefixIcon: const Icon(Icons.calendar_today_outlined),
-                  ),
-                  const SizedBox(height: 12),
-                  VeloxTextField(
-                    label: 'Ngày kết thúc',
-                    hint: 'Chọn ngày',
-                    controller: _end,
-                    readOnly: true,
-                    onTap: () => _pickDate(_end),
-                    prefixIcon: const Icon(Icons.calendar_today_outlined),
-                  ),
-                  const SizedBox(height: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Phương thức cọc',
-                          style: TextStyle(fontFamily: 'PlusJakartaSans', fontWeight: FontWeight.w600, fontSize: 14)),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFF1F4F2),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: const Color(0xFFBBCABF)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            isExpanded: true,
-                            value: _depositMethod,
-                            items: const [
-                              DropdownMenuItem(value: 'online', child: Text('Cọc online (VNPay)')),
-                              DropdownMenuItem(value: 'cash', child: Text('Cọc tiền mặt')),
-                            ],
-                            onChanged: (v) => setState(() => _depositMethod = v!),
+                        trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.person, color: Color(0xFF0058BE)),
+                            onPressed: a.lenderId == null
+                                ? null
+                                : () => Navigator.pushNamed(context, '/user-profile',
+                                    arguments: a.lenderId),
                           ),
-                        ),
+                          IconButton(
+                            icon: const Icon(Icons.chat, color: Color(0xFF0058BE)),
+                            onPressed: a.lenderId == null
+                                ? null
+                                : () => Navigator.pushNamed(context, '/chat',
+                                    arguments: {
+                                      'peerId': a.lenderId,
+                                      'peerName': a.lenderName
+                                    }),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _book,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: const Color(0xFF005236),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Text('Đặt và thanh toán', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
                     ),
                   ),
+                  if (_reviews.isNotEmpty) ...[
+                    const SizedBox(height: 16),
+                    const Text('Đánh giá',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontFamily: 'PlusJakartaSans', fontSize: 16)),
+                    const SizedBox(height: 8),
+                    ..._reviews.map((r) => _ReviewTile(review: r)),
+                  ],
+                  if (isOwner) ...[
+                    const SizedBox(height: 16),
+                    const Divider(),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pushNamed(context, '/lender/post-asset', arguments: a.id),
+                        icon: const Icon(Icons.edit),
+                        label: const Text('Chỉnh sửa thiết bị'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                          foregroundColor: const Color(0xFF005236),
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -265,26 +231,59 @@ class _AssetDetailScreenState extends State<AssetDetailScreen> {
   }
 }
 
-class AlertRequestPayment extends StatelessWidget {
-  final String? url;
-  const AlertRequestPayment({super.key, this.url});
+class _ReviewTile extends StatelessWidget {
+  final Review review;
+  const _ReviewTile({required this.review});
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Thanh toán'),
-      content: SingleChildScrollView(
-        child: Text(
-            'Đơn hàng đã được tạo. Vui lòng mở liên kết VNPay sau để thanh toán:\n\n${url ?? ''}'),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            CircleAvatar(
+              radius: 18,
+              backgroundColor: const Color(0xFF10B981),
+              backgroundImage: review.renterAvatar != null && !review.renterAvatar!.startsWith('data:')
+                  ? NetworkImage(review.renterAvatar!)
+                  : null,
+              child: review.renterAvatar == null || (review.renterAvatar!.startsWith('data:'))
+                  ? const Icon(Icons.person, size: 18, color: Color(0xFF005236))
+                  : null,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(review.renterName,
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      const Spacer(),
+                      Row(
+                        children: List.generate(5, (i) => Icon(
+                          i < review.lenderRating ? Icons.star : Icons.star_border,
+                          size: 16, color: const Color(0xFF0058BE),
+                        )),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(review.lenderComment,
+                      style: const TextStyle(color: Color(0xFF3C4A42), fontSize: 13)),
+                  const SizedBox(height: 4),
+                  Text(DateFormat('dd/MM/yyyy').format(review.createdAt),
+                      style: const TextStyle(color: Color(0xFF808080), fontSize: 11)),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
-      actions: [
-        TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-            },
-            child: const Text('Đóng')),
-      ],
     );
   }
 }

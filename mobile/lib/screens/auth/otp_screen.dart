@@ -19,7 +19,7 @@ class _OtpScreenState extends State<OtpScreen> {
     try {
       await auth.verifyOtp(userId, _otp.text.trim());
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
     } catch (e) {
       UiHelper.showErrorToast(context, e);
     }

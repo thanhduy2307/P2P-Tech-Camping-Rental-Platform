@@ -229,3 +229,88 @@ exports.getAdminBankAccounts = async (req, res) => {
     res.status(500).json({ success: false, message: error.message });
   }
 };
+
+// @desc    Resolve dispute (simple admin version)
+// @route   POST /api/admin/disputes/:id/resolve
+// @access  Private (Admin)
+exports.resolveDispute = async (req, res) => {
+  try {
+    const { resolution, note } = req.body; // 'lender' or 'renter'
+    const order = await Order.findById(req.params.id).populate('asset');
+    if (!order) return res.status(404).json({ success: false, message: 'Order not found' });
+    if (order.status !== 'disputed') {
+      return res.status(400).json({ success: false, message: 'Order is not disputed' });
+    }
+
+    const platformFeePercent = 0.1;
+    const lender = await User.findById(order.asset.lender);
+    const renter = await User.findById(order.renter);
+    let message = 'Đã giải quyết tranh chấp.';
+
+    if (resolution === 'renter') {
+      // Favor the renter
+      if (order.disputeCreator === 'renter') {
+        // accept_renter_dispute: renter rejected at handover, full refund
+        order.platformFee = 0;
+        let refund = order.totalRent;
+        if (order.depositMethod === 'online') refund += order.deposit;
+        renter.balance += refund;
+        message = 'Chấp nhận khiếu nại Renter. Hoàn 100% tiền.';
+      } else {
+        // reject_lender_dispute: lender's damage claim rejected
+        const fee = order.totalRent * platformFeePercent;
+        order.platformFee = fee;
+        const payout = order.totalRent - fee;
+        lender.balance += payout;
+        if (order.depositMethod === 'online') {
+          renter.balance += order.deposit;
+        } else {
+          order.actualCashDepositReturned = order.deposit;
+        }
+        message = 'Bác bỏ yêu cầu bồi thường của Lender. Hoàn cọc 100% cho Renter.';
+      }
+    } else {
+      // Favor the lender
+      if (order.disputeCreator === 'renter') {
+        // reject_renter_dispute: renter's rejection was unjustified
+        const fee = order.totalRent * platformFeePercent;
+        order.platformFee = fee;
+        const payout = order.totalRent - fee;
+        if (order.depositMethod === 'online') {
+          lender.balance += payout;
+          renter.balance += order.deposit;
+        } else {
+          lender.balance += payout;
+          order.actualCashDepositReturned = order.deposit;
+        }
+        message = 'Bác bỏ khiếu nại Renter. Renter mất tiền thuê.';
+      } else {
+        // force_compensation: lender's damage claim accepted
+        const fee = order.totalRent * platformFeePercent;
+        order.platformFee = fee;
+        const payout = order.totalRent - fee;
+        if (order.depositMethod === 'online') {
+          lender.balance += (payout + order.deposit);
+          renter.balance -= order.deposit;
+          if (renter.balance < 0) renter.balance = 0;
+        } else {
+          lender.balance += payout;
+          order.actualCashDepositReturned = 0;
+        }
+        message = 'Chấp nhận yêu cầu bồi thường của Lender. Trừ cọc Renter.';
+      }
+    }
+
+    order.status = 'completed';
+    order.disputeStatus = 'resolved';
+    order.adminNote = note || '';
+    order.inspector = req.user._id;
+    await order.save();
+    await lender.save();
+    await renter.save();
+
+    res.status(200).json({ success: true, message, data: order });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};

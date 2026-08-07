@@ -207,8 +207,16 @@ exports.createAsset = async (req, res) => {
 // @access  Public
 exports.getVerifiedAssets = async (req, res) => {
   try {
-    const assets = await Asset.find({ status: 'verified' }).populate('lender', 'name');
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 20, 50);
+    const skip = (page - 1) * limit;
+
+    const assets = await Asset.find({ status: 'verified' })
+      .populate('lender', 'name')
+      .skip(skip)
+      .limit(limit);
     
+    const total = await Asset.countDocuments({ status: 'verified' });
     const { lat, lng } = req.query;
 
     if (lat && lng) {
@@ -240,10 +248,10 @@ exports.getVerifiedAssets = async (req, res) => {
         return a.distance - b.distance;
       });
 
-      return res.status(200).json({ success: true, data: assetsWithDistance });
+      return res.status(200).json({ success: true, data: assetsWithDistance, page, total });
     }
 
-    res.status(200).json({ success: true, data: assets });
+    res.status(200).json({ success: true, data: assets, page, total });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }

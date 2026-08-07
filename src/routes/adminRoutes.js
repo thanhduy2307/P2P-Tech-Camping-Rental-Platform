@@ -5,8 +5,10 @@ const {
   updateUserRole,
   toggleUserBan,
   getAssets,
-  getOrders
+  getOrders,
+  resolveDispute
 } = require('../controllers/adminController');
+const { getDisputedOrders } = require('../controllers/orderController');
 const { protect, authorize } = require('../middleware/auth');
 
 const router = express.Router();
@@ -22,5 +24,9 @@ router.put('/users/:id/ban', toggleUserBan);
 router.get('/assets', getAssets);
 router.get('/orders', getOrders);
 router.get('/bank-accounts', require('../controllers/adminController').getAdminBankAccounts);
+
+// Disputes
+router.get('/disputes', getDisputedOrders);
+router.post('/disputes/:id/resolve', resolveDispute);
 
 module.exports = router;

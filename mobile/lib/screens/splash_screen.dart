@@ -19,8 +19,8 @@ class _SplashScreenState extends State<SplashScreen> {
       if (!mounted) return;
       try {
         if (Storage.isLoggedIn()) {
-          final role = Provider.of<AuthProvider>(context, listen: false).role;
-          Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(role ?? 'renter'));
+          final auth = Provider.of<AuthProvider>(context, listen: false);
+          Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role ?? 'renter', lenderStatus: auth.user?.lenderStatus));
         } else {
           Navigator.pushReplacementNamed(context, AppRoutes.login);
         }

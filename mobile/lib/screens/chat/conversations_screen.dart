@@ -57,28 +57,75 @@ class _ConversationsScreenState extends State<ConversationsScreen> {
                           itemCount: _list.length,
                           itemBuilder: (_, i) {
                             final c = _list[i];
+                            final avatarColor = UiHelper.nameColor(c.peerId);
                             return Card(
-                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                              child: ListTile(
-                                leading: CircleAvatar(
-                                    backgroundColor: const Color(0xFF10B981),
-                                    child: Text(UiHelper.initials(c.peerName),
-                                        style: const TextStyle(color: Color(0xFF005236)))),
-                                title: Text(c.peerName, style: const TextStyle(fontWeight: FontWeight.w600)),
-                                subtitle: Text(c.lastMessage),
-                                trailing: c.unreadCount > 0
-                                    ? CircleAvatar(
-                                        radius: 12,
-                                        backgroundColor: const Color(0xFFBA1A1A),
-                                        child: Text('${c.unreadCount}',
-                                            style: const TextStyle(
-                                                color: Colors.white, fontSize: 11)))
-                                    : null,
+                              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
                                 onTap: () => Navigator.pushNamed(context, '/chat',
-                                    arguments: {
-                                      'peerId': c.peerId,
-                                      'peerName': c.peerName
-                                    }).then((_) => _load()),
+                                    arguments: {'peerId': c.peerId, 'peerName': c.peerName}).then((_) => _load()),
+                                child: Padding(
+                                  padding: const EdgeInsets.all(12),
+                                  child: Row(
+                                    children: [
+                                      Stack(
+                                        children: [
+                                          CircleAvatar(
+                                            radius: 24,
+                                            backgroundColor: avatarColor.withValues(alpha: 0.15),
+                                            child: Text(UiHelper.initials(c.peerName),
+                                                style: TextStyle(color: avatarColor, fontWeight: FontWeight.w700, fontSize: 16)),
+                                          ),
+                                          Positioned(
+                                            right: 0, bottom: 0,
+                                            child: Container(
+                                              width: 12, height: 12,
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFF10B981),
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: Colors.white, width: 2),
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Expanded(child: Text(c.peerName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15))),
+                                                Text(UiHelper.timeAgo(c.updatedAt), style: const TextStyle(fontSize: 11, color: Color(0xFF808080))),
+                                              ],
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Row(
+                                              children: [
+                                                Expanded(
+                                                  child: Text(c.lastMessage, maxLines: 1, overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(fontSize: 13, color: Color(0xFF3C4A42))),
+                                                ),
+                                                if (c.unreadCount > 0) ...[
+                                                  const SizedBox(width: 8),
+                                                  Container(
+                                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                    decoration: BoxDecoration(
+                                                      color: const Color(0xFFBA1A1A),
+                                                      borderRadius: BorderRadius.circular(999),
+                                                    ),
+                                                    child: Text('${c.unreadCount}', style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             );
                           },

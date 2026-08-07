@@ -113,4 +113,22 @@ class AdminService {
     await ApiClient.put('/auth/withdrawals/$id/verify',
         {'status': status, if (rejectReason != null) 'rejectReason': rejectReason});
   }
+
+  // ===== Disputes =====
+
+  /// GET /api/admin/disputes
+  static Future<List<Map<String, dynamic>>> getDisputedOrders() async {
+    final res = await ApiClient.get('/admin/disputes');
+    final list = res['data'] as List? ?? [];
+    return list.whereType<Map<String, dynamic>>().toList();
+  }
+
+  /// POST /api/admin/disputes/:orderId/resolve  {resolution, note?}
+  static Future<void> resolveDispute(String orderId, String resolution,
+      {String? note}) async {
+    await ApiClient.post('/admin/disputes/$orderId/resolve', {
+      'resolution': resolution,
+      if (note != null) 'note': note,
+    });
+  }
 }
