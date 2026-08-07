@@ -716,14 +716,7 @@ const isLenderNoShow = reason === 'lender_no_show' ||
         ));
 
       if (isLenderNoShow) {
-        let proofImgs = req.body.renterNoShowEvidence || req.body.cancellationProofImages || req.body.proofImages || req.body.images;
-        if (typeof proofImgs === 'string') {
-          try {
-            proofImgs = JSON.parse(proofImgs);
-          } catch (e) {
-            proofImgs = [proofImgs];
-          }
-        }
+        const proofImgs = req.body.renterNoShowEvidence || req.body.cancellationProofImages || req.body.proofImages || req.body.images;
 
         const validProofArray = Array.isArray(proofImgs) ? proofImgs.filter(Boolean) : (proofImgs ? [proofImgs] : []);
 
@@ -749,6 +742,9 @@ const isLenderNoShow = reason === 'lender_no_show' ||
           distance = haversineMeters(renterLoc.lat, renterLoc.lng, assetLoc.lat, assetLoc.lng);
         }
 
+        order.renterNoShowEvidence = validProofArray;
+        order.noShowDistanceMeters = distance === null ? undefined : Math.round(distance);
+
         if (distance !== null && distance <= PICKUP_RADIUS_METERS) {
           // Renter is at/near the pickup spot -> Lender at fault
           refundRent = order.totalRent;
@@ -767,8 +763,6 @@ const isLenderNoShow = reason === 'lender_no_show' ||
             reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
           });
 
-          order.renterNoShowEvidence = validProofArray;
-          order.noShowDistanceMeters = Math.round(distance);
           message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
           order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Renter đã có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m). Đã gửi ${validProofArray.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
 

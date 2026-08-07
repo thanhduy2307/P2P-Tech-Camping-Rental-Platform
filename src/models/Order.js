@@ -163,6 +163,12 @@ const orderSchema = new mongoose.Schema({
   }],
   disputedAt: {
     type: Date
+  },
+  renterNoShowEvidence: [{
+    type: String
+  }],
+  noShowDistanceMeters: {
+    type: Number
   }
 }, { timestamps: true });
 

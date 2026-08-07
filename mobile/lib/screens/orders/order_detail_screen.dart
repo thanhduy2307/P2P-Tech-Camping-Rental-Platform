@@ -30,6 +30,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
   final _disputeNotes = TextEditingController();
   String _disputeType = 'renter';
   final _extendDays = TextEditingController();
+  final List<XFile> _noShowImages = [];
 
   bool get _isLender => Storage.getRole() == 'lender';
 
@@ -130,10 +131,25 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
     }
   }
 
+  Future<void> _pickNoShowImages() async {
+    final picked = await _picker.pickMultiImage(imageQuality: 75, maxWidth: 1024);
+    if (picked.isNotEmpty) setState(() => _noShowImages.addAll(picked));
+  }
+
+  void _removeNoShowImage(int index) =>
+      setState(() => _noShowImages.removeAt(index));
+
   Future<void> _cancelNoShow() async {
     final ok = await EquipDialog.confirm(context, 'Không liên hệ được Lender',
-        'Hệ thống sẽ lấy vị trí GPS của bạn để kiểm tra bạn có đúng mặt tại địa điểm nhận đồ hay không, nhằm xác định đúng bên có lỗi. Tiếp tục?');
+        'Hệ thống sẽ lấy vị trí GPS của bạn để kiểm tra bạn có đúng mặt tại địa điểm nhận đồ hay không, đồng thời yêu cầu upload ảnh bằng chứng (tối thiểu 1 ảnh, ví dụ: screenshot cuộc gọi/chat không được trả lời). Tiếp tục?');
     if (ok != true) return;
+
+    if (_noShowImages.isEmpty) {
+      UiHelper.showErrorToast(context, 'Vui lòng chọn ít nhất 1 ảnh bằng chứng.');
+      return;
+    }
+    final evidence = await UiHelper.imagesToBase64(_noShowImages);
+    if (!mounted) return;
 
     UiHelper.showLoading(context);
     try {
@@ -147,7 +163,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
           if (!mounted) return;
           UiHelper.hideLoading(context);
           EquipDialog.info(context,
-              'Không thể xác nhận vị trí vì bạn chưa cấp quyền GPS. Hãy bật quyền vị trí rồi thử lại. Nếu bạn không có mặt tại địa điểm nhận đồ, đơn sẽ bị hủy như hủy thường và bạn có thể bị phạt 30%.');
+              'Không thể xác nhận vị trí vì bạn chưa cấp quyền GPS. Hãy bật quyền vị trí rồi thử lại.');
           return;
         }
       }
@@ -157,7 +173,8 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
       if (!mounted) return;
       final result = await OrderService.cancelOrder(_order!.id,
           reason: 'lender_no_show',
-          renterLocation: {'lat': pos.latitude, 'lng': pos.longitude});
+          renterLocation: {'lat': pos.latitude, 'lng': pos.longitude},
+          renterNoShowEvidence: evidence);
       if (!mounted) return;
       UiHelper.hideLoading(context);
       final msg = result['message']?.toString() ?? 'Đã hủy đơn';
@@ -369,6 +386,49 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
               child: const Text('Hủy đơn'),
             )),
             if (s == 'reserved' && !_isLender) ...[
+              const SizedBox(height: 8),
+              const Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Ảnh bằng chứng (tối thiểu 1 ảnh — screenshot cuộc gọi/chat)',
+                    style: TextStyle(
+                        fontSize: 12, color: AppTheme.onSurfaceVariant)),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  ...List.generate(_noShowImages.length.clamp(0, 3), (idx) => Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Stack(
+                          children: [
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(8),
+                              child: Image.file(File(_noShowImages[idx].path),
+                                  width: 64, height: 64, fit: BoxFit.cover),
+                            ),
+                            Positioned(
+                              right: 2,
+                              top: 2,
+                              child: GestureDetector(
+                                onTap: () => _removeNoShowImage(idx),
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      shape: BoxShape.circle),
+                                  padding: const EdgeInsets.all(2),
+                                  child: const Icon(Icons.close,
+                                      size: 14, color: Colors.white),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )),
+                  OutlinedButton.icon(
+                    onPressed: _pickNoShowImages,
+                    icon: const Icon(Icons.add_photo_alternate_outlined),
+                    label: Text('Thêm ảnh')),
+                ],
+              ),
               const SizedBox(height: 8),
               SizedBox(width: double.infinity, child: OutlinedButton.icon(
                 onPressed: _cancelNoShow,
