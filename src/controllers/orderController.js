@@ -3,6 +3,7 @@ const Asset = require('../models/Asset');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { createPaymentUrl, verifyReturnUrl } = require('../services/vnpayService');
+const { notifyUser } = require('../utils/notificationHelper');
 const { differenceInDays, parseISO } = require('date-fns');
 
 // Helper to auto-expire unpaid orders older than 1 minute
@@ -709,6 +710,14 @@ exports.cancelOrder = async (req, res) => {
 
         message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
         order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+
+        notifyUser(
+          order.asset.lender,
+          'order',
+          'Đơn hàng bị hủy do Lender không xuất hiện',
+          `Đơn hàng #${order._id.toString().slice(-6)} đã bị Renter hủy với lý do không liên hệ/gặp được Lender. Bạn bị phạt 5% tiền thuê.`,
+          '/lender-orders'
+        );
       } else {
         // Normal Renter cancel
         if (hoursToStart >= 48) {
@@ -734,6 +743,14 @@ exports.cancelOrder = async (req, res) => {
           });
         }
         order.disputeNotes = `Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
+
+        notifyUser(
+          order.asset.lender,
+          'order',
+          'Người thuê đã hủy đơn hàng',
+          `Đơn hàng #${order._id.toString().slice(-6)} đã được người thuê hủy.`,
+          '/lender-orders'
+        );
       }
 
       // Process Renter refund
@@ -743,6 +760,14 @@ exports.cancelOrder = async (req, res) => {
 
       order.status = 'cancelled';
       await order.save();
+
+      notifyUser(
+        order.renter,
+        'order',
+        'Hủy đơn hàng thành công',
+        `Đơn hàng #${order._id.toString().slice(-6)} đã được hủy. Số tiền ${(refundRent + refundDeposit).toLocaleString('vi-VN')} đ đã hoàn về ví.`,
+        '/orders'
+      );
 
       return res.status(200).json({ success: true, message, data: order });
     } else {
