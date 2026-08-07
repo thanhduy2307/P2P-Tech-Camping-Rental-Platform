@@ -235,16 +235,6 @@ const Orders = () => {
     }
   };
 
-    } catch (err) {
-      console.error(err);
-      Swal.fire({
-        icon: 'error',
-        title: 'Lỗi',
-        text: err.response?.data?.message || 'Không thể hủy đơn hàng.'
-      });
-    }
-  };
-
   const handleContinuePayment = async (orderId) => {
     try {
       const response = await api.get(`/orders/${orderId}/pay`);
