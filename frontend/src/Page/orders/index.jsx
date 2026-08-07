@@ -140,32 +140,58 @@ const Orders = () => {
   };
 
   const handleCancelOrder = async (orderId, orderStatus) => {
-    const confirmMsg = orderStatus === 'reserved'
-      ? 'Bạn có chắc chắn muốn hủy đơn hàng ĐÃ ĐẶT CỌC này không? Tùy theo thời gian hủy so với lúc nhận đồ, bạn có thể bị trừ tiền cọc.'
-      : 'Bạn có chắc chắn muốn hủy đơn hàng chưa thanh toán này không?';
+    let reason = '';
 
-    const _swalRes = await Swal.fire({
-      title: confirmMsg,
-      input: 'textarea',
-      inputLabel: 'Lý do hủy đơn',
-      inputPlaceholder: 'Vui lòng nhập lý do hủy đơn...',
-      inputValidator: (value) => {
-        if (!value) {
-          return 'Bạn cần nhập lý do hủy đơn!';
-        }
-      },
-      showCancelButton: true,
-      confirmButtonText: "Đồng ý",
-      cancelButtonText: "Hủy"
-    });
+    if (orderStatus === 'reserved') {
+      const _swalRes = await Swal.fire({
+        title: 'Hủy đơn hàng đã đặt cọc',
+        text: 'Vui lòng chọn lý do bạn muốn hủy đơn hàng này:',
+        input: 'radio',
+        inputOptions: {
+          'lender_no_show': '🚨 Không liên hệ được Lender / Lender không xuất hiện giao đồ (Hoàn 100% tiền & phạt Lender)',
+          'personal_reason': '👤 Lý do cá nhân (Nếu sát ngày <48h sẽ bị phạt 30% tiền thuê)'
+        },
+        inputValidator: (value) => {
+          if (!value) {
+            return 'Vui lòng chọn lý do hủy đơn!';
+          }
+        },
+        showCancelButton: true,
+        confirmButtonText: 'Đồng ý hủy',
+        cancelButtonText: 'Quay lại',
+        confirmButtonColor: '#d33'
+      });
 
-    if (!_swalRes.isConfirmed) return;
-    const reason = _swalRes.value;
+      if (!_swalRes.isConfirmed) return;
+      reason = _swalRes.value;
+    } else {
+      const _swalRes = await Swal.fire({
+        title: 'Bạn có chắc chắn muốn hủy đơn hàng chưa thanh toán này không?',
+        input: 'textarea',
+        inputLabel: 'Lý do hủy đơn',
+        inputPlaceholder: 'Vui lòng nhập lý do hủy đơn...',
+        inputValidator: (value) => {
+          if (!value) {
+            return 'Bạn cần nhập lý do hủy đơn!';
+          }
+        },
+        showCancelButton: true,
+        confirmButtonText: "Đồng ý",
+        cancelButtonText: "Hủy"
+      });
+
+      if (!_swalRes.isConfirmed) return;
+      reason = _swalRes.value;
+    }
 
     try {
       const response = await api.put(`/orders/${orderId}/cancel`, { reason });
       if (response.data?.success) {
-        Swal.fire(response.data.message || 'Hủy đơn hàng thành công.');
+        Swal.fire({
+          icon: 'success',
+          title: 'Đã hủy đơn hàng',
+          text: response.data.message || 'Hủy đơn hàng thành công.'
+        });
         // Re-fetch to update list
         const res = await api.get('/orders/my-rentals');
         if (res.data?.success) setOrders(res.data.data || []);
@@ -173,6 +199,40 @@ const Orders = () => {
     } catch (err) {
       console.error(err);
       Swal.fire(err.response?.data?.message || 'Không thể hủy đơn hàng.');
+    }
+  };
+
+  const handleCancelNoShow = async (orderId) => {
+    const result = await Swal.fire({
+      title: 'Hủy đơn (Không liên hệ được Lender)',
+      text: 'Bạn có chắc chắn không thể liên hệ được với Lender để nhận đồ? Nếu xác nhận, đơn hàng sẽ bị hủy, bạn sẽ được hoàn 100% tiền và Lender sẽ bị áp dụng mức phạt.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Xác nhận hủy',
+      cancelButtonText: 'Quay lại',
+      confirmButtonColor: '#d33',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await api.put(`/orders/${orderId}/cancel`, { reason: 'lender_no_show' });
+      if (response.data?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Đã hủy đơn hàng',
+          text: response.data.message || 'Hủy đơn hàng thành công.'
+        });
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Lỗi',
+        text: err.response?.data?.message || 'Không thể hủy đơn hàng.'
+      });
     }
   };
 
@@ -790,9 +850,13 @@ const Orders = () => {
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleCancelNoShow(order._id)}
-                              className="w-full text-[10px] font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-300 py-2 rounded-lg transition-colors cursor-pointer relative z-10 mt-2"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleCancelNoShow(order._id);
+                              }}
+                              className="w-full text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 py-2.5 rounded-lg transition-all cursor-pointer relative z-20 mt-2 flex items-center justify-center gap-1.5 shadow-sm"
                             >
+                              <span className="material-symbols-outlined text-sm text-amber-700">no_accounts</span>
                               Hủy đơn (Không liên hệ được Lender)
                             </button>
                           </div>

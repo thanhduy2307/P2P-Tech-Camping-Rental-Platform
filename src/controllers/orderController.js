@@ -690,7 +690,15 @@ exports.cancelOrder = async (req, res) => {
       let penalty = 0;
       let message = '';
       
-      if (reason === 'lender_no_show') {
+      const isLenderNoShow = reason === 'lender_no_show' || 
+        (typeof reason === 'string' && (
+          reason.toLowerCase().includes('lender') || 
+          reason.toLowerCase().includes('chủ đồ') ||
+          reason.toLowerCase().includes('không liên hệ') ||
+          reason.toLowerCase().includes('no_show')
+        ));
+
+      if (isLenderNoShow) {
         // Renter reports Lender did not show up
         refundRent = order.totalRent;
         const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
