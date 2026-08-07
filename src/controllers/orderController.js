@@ -690,7 +690,23 @@ exports.cancelOrder = async (req, res) => {
       let penalty = 0;
       let message = '';
       
-      if (reason === 'lender_no_show') {
+      const isLenderNoShow = reason === 'lender_no_show' || 
+        (typeof reason === 'string' && (
+          reason.toLowerCase().includes('lender') || 
+          reason.toLowerCase().includes('chủ đồ') ||
+          reason.toLowerCase().includes('không liên hệ') ||
+          reason.toLowerCase().includes('no_show')
+        ));
+
+      if (isLenderNoShow) {
+        const { cancellationProofImages } = req.body;
+        if (!cancellationProofImages || !Array.isArray(cancellationProofImages) || cancellationProofImages.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Bắt buộc phải tải lên ít nhất 1 ảnh bằng chứng (ảnh cuộc gọi/tin nhắn cho Lender) để thực hiện hủy đơn miễn phí.'
+          });
+        }
+
         // Renter reports Lender did not show up
         refundRent = order.totalRent;
         const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
@@ -708,8 +724,9 @@ exports.cancelOrder = async (req, res) => {
           reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
         });
 
-        message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
-        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+        order.cancellationProofImages = cancellationProofImages;
+        message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Hệ thống đã ghi nhận ảnh bằng chứng và áp dụng mức phạt đối với chủ đồ.`;
+        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Đã gửi ${cancellationProofImages.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
 
         notifyUser(
           order.asset.lender,
