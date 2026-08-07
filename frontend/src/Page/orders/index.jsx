@@ -153,6 +153,77 @@ const Orders = () => {
     setCancelProofModalOpen(true);
   };
 
+  const handlePickCancelProofImage = (index) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.click();
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+
+      Swal.fire({
+        title: 'Đang xử lý ảnh...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+
+      try {
+        const compressedBase64 = await compressImage(file);
+        setCancelProofImages(prev => {
+          const next = [...prev];
+          next[index] = compressedBase64;
+          return next;
+        });
+        Swal.close();
+      } catch (err) {
+        console.error(err);
+        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh.', 'error');
+      }
+    };
+  };
+
+  const handleSubmitCancelProof = async (e) => {
+    e.preventDefault();
+    const validImages = cancelProofImages.filter(Boolean);
+    if (validImages.length === 0) {
+      return Swal.fire({
+        icon: 'warning',
+        title: 'Bắt buộc tải ảnh bằng chứng',
+        text: 'Vui lòng tải lên ít nhất 1 ảnh chụp màn hình bằng chứng (lịch sử cuộc gọi hoặc tin nhắn cho Lender) để thực hiện hủy đơn.'
+      });
+    }
+
+    setCancelProofLoading(true);
+    try {
+      const response = await api.put(`/orders/${selectedCancelOrderId}/cancel`, {
+        reason: 'lender_no_show',
+        cancellationProofImages: validImages,
+        note: cancelProofNote
+      });
+
+      if (response.data?.success) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Hủy đơn thành công',
+          text: response.data.message || 'Đã ghi nhận bằng chứng và xử lý hủy đơn hàng.'
+        });
+        setCancelProofModalOpen(false);
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire({
+        icon: 'error',
+        title: 'Không thể hủy đơn hàng',
+        text: err.response?.data?.message || 'Có lỗi xảy ra khi hủy đơn hàng.'
+      });
+    } finally {
+      setCancelProofLoading(false);
+    }
+  };
+
   const handleCancelOrder = async (orderId, orderStatus) => {
     if (orderStatus === 'reserved') {
       const _swalRes = await Swal.fire({
