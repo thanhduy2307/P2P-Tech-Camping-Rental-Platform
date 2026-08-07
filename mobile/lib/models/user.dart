@@ -16,6 +16,7 @@ class User {
   final bool isBanned;
   final String? createdAt;
   final String? addressString;
+  final Map<String, dynamic>? bankAccount;
 
   User({
     required this.id,
@@ -35,6 +36,7 @@ class User {
     this.isBanned = false,
     this.createdAt,
     this.addressString,
+    this.bankAccount,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -57,6 +59,7 @@ class User {
       balance: (json['balance'] is num) ? (json['balance'] as num).toDouble() : 0.0,
       isBanned: json['isBanned'] == true,
       createdAt: json['createdAt']?.toString(),
+      bankAccount: _asMap(json['bankAccount']),
       addressString: address != null
           ? '${address['street'] ?? ''}, ${address['ward'] ?? ''}'.trim()
           : null,

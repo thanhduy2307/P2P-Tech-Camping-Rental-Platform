@@ -96,7 +96,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                               try {
                                 await NotificationService.markRead(n.id);
                                 if (!mounted) return;
-                                _load();
+                                await _load();
+                                if (n.link != null && n.link!.isNotEmpty) {
+                                  _navigate(n.link!);
+                                }
                               } catch (e) {
                                 if (mounted) UiHelper.showErrorToast(context, e);
                               }
@@ -108,5 +111,28 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ),
                 ),
     );
+  }
+
+  void _navigate(String link) {
+    final uri = Uri.tryParse(link);
+    if (uri == null) return;
+    final path = uri.path;
+    final segments = path.split('/').where((s) => s.isNotEmpty).toList();
+    if (segments.isEmpty) return;
+
+    final first = segments[0];
+    if (first == 'orders' && segments.length >= 2) {
+      Navigator.pushNamed(context, '/order-detail', arguments: segments[1]);
+    } else if (first == 'chats' && segments.length >= 2) {
+      Navigator.pushNamed(context, '/chat', arguments: segments[1]);
+    } else if (first == 'conversations') {
+      Navigator.pushNamed(context, '/conversations');
+    } else if (first == 'assets' && segments.length >= 2) {
+      Navigator.pushNamed(context, '/asset-detail', arguments: segments[1]);
+    } else if (first == 'profile') {
+      Navigator.pushNamed(context, '/profile');
+    } else if (first == 'my-orders') {
+      Navigator.pushNamed(context, '/my-orders');
+    }
   }
 }

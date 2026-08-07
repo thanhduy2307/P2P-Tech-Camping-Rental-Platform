@@ -1,8 +1,9 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:velox_mobile/core/theme.dart';
 import 'package:velox_mobile/services/asset_service.dart';
 import 'package:velox_mobile/widgets/app_shell.dart';
 import 'package:velox_mobile/widgets/common.dart';
@@ -15,6 +16,7 @@ class PostAssetScreen extends StatefulWidget {
 }
 
 class _PostAssetScreenState extends State<PostAssetScreen> {
+  String? _editId;
   final _name = TextEditingController();
   final _desc = TextEditingController();
   final _category = TextEditingController();
@@ -28,6 +30,42 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
 
   final _picker = ImagePicker();
   final List<XFile> _selectedImages = [];
+  List<String> _existingImages = [];
+  double _lat = 21.0285;
+  double _lng = 105.8048;
+  String _address = '';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final arg = ModalRoute.of(context)?.settings.arguments;
+      if (arg is String) _loadForEdit(arg);
+    });
+  }
+
+  Future<void> _loadForEdit(String id) async {
+    setState(() => _loading = true);
+    try {
+      _editId = id;
+      final asset = await AssetService.getAssetById(id);
+      _name.text = asset.name;
+      _desc.text = asset.description;
+      _category.text = asset.category;
+      _price.text = asset.pricePerDay.toStringAsFixed(0);
+      _deposit.text = asset.depositAmount.toStringAsFixed(0);
+      _existingImages = List.from(asset.images);
+      if (asset.lat != null && asset.lng != null) {
+        _lat = asset.lat!;
+        _lng = asset.lng!;
+      }
+      _address = asset.addressString ?? '';
+    } catch (e) {
+      if (mounted) UiHelper.showErrorToast(context, e);
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   Future<void> _pickImages() async {
     final picked = await _picker.pickMultiImage(
@@ -43,16 +81,7 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
     setState(() => _selectedImages.removeAt(index));
   }
 
-  Future<List<String>> _imagesToBase64() async {
-    final results = <String>[];
-    for (final img in _selectedImages) {
-      final bytes = await img.readAsBytes();
-      final ext = img.path.split('.').last.toLowerCase();
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-      results.add('data:$mime;base64,${base64Encode(bytes)}');
-    }
-    return results;
-  }
+  Future<List<String>> _imagesToBase64() async => UiHelper.imagesToBase64(_selectedImages);
 
   Future<void> _estimate() async {
     try {
@@ -88,28 +117,41 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
   }
 
   Future<void> _submit() async {
-    if (_selectedImages.length < 5) {
-      UiHelper.showErrorToast(context, 'Vui lòng chọn ít nhất 5 ảnh');
+    if (_selectedImages.isEmpty && _existingImages.isEmpty) {
+      UiHelper.showErrorToast(context, 'Vui lòng chọn ảnh thiết bị');
       return;
     }
     setState(() => _loading = true);
     try {
-      final imagesB64 = await _imagesToBase64();
-      await AssetService.createAsset({
+      final body = <String, dynamic>{
         'name': _name.text,
         'description': _desc.text,
         'category': _category.text,
         'pricePerDay': double.tryParse(_price.text) ?? 0,
         'depositAmount': double.tryParse(_deposit.text) ?? 0,
         'depositCalculationMode': _depositMode,
-        'images': imagesB64,
-        'location': {'lat': 21.0285, 'lng': 105.8048, 'addressString': ''},
+        'location': {'lat': _lat, 'lng': _lng, 'addressString': _address},
         'originalPrice': double.tryParse(_originalPrice.text),
         'purchaseYear': int.tryParse(_purchaseYear.text),
         'itemConditionRate': double.tryParse(_conditionRate.text),
-      });
-      if (!mounted) return;
-      UiHelper.showSuccessToast(context, 'Đăng thiết bị thành công!');
+      };
+      if (_selectedImages.isNotEmpty) {
+        body['images'] = await _imagesToBase64();
+      }
+      if (_editId != null) {
+        await AssetService.updateAsset(_editId!, body);
+        if (!mounted) return;
+        UiHelper.showSuccessToast(context, 'Cập nhật thiết bị thành công!');
+      } else {
+        if (_selectedImages.length < 5) {
+          setState(() => _loading = false);
+          if (mounted) UiHelper.showErrorToast(context, 'Vui lòng chọn ít nhất 5 ảnh');
+          return;
+        }
+        await AssetService.createAsset(body);
+        if (!mounted) return;
+        UiHelper.showSuccessToast(context, 'Đăng thiết bị thành công!');
+      }
       Navigator.pop(context);
     } catch (e) {
       UiHelper.showErrorToast(context, e);
@@ -183,6 +225,25 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
             const SizedBox(height: 12),
             OutlinedButton(
                 onPressed: _estimate, child: const Text('AI ước tính cọc & giá')),
+            const SizedBox(height: 12),
+            Text('Vị trí: $_lat, $_lng${_address.isNotEmpty ? ' - $_address' : ''}',
+                style: const TextStyle(fontSize: 12, color: AppTheme.onSurfaceVariant)),
+            const SizedBox(height: 8),
+            SizedBox(width: double.infinity, child: OutlinedButton.icon(
+              icon: const Icon(Icons.my_location, size: 16),
+              label: const Text('Lấy vị trí hiện tại'),
+              onPressed: () async {
+                try {
+                  final perm = await Geolocator.checkPermission();
+                  if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+                    final req = await Geolocator.requestPermission();
+                    if (req == LocationPermission.denied || req == LocationPermission.deniedForever) return;
+                  }
+                  final pos = await Geolocator.getCurrentPosition();
+                  setState(() { _lat = pos.latitude; _lng = pos.longitude; _address = ''; });
+                } catch (_) {}
+              },
+            )),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -190,7 +251,7 @@ class _PostAssetScreenState extends State<PostAssetScreen> {
                 onPressed: _loading ? null : _submit,
                 child: _loading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Đăng thiết bị'),
+                    : Text(_editId != null ? 'Cập nhật thiết bị' : 'Đăng thiết bị'),
               ),
             ),
           ],

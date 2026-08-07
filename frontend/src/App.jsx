@@ -29,6 +29,7 @@ import DashboardInspector from './Page/dashboard-inspector';
 import DashboardAdmin from './Page/dashboard-admin';
 import Login from './Page/login';
 import Register from './Page/register';
+import ForgotPassword from './Page/forgot-password';
 import Chat from './Page/chat';
 
 import PublicProfile from './Page/public-profile';
@@ -49,6 +50,7 @@ function App() {
         {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Protected General User Routes */}
         <Route element={<ProtectedRoute allowedRoles={['renter', 'lender', 'inspector', 'admin']} />}>

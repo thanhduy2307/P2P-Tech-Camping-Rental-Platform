@@ -1,7 +1,10 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:velox_mobile/providers/auth_provider.dart';
 import 'package:velox_mobile/main.dart';
+import 'package:velox_mobile/services/auth_service.dart';
 import 'package:velox_mobile/widgets/common.dart';
 import 'package:velox_mobile/widgets/brand_logo.dart';
 import 'package:velox_mobile/widgets/velox_button.dart';
@@ -24,9 +27,40 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await auth.login(_emailController.text.trim(), _passwordController.text);
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+      Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
     } catch (e) {
       UiHelper.showErrorToast(context, e);
+    }
+  }
+
+  Future<void> _googleSignIn() async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    try {
+      final data = await AuthService.startGoogleAuth();
+      if (!mounted) return;
+      final authUrl = data['authUrl']?.toString();
+      final sessionId = data['sessionId']?.toString();
+      if (authUrl == null || sessionId == null) {
+        UiHelper.showErrorToast(context, 'Google Auth không khả dụng');
+        return;
+      }
+      await launchUrl(Uri.parse(authUrl), mode: LaunchMode.externalApplication);
+      if (!mounted) return;
+      final result = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _GoogleAuthPollingDialog(sessionId: sessionId),
+      );
+      if (!mounted) return;
+      if (result == 'done') {
+        await auth.refresh();
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
+      } else if (result != null) {
+        UiHelper.showErrorToast(context, result);
+      }
+    } catch (e) {
+      if (mounted) UiHelper.showErrorToast(context, e);
     }
   }
 
@@ -109,6 +143,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     onPressed: auth.loading ? null : _submit,
                     icon: const Icon(Icons.arrow_forward, size: 18),
                   ),
+                  Center(
+                    child: GestureDetector(
+                      onTap: () => Navigator.pushNamed(context, '/forgot-password'),
+                      child: const Text('Quên mật khẩu?', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF0058BE))),
+                    ),
+                  ),
                   const SizedBox(height: 18),
                   const Row(
                     children: [
@@ -125,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     label: 'Google',
                     outline: true,
                     icon: const Icon(Icons.g_mobiledata, size: 22),
-                    onPressed: () {},
+                    onPressed: _googleSignIn,
                   ),
                   const SizedBox(height: 20),
                   Row(
@@ -143,6 +183,60 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _GoogleAuthPollingDialog extends StatefulWidget {
+  final String sessionId;
+  const _GoogleAuthPollingDialog({required this.sessionId});
+
+  @override
+  State<_GoogleAuthPollingDialog> createState() => _GoogleAuthPollingDialogState();
+}
+
+class _GoogleAuthPollingDialogState extends State<_GoogleAuthPollingDialog> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _poll();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _poll());
+  }
+
+  Future<void> _poll() async {
+    try {
+      final data = await AuthService.pollGoogleSession(widget.sessionId);
+      if (!mounted) return;
+      if (data == null) return;
+      _timer?.cancel();
+      final status = data['status'] as String?;
+      if (status == 'done') {
+        await AuthService.persistSession(data);
+        if (mounted) Navigator.pop(context, 'done');
+      } else {
+        Navigator.pop(context, data['message'] as String? ?? 'Đăng nhập thất bại');
+      }
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      content: Row(
+        children: [
+          const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+          const SizedBox(width: 16),
+          const Expanded(child: Text('Vui lòng đăng nhập Google trong trình duyệt...')),
+        ],
       ),
     );
   }
