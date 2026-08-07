@@ -1379,6 +1379,9 @@ const Orders = () => {
               </div>
             </form>
           </div>
+        </div>
+      )}
+
       {/* Cancellation Proof Modal (Lender No Show) */}
       {cancelProofModalOpen && selectedCancelOrderId && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
