@@ -21,7 +21,8 @@ const LenderTopAssets = () => {
         }
       } catch (err) {
         console.error('Failed to load lender top assets', err);
-        setError('Không thể tải thống kê sản phẩm nổi bật. Vui lòng thử lại sau.');
+        const serverMsg = err.response?.data?.message;
+        setError(serverMsg || 'Không thể tải thống kê sản phẩm nổi bật. Vui lòng thử lại sau.');
       } finally {
         setLoading(false);
       }
