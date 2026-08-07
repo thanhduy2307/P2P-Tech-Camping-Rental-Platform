@@ -60,18 +60,22 @@ const LenderTopAssets = () => {
         </div>
       </section>
 
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-600">
-          {error}
+      {error ? (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-center">
+          <p className="text-sm font-semibold text-red-600 mb-3">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-bold transition-colors"
+          >
+            Thử lại
+          </button>
         </div>
-      )}
-
-      {topItems.length === 0 ? (
+      ) : topItems.length === 0 ? (
         <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-10 text-center">
           <span className="material-symbols-outlined text-5xl text-slate-300">leaderboard</span>
           <h3 className="mt-4 text-lg font-bold text-slate-800">Chưa có dữ liệu sản phẩm nổi bật</h3>
           <p className="mt-2 text-sm text-slate-500">
-            Khi thiết bị của bạn được thuê, thống kê sản phẩm nổi bật sẽ hiển thị tại đây.
+            Khi bạn đăng sản phẩm hoặc thiết bị của bạn được thuê, thống kê sản phẩm nổi bật sẽ hiển thị tại đây.
           </p>
         </div>
       ) : (
