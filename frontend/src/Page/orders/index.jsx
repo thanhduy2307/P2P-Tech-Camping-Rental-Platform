@@ -35,6 +35,13 @@ const Orders = () => {
   
   const [defenseModalOpen, setDefenseModalOpen] = useState(false);
   const [defenseNotes, setDefenseNotes] = useState('');
+
+  // Cancellation proof modal states
+  const [cancelProofModalOpen, setCancelProofModalOpen] = useState(false);
+  const [selectedCancelOrderId, setSelectedCancelOrderId] = useState(null);
+  const [cancelProofImages, setCancelProofImages] = useState(['', '', '']);
+  const [cancelProofNote, setCancelProofNote] = useState('');
+  const [cancelProofLoading, setCancelProofLoading] = useState(false);
   const handleSubmitRating = async (e) => {
     e.preventDefault();
     setRatingError('');
@@ -139,16 +146,21 @@ const Orders = () => {
     }
   };
 
-  const handleCancelOrder = async (orderId, orderStatus) => {
-    let reason = '';
+  const handleCancelNoShow = (orderId) => {
+    setSelectedCancelOrderId(orderId);
+    setCancelProofImages(['', '', '']);
+    setCancelProofNote('');
+    setCancelProofModalOpen(true);
+  };
 
+  const handleCancelOrder = async (orderId, orderStatus) => {
     if (orderStatus === 'reserved') {
       const _swalRes = await Swal.fire({
         title: 'Hủy đơn hàng đã đặt cọc',
         text: 'Vui lòng chọn lý do bạn muốn hủy đơn hàng này:',
         input: 'radio',
         inputOptions: {
-          'lender_no_show': '🚨 Không liên hệ được Lender / Lender không xuất hiện giao đồ (Hoàn 100% tiền & phạt Lender)',
+          'lender_no_show': '🚨 Không liên hệ được Lender (Yêu cầu tải ảnh cuộc gọi/tin nhắn bằng chứng)',
           'personal_reason': '👤 Lý do cá nhân (Nếu sát ngày <48h sẽ bị phạt 30% tiền thuê)'
         },
         inputValidator: (value) => {
@@ -157,32 +169,54 @@ const Orders = () => {
           }
         },
         showCancelButton: true,
-        confirmButtonText: 'Đồng ý hủy',
+        confirmButtonText: 'Đồng ý',
         cancelButtonText: 'Quay lại',
         confirmButtonColor: '#d33'
       });
 
       if (!_swalRes.isConfirmed) return;
-      reason = _swalRes.value;
-    } else {
-      const _swalRes = await Swal.fire({
-        title: 'Bạn có chắc chắn muốn hủy đơn hàng chưa thanh toán này không?',
-        input: 'textarea',
-        inputLabel: 'Lý do hủy đơn',
-        inputPlaceholder: 'Vui lòng nhập lý do hủy đơn...',
-        inputValidator: (value) => {
-          if (!value) {
-            return 'Bạn cần nhập lý do hủy đơn!';
-          }
-        },
-        showCancelButton: true,
-        confirmButtonText: "Đồng ý",
-        cancelButtonText: "Hủy"
-      });
+      
+      if (_swalRes.value === 'lender_no_show') {
+        handleCancelNoShow(orderId);
+        return;
+      }
 
-      if (!_swalRes.isConfirmed) return;
-      reason = _swalRes.value;
+      const reason = _swalRes.value;
+      try {
+        const response = await api.put(`/orders/${orderId}/cancel`, { reason });
+        if (response.data?.success) {
+          Swal.fire({
+            icon: 'success',
+            title: 'Đã hủy đơn hàng',
+            text: response.data.message || 'Hủy đơn hàng thành công.'
+          });
+          const res = await api.get('/orders/my-rentals');
+          if (res.data?.success) setOrders(res.data.data || []);
+        }
+      } catch (err) {
+        console.error(err);
+        Swal.fire(err.response?.data?.message || 'Không thể hủy đơn hàng.');
+      }
+      return;
     }
+
+    const _swalRes = await Swal.fire({
+      title: 'Bạn có chắc chắn muốn hủy đơn hàng chưa thanh toán này không?',
+      input: 'textarea',
+      inputLabel: 'Lý do hủy đơn',
+      inputPlaceholder: 'Vui lòng nhập lý do hủy đơn...',
+      inputValidator: (value) => {
+        if (!value) {
+          return 'Bạn cần nhập lý do hủy đơn!';
+        }
+      },
+      showCancelButton: true,
+      confirmButtonText: "Đồng ý",
+      cancelButtonText: "Hủy"
+    });
+
+    if (!_swalRes.isConfirmed) return;
+    const reason = _swalRes.value;
 
     try {
       const response = await api.put(`/orders/${orderId}/cancel`, { reason });
@@ -192,7 +226,6 @@ const Orders = () => {
           title: 'Đã hủy đơn hàng',
           text: response.data.message || 'Hủy đơn hàng thành công.'
         });
-        // Re-fetch to update list
         const res = await api.get('/orders/my-rentals');
         if (res.data?.success) setOrders(res.data.data || []);
       }
@@ -202,30 +235,6 @@ const Orders = () => {
     }
   };
 
-  const handleCancelNoShow = async (orderId) => {
-    const result = await Swal.fire({
-      title: 'Hủy đơn (Không liên hệ được Lender)',
-      text: 'Bạn có chắc chắn không thể liên hệ được với Lender để nhận đồ? Nếu xác nhận, đơn hàng sẽ bị hủy, bạn sẽ được hoàn 100% tiền và Lender sẽ bị áp dụng mức phạt.',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Xác nhận hủy',
-      cancelButtonText: 'Quay lại',
-      confirmButtonColor: '#d33',
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-      const response = await api.put(`/orders/${orderId}/cancel`, { reason: 'lender_no_show' });
-      if (response.data?.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Đã hủy đơn hàng',
-          text: response.data.message || 'Hủy đơn hàng thành công.'
-        });
-        const res = await api.get('/orders/my-rentals');
-        if (res.data?.success) setOrders(res.data.data || []);
-      }
     } catch (err) {
       console.error(err);
       Swal.fire({
@@ -1377,6 +1386,110 @@ const Orders = () => {
               <div className="flex gap-3 pt-4 border-t border-slate-100">
                 <button type="button" onClick={() => setDefenseModalOpen(false)} className="flex-1 py-2 px-4 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-55 transition-colors text-xs cursor-pointer bg-white">Hủy</button>
                 <button type="submit" className="flex-1 py-2 px-4 bg-orange-500 text-white rounded-lg font-bold hover:bg-orange-600 transition-colors text-xs shadow cursor-pointer border-none">Gửi bằng chứng</button>
+              </div>
+            </form>
+          </div>
+      {/* Cancellation Proof Modal (Lender No Show) */}
+      {cancelProofModalOpen && selectedCancelOrderId && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg border border-slate-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="px-6 py-4 bg-amber-600 text-white flex justify-between items-center">
+              <h3 className="font-bold text-base flex items-center gap-2">
+                <span className="material-symbols-outlined">no_accounts</span>
+                Tải ảnh bằng chứng (Không liên hệ được Lender)
+              </h3>
+              <button 
+                onClick={() => setCancelProofModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-amber-700 hover:bg-amber-800 transition-colors flex items-center justify-center text-white border-none cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitCancelProof} className="p-6 space-y-4">
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-900 leading-relaxed space-y-1">
+                <p className="font-bold flex items-center gap-1 text-amber-800">
+                  <span className="material-symbols-outlined text-sm">warning</span>
+                  Quy định chống gian lận hủy đơn sát giờ:
+                </p>
+                <p>
+                  Để được **hoàn 100% tiền và miễn phí phạt**, bạn **bắt buộc phải tải lên ít nhất 1 ảnh chụp màn hình** làm bằng chứng (Lịch sử cuộc gọi điện thoại hoặc tin nhắn SMS/Zalo/Chat đã liên hệ nhưng Lender không phản hồi).
+                </p>
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-2">
+                  Tải lên ảnh bằng chứng (Bắt buộc ít nhất 1 ảnh, tối đa 3 ảnh):
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  {[0, 1, 2].map((idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => handlePickCancelProofImage(idx)}
+                      className="h-24 rounded-lg border-2 border-dashed border-slate-300 flex flex-col items-center justify-center cursor-pointer hover:border-amber-500 hover:bg-amber-50/40 transition-colors overflow-hidden relative"
+                    >
+                      {cancelProofImages[idx] ? (
+                        <>
+                          <img src={cancelProofImages[idx]} className="w-full h-full object-cover" alt="Bằng chứng" />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setCancelProofImages(prev => {
+                                const next = [...prev];
+                                next[idx] = '';
+                                return next;
+                              });
+                            }}
+                            className="absolute top-1 right-1 bg-red-600 text-white rounded-full p-0.5 hover:bg-red-700 text-[10px]"
+                          >
+                            <span className="material-symbols-outlined text-xs">close</span>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-center p-2 text-slate-400">
+                          <span className="material-symbols-outlined text-2xl">add_a_photo</span>
+                          <span className="text-[10px] block font-semibold mt-1">Ảnh {idx + 1}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-slate-700 block">Ghi chú thêm (Không bắt buộc)</label>
+                <textarea
+                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500 text-slate-800"
+                  rows={2}
+                  value={cancelProofNote}
+                  onChange={(e) => setCancelProofNote(e.target.value)}
+                  placeholder="Ví dụ: Đã gọi 3 cuộc lúc 8h sáng nhưng không nghe máy..."
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setCancelProofModalOpen(false)}
+                  className="flex-1 py-2.5 px-4 border border-slate-200 rounded-lg text-slate-600 font-bold hover:bg-slate-50 transition-colors text-xs cursor-pointer bg-white"
+                >
+                  Hủy bỏ
+                </button>
+                <button
+                  type="submit"
+                  disabled={cancelProofLoading}
+                  className="flex-1 py-2.5 px-4 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 transition-colors text-xs shadow cursor-pointer border-none flex items-center justify-center gap-1.5"
+                >
+                  {cancelProofLoading ? (
+                    <span>Đang xử lý...</span>
+                  ) : (
+                    <>
+                      <span className="material-symbols-outlined text-sm">send</span>
+                      <span>Xác nhận gửi bằng chứng</span>
+                    </>
+                  )}
+                </button>
               </div>
             </form>
           </div>
