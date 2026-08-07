@@ -699,11 +699,21 @@ exports.cancelOrder = async (req, res) => {
         ));
 
       if (isLenderNoShow) {
-        const { cancellationProofImages } = req.body;
-        if (!cancellationProofImages || !Array.isArray(cancellationProofImages) || cancellationProofImages.length === 0) {
+        let proofImgs = req.body.cancellationProofImages || req.body.proofImages || req.body.images;
+        if (typeof proofImgs === 'string') {
+          try {
+            proofImgs = JSON.parse(proofImgs);
+          } catch (e) {
+            proofImgs = [proofImgs];
+          }
+        }
+
+        const validProofArray = Array.isArray(proofImgs) ? proofImgs.filter(Boolean) : (proofImgs ? [proofImgs] : []);
+
+        if (validProofArray.length === 0) {
           return res.status(400).json({
             success: false,
-            message: 'Bắt buộc phải tải lên ít nhất 1 ảnh bằng chứng (ảnh cuộc gọi/tin nhắn cho Lender) để thực hiện hủy đơn miễn phí.'
+            message: 'Vui lòng tải lên ít nhất 1 hình ảnh bằng chứng (ảnh lịch sử cuộc gọi hoặc tin nhắn cho Lender) để thực hiện hủy đơn.'
           });
         }
 
@@ -724,9 +734,9 @@ exports.cancelOrder = async (req, res) => {
           reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
         });
 
-        order.cancellationProofImages = cancellationProofImages;
+        order.cancellationProofImages = validProofArray;
         message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Hệ thống đã ghi nhận ảnh bằng chứng và áp dụng mức phạt đối với chủ đồ.`;
-        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Đã gửi ${cancellationProofImages.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Đã gửi ${validProofArray.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
 
         notifyUser(
           order.asset.lender,

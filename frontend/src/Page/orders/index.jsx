@@ -199,6 +199,8 @@ const Orders = () => {
       const response = await api.put(`/orders/${selectedCancelOrderId}/cancel`, {
         reason: 'lender_no_show',
         cancellationProofImages: validImages,
+        proofImages: validImages,
+        images: validImages,
         note: cancelProofNote
       });
 
