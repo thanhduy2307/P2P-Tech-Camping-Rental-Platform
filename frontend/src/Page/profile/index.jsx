@@ -130,6 +130,30 @@ const Profile = () => {
   const displayTransactions = (transactions && transactions.length > 0) ? transactions : MOCK_TRANSACTIONS;
 
   const filteredTransactions = displayTransactions.filter((item) => {
+    const orderStatus = typeof item.order === 'object' ? item.order?.status : null;
+    const reasonLower = (item.reason || item.description || '').toLowerCase();
+    
+    // 1. Ẩn chi tiết giao dịch liên quan tới đơn hàng bị hủy hoặc đang khiếu nại/tranh chấp
+    const isCancelledOrDisputed = 
+      orderStatus === 'cancelled' || 
+      orderStatus === 'disputed' || 
+      item.category === 'cancellation_refund' || 
+      item.category === 'dispute_refund' ||
+      reasonLower.includes('hủy đơn') ||
+      reasonLower.includes('khiếu nại') ||
+      reasonLower.includes('tranh chấp');
+
+    if (isCancelledOrDisputed) {
+      return false;
+    }
+
+    // 2. Cộng tiền chỉ hiển thị khi đơn hàng đó đã hoàn thành ('completed')
+    if (item.type === 'addition' && item.order) {
+      if (orderStatus && orderStatus !== 'completed') {
+        return false;
+      }
+    }
+
     if (txnCategoryFilter !== 'all') {
       if (txnCategoryFilter === 'rental_payment' && item.category !== 'rental_payment' && item.type !== 'deduction') return false;
       if (txnCategoryFilter === 'deposit_refund' && item.category !== 'deposit_refund' && item.type !== 'addition') return false;
@@ -888,7 +912,7 @@ const Profile = () => {
                     <span className="material-symbols-outlined animate-spin text-2xl mb-2 text-slate-300">autorenew</span>
                     <p className="text-xs font-medium">Đang tải lịch sử giao dịch...</p>
                   </div>
-                ) : transactions.length === 0 ? (
+                ) : filteredTransactions.length === 0 ? (
                   <div className="p-8 text-center text-slate-400">
                     <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">history</span>
                     <p className="text-xs font-medium">Chưa có giao dịch nào.</p>
@@ -905,8 +929,8 @@ const Profile = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant text-xs text-slate-700">
-                        {transactions.map((txn) => (
-                          <tr key={txn._id} className="hover:bg-slate-50/50 transition-colors">
+                        {filteredTransactions.map((txn) => (
+                          <tr key={txn._id || txn.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-2.5 px-4 font-medium text-slate-500">
                               {new Date(txn.createdAt).toLocaleString('vi-VN', {
                                 day: '2-digit', month: '2-digit', year: 'numeric',
@@ -925,10 +949,10 @@ const Profile = () => {
                               )}
                             </td>
                             <td className={`py-2.5 px-4 font-extrabold text-right ${txn.type === 'addition' ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {txn.type === 'addition' ? '+' : '-'}{txn.amount.toLocaleString('vi-VN')} đ
+                              {txn.type === 'addition' ? '+' : '-'}{Math.abs(txn.amount).toLocaleString('vi-VN')} đ
                             </td>
-                            <td className="py-2.5 px-4 text-slate-600 truncate max-w-[200px]" title={txn.reason}>
-                              {txn.reason}
+                            <td className="py-2.5 px-4 text-slate-600 truncate max-w-[200px]" title={txn.reason || txn.description}>
+                              {txn.reason || txn.description}
                             </td>
                           </tr>
                         ))}

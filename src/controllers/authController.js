@@ -886,7 +886,7 @@ exports.createWithdrawal = async (req, res) => {
 
     await Transaction.create({
       user: user._id,
-      amount: -amount,
+      amount,
       type: 'deduction',
       reason: 'Yêu cầu rút tiền. Số dư bị đóng băng chờ duyệt.'
     });
