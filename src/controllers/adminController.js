@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Asset = require('../models/Asset');
 const Order = require('../models/Order');
 const WithdrawalRequest = require('../models/WithdrawalRequest');
+const Transaction = require('../models/Transaction');
 
 // @desc    Lấy thống kê số liệu tổng quan hệ thống
 // @route   GET /api/admin/stats
@@ -255,6 +256,13 @@ exports.resolveDispute = async (req, res) => {
         let refund = order.totalRent;
         if (order.depositMethod === 'online') refund += order.deposit;
         renter.balance += refund;
+        await Transaction.create({
+          user: renter._id,
+          order: order._id,
+          amount: refund,
+          type: 'addition',
+          reason: 'Admin giải quyết khiếu nại: Hoàn trả 100% tiền thuê và cọc cho Renter'
+        });
         message = 'Chấp nhận khiếu nại Renter. Hoàn 100% tiền.';
       } else {
         // reject_lender_dispute: lender's damage claim rejected
@@ -262,8 +270,22 @@ exports.resolveDispute = async (req, res) => {
         order.platformFee = fee;
         const payout = order.totalRent - fee;
         lender.balance += payout;
+        await Transaction.create({
+          user: lender._id,
+          order: order._id,
+          amount: payout,
+          type: 'addition',
+          reason: 'Admin giải quyết khiếu nại: Thanh toán tiền thuê cho Lender'
+        });
         if (order.depositMethod === 'online') {
           renter.balance += order.deposit;
+          await Transaction.create({
+            user: renter._id,
+            order: order._id,
+            amount: order.deposit,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Hoàn trả tiền cọc cho Renter'
+          });
         } else {
           order.actualCashDepositReturned = order.deposit;
         }
@@ -278,9 +300,30 @@ exports.resolveDispute = async (req, res) => {
         const payout = order.totalRent - fee;
         if (order.depositMethod === 'online') {
           lender.balance += payout;
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: payout,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Thanh toán tiền thuê cho Lender'
+          });
           renter.balance += order.deposit;
+          await Transaction.create({
+            user: renter._id,
+            order: order._id,
+            amount: order.deposit,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Hoàn trả tiền cọc cho Renter'
+          });
         } else {
           lender.balance += payout;
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: payout,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Thanh toán tiền thuê cho Lender'
+          });
           order.actualCashDepositReturned = order.deposit;
         }
         message = 'Bác bỏ khiếu nại Renter. Renter mất tiền thuê.';
@@ -291,10 +334,31 @@ exports.resolveDispute = async (req, res) => {
         const payout = order.totalRent - fee;
         if (order.depositMethod === 'online') {
           lender.balance += (payout + order.deposit);
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: payout + order.deposit,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Thanh toán tiền thuê và tiền đền bù thiệt hại cho Lender'
+          });
           renter.balance -= order.deposit;
           if (renter.balance < 0) renter.balance = 0;
+          await Transaction.create({
+            user: renter._id,
+            order: order._id,
+            amount: order.deposit,
+            type: 'deduction',
+            reason: 'Admin giải quyết khiếu nại: Trừ tiền cọc đền bù thiệt hại cho Lender'
+          });
         } else {
           lender.balance += payout;
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: payout,
+            type: 'addition',
+            reason: 'Admin giải quyết khiếu nại: Thanh toán tiền thuê cho Lender'
+          });
           order.actualCashDepositReturned = 0;
         }
         message = 'Chấp nhận yêu cầu bồi thường của Lender. Trừ cọc Renter.';
