@@ -56,10 +56,9 @@ const Profile = () => {
   const [loadingWithdrawals, setLoadingWithdrawals] = useState(false);
   const [receiptLightbox, setReceiptLightbox] = useState({ open: false, url: '' });
 
-
   // History Tab & Filter States
-  const [historyTab, setHistoryTab] = useState('transactions'); // 'transactions' | 'refunds'
-  
+  const [historyTab, setHistoryTab] = useState('transactions');
+
   // Transaction Filters
   const [transactions, setTransactions] = useState([]);
   const [loadingTransactions, setLoadingTransactions] = useState(false);
@@ -96,7 +95,6 @@ const Profile = () => {
       setLoadingTransactions(false);
     }
   };
-
 
   useEffect(() => {
     fetchWithdrawals();
@@ -143,9 +141,6 @@ const Profile = () => {
     }
     return true;
   });
-
-
-
 
   // Fetch full fresh profile on load
   useEffect(() => {
@@ -267,7 +262,6 @@ const Profile = () => {
     setWard(e.target.value);
   };
 
-
   // Fetch wallet balance
   useEffect(() => {
     const fetchBalance = async () => {
@@ -353,7 +347,8 @@ const Profile = () => {
         } else {
           setProfileError('Đã xảy ra lỗi khi cập nhật ảnh đại diện.');
         }
-      } finally {
+      } font-semibold
+      finally {
         setLoadingProfile(false);
       }
     };
@@ -938,9 +933,6 @@ const Profile = () => {
                 )}
               </div>
             </div>
-
-
-
 
             {/* Profile detail card */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
