@@ -79,14 +79,16 @@ export const MOCK_TRANSACTIONS = [
   {
     id: 'TXN-882190',
     orderId: 'ORD-2026-041',
-    serviceName: 'Hoàn hủy đơn: Máy chiếu mini Anker Nebula Capsule',
+    serviceName: 'Hoàn tiền cọc & thuê: Máy chiếu mini Anker Nebula Capsule',
     createdAt: '2026-07-10T11:20:00Z',
-    amount: 1800000,
+    amount: 1530000,
     flowType: 'addition',
+    type: 'addition',
     category: 'cancellation_refund',
     paymentMethod: 'Ví EquipPeer Wallet',
     status: 'success',
-    description: 'Hoàn 100% tiền cọc + tiền thuê do hủy đơn trước 24h'
+    reason: 'Hoàn tiền cọc & tiền thuê sau khi hủy đơn (Đã trừ 15% phí phạt hủy: 270.000 đ)',
+    description: 'Hoàn tiền cọc & tiền thuê sau khi hủy đơn (Đã trừ 15% phí phạt hủy: 270.000 đ)'
   },
   {
     id: 'TXN-874011',

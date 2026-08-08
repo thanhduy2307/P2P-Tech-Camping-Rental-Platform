@@ -4,7 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import api from '../../configs/axios';
 import { loginSuccess, updateProfile } from '../../redux/authSlice';
-import { MOCK_TRANSACTIONS, MOCK_REFUNDS } from '../../mock/transactionData';
+import { MOCK_TRANSACTIONS } from '../../mock/transactionData';
 
 const Profile = () => {
   const dispatch = useDispatch();
@@ -67,13 +67,6 @@ const Profile = () => {
   const [txnCategoryFilter, setTxnCategoryFilter] = useState('all');
   const [txnTimeFilter, setTxnTimeFilter] = useState('all');
 
-  // Refund History Filters
-  const [refunds, setRefunds] = useState([]);
-  const [loadingRefunds, setLoadingRefunds] = useState(false);
-  const [refundSearchQuery, setRefundSearchQuery] = useState('');
-  const [refundStatusFilter, setRefundStatusFilter] = useState('all');
-  const [refundTimeFilter, setRefundTimeFilter] = useState('all');
-
   const fetchWithdrawals = async () => {
     if (!token) return;
     setLoadingWithdrawals(true);
@@ -104,59 +97,10 @@ const Profile = () => {
     }
   };
 
-  const fetchRefunds = async () => {
-    if (!token) return;
-    setLoadingRefunds(true);
-    try {
-      const response = await api.get('/orders/my-refunds');
-      if (response.data && response.data.success) {
-        setRefunds(response.data.data || []);
-      }
-    } catch (err) {
-      console.error('Error fetching refunds:', err);
-      try {
-        const txnRes = await api.get('/auth/my-transactions');
-        if (txnRes.data && txnRes.data.success) {
-          const formatted = (txnRes.data.data || []).map(t => {
-            const isAdd = t.type === 'addition';
-            const absAmt = Math.abs(t.amount);
-            const rLower = (t.reason || '').toLowerCase();
-            let rType = 'other';
-            if (rLower.includes('cọc')) rType = 'deposit_return';
-            else if (rLower.includes('hủy')) rType = 'order_cancelled';
-            else if (rLower.includes('tranh chấp') || rLower.includes('bồi thường') || rLower.includes('đền bù')) rType = 'dispute_settled';
-            else if (rLower.includes('phạt')) rType = 'penalty';
-
-            return {
-              refundId: `TXN-${t._id.toString().slice(-6).toUpperCase()}`,
-              orderId: t.order ? `ORD-${t.order._id?.toString().slice(-6).toUpperCase()}` : 'N/A',
-              assetTitle: t.order?.asset?.name || 'Giao dịch EquipPeer',
-              requestDate: t.createdAt,
-              type: t.type,
-              isAddition: isAdd,
-              refundType: rType,
-              refundAmount: absAmt,
-              refundMethod: 'Ví EquipPeer Wallet',
-              reason: t.reason,
-              status: 'success'
-            };
-          });
-          setRefunds(formatted);
-          return;
-        }
-      } catch (e) {
-        console.error(e);
-      }
-      setRefunds([]);
-    } finally {
-      setLoadingRefunds(false);
-    }
-  };
 
   useEffect(() => {
     fetchWithdrawals();
     fetchTransactions();
-    fetchRefunds();
   }, [token]);
 
   // Filter logic helper for time periods
@@ -193,34 +137,15 @@ const Profile = () => {
     if (!isWithinTimeRange(item.createdAt, txnTimeFilter)) return false;
     if (txnSearchQuery.trim()) {
       const q = txnSearchQuery.toLowerCase();
-      const matchName = (item.serviceName || item.reason || '').toLowerCase().includes(q);
+      const matchName = (item.serviceName || item.reason || item.description || '').toLowerCase().includes(q);
       const matchCode = (item.id || item.orderId || '').toLowerCase().includes(q);
       if (!matchName && !matchCode) return false;
     }
     return true;
   });
 
-  // Get active list of refunds (real transactions)
-  const displayRefunds = refunds || [];
 
-  const filteredRefunds = displayRefunds.filter((item) => {
-    if (refundStatusFilter !== 'all') {
-      if (refundStatusFilter === 'addition' && !item.isAddition && item.type !== 'addition') return false;
-      if (refundStatusFilter === 'deduction' && (item.isAddition || item.type === 'addition')) return false;
-      if (refundStatusFilter === 'pending' && item.status !== 'pending') return false;
-      if (refundStatusFilter === 'success' && item.status !== 'success') return false;
-      if (refundStatusFilter === 'failed' && item.status !== 'failed') return false;
-    }
-    if (!isWithinTimeRange(item.requestDate || item.createdAt, refundTimeFilter)) return false;
-    if (refundSearchQuery.trim()) {
-      const q = refundSearchQuery.toLowerCase();
-      const matchTitle = (item.assetTitle || '').toLowerCase().includes(q);
-      const matchCode = (item.refundId || item.orderId || '').toLowerCase().includes(q);
-      const matchReason = (item.reason || '').toLowerCase().includes(q);
-      if (!matchTitle && !matchCode && !matchReason) return false;
-    }
-    return true;
-  });
+
 
   // Fetch full fresh profile on load
   useEffect(() => {
@@ -963,7 +888,7 @@ const Profile = () => {
                     <span className="material-symbols-outlined animate-spin text-2xl mb-2 text-slate-300">autorenew</span>
                     <p className="text-xs font-medium">Đang tải lịch sử giao dịch...</p>
                   </div>
-                ) : transactions.length === 0 ? (
+                ) : filteredTransactions.length === 0 ? (
                   <div className="p-8 text-center text-slate-400">
                     <span className="material-symbols-outlined text-4xl mb-2 text-slate-300">history</span>
                     <p className="text-xs font-medium">Chưa có giao dịch nào.</p>
@@ -980,8 +905,8 @@ const Profile = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-outline-variant text-xs text-slate-700">
-                        {transactions.map((txn) => (
-                          <tr key={txn._id} className="hover:bg-slate-50/50 transition-colors">
+                        {filteredTransactions.map((txn) => (
+                          <tr key={txn._id || txn.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-2.5 px-4 font-medium text-slate-500">
                               {new Date(txn.createdAt).toLocaleString('vi-VN', {
                                 day: '2-digit', month: '2-digit', year: 'numeric',
@@ -1000,10 +925,10 @@ const Profile = () => {
                               )}
                             </td>
                             <td className={`py-2.5 px-4 font-extrabold text-right ${txn.type === 'addition' ? 'text-emerald-600' : 'text-red-600'}`}>
-                              {txn.type === 'addition' ? '+' : '-'}{txn.amount.toLocaleString('vi-VN')} đ
+                              {txn.type === 'addition' ? '+' : '-'}{Math.abs(txn.amount).toLocaleString('vi-VN')} đ
                             </td>
-                            <td className="py-2.5 px-4 text-slate-600 truncate max-w-[200px]" title={txn.reason}>
-                              {txn.reason}
+                            <td className="py-2.5 px-4 text-slate-600 truncate max-w-[200px]" title={txn.reason || txn.description}>
+                              {txn.reason || txn.description}
                             </td>
                           </tr>
                         ))}
@@ -1014,208 +939,8 @@ const Profile = () => {
               </div>
             </div>
 
-            {/* Standalone Refund Details Management Card */}
-            <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)] mt-6">
-              
-              {/* Header Title */}
-              <div className="flex items-center justify-between border-b border-outline-variant/50 pb-4 mb-6">
-                <h3 className="font-title-md text-base font-bold text-on-surface flex items-center gap-2">
-                  <span className="material-symbols-outlined text-primary">currency_exchange</span>
-                  Chi tiết hoàn tiền
-                  {filteredRefunds.length > 0 && (
-                    <span className="bg-emerald-100 text-emerald-800 text-xs px-2 py-0.5 rounded-full font-bold">
-                      {filteredRefunds.length}
-                    </span>
-                  )}
-                </h3>
-              </div>
 
-              {/* Refund History & Details */}
-              <div className="space-y-4">
-                {/* Filters Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 bg-surface-container-low p-3.5 rounded-xl border border-outline-variant/40">
-                  <div className="sm:col-span-5 relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-sm">search</span>
-                    <input 
-                      type="text" 
-                      placeholder="Tìm theo tên thiết bị, mã hoàn tiền, lý do..." 
-                      value={refundSearchQuery}
-                      onChange={(e) => setRefundSearchQuery(e.target.value)}
-                      className="w-full bg-white border border-outline-variant/60 rounded-xl pl-9 pr-3 py-2 text-xs text-on-surface focus:outline-none focus:border-secondary font-medium"
-                    />
-                  </div>
 
-                  <div className="sm:col-span-4">
-                    <select 
-                      value={refundStatusFilter}
-                      onChange={(e) => setRefundStatusFilter(e.target.value)}
-                      className="w-full bg-white border border-outline-variant/60 rounded-xl px-3 py-2 text-xs text-on-surface font-medium focus:outline-none"
-                    >
-                      <option value="all">Tất cả loại & trạng thái giao dịch</option>
-                      <option value="addition">Cộng tiền / Hoàn cọc (+)</option>
-                      <option value="deduction">Trừ tiền / Khấu trừ / Phạt (-)</option>
-                    </select>
-                  </div>
-
-                  <div className="sm:col-span-3">
-                    <select 
-                      value={refundTimeFilter}
-                      onChange={(e) => setRefundTimeFilter(e.target.value)}
-                      className="w-full bg-white border border-outline-variant/60 rounded-xl px-3 py-2 text-xs text-on-surface font-medium focus:outline-none"
-                    >
-                      <option value="all">Tất cả thời gian</option>
-                      <option value="7days">7 ngày qua</option>
-                      <option value="30days">30 ngày qua</option>
-                      <option value="thisMonth">Tháng này</option>
-                      <option value="thisYear">Năm nay</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Refunds List Table */}
-                <div className="bg-surface-container-low rounded-xl border border-outline-variant/50 overflow-hidden">
-                  {loadingRefunds ? (
-                    <div className="p-8 text-center text-slate-400">
-                      <span className="material-symbols-outlined animate-spin text-2xl mb-2 text-slate-300">autorenew</span>
-                      <p className="text-xs font-medium">Đang tải lịch sử giao dịch hoàn tiền...</p>
-                    </div>
-                  ) : filteredRefunds.length === 0 ? (
-                    <div className="p-8 text-center text-slate-400 space-y-2">
-                      <span className="material-symbols-outlined text-4xl text-slate-300">published_with_changes</span>
-                      <p className="text-xs font-medium">Chưa có giao dịch hoàn tiền hoặc khấu trừ nào trong khoảng thời gian này.</p>
-                      {(refundSearchQuery || refundStatusFilter !== 'all' || refundTimeFilter !== 'all') && (
-                        <button 
-                          onClick={() => {
-                            setRefundSearchQuery('');
-                            setRefundStatusFilter('all');
-                            setRefundTimeFilter('all');
-                          }}
-                          className="text-xs text-primary font-bold hover:underline block mx-auto"
-                        >
-                          Xóa bộ lọc
-                        </button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-left text-xs whitespace-nowrap">
-                        <thead className="bg-slate-100/70 text-slate-600 text-[11px] uppercase font-bold tracking-wider border-b border-outline-variant/40">
-                          <tr>
-                            <th className="py-3 px-4">Mã giao dịch & Đơn</th>
-                            <th className="py-3 px-4">Thiết bị / Dịch vụ</th>
-                            <th className="py-3 px-4">Phân loại</th>
-                            <th className="py-3 px-4">Số tiền biến động</th>
-                            <th className="py-3 px-4">Nơi nhận / Nguồn</th>
-                            <th className="py-3 px-4">Lý do & Diễn giải</th>
-                            <th className="py-3 px-4">Trạng thái</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-outline-variant/30 text-xs text-slate-700">
-                          {filteredRefunds.map((rf) => (
-                            <tr key={rf.refundId || rf._id} className="hover:bg-slate-50/70 transition-colors">
-                              <td className="py-3 px-4">
-                                <span className="font-bold text-slate-800 block text-[11px] font-mono">
-                                  {rf.refundId}
-                                </span>
-                                <span className="text-[10px] text-slate-400 block font-mono">
-                                  {rf.orderId}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-4">
-                                <strong className="text-slate-800 block truncate max-w-[200px]">
-                                  {rf.assetTitle}
-                                </strong>
-                                <span className="text-[10px] text-slate-400">
-                                  Ngày: {new Date(rf.requestDate).toLocaleDateString('vi-VN')} {new Date(rf.requestDate).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                              </td>
-
-                              <td className="py-3 px-4">
-                                {rf.refundType === 'deposit_return' && (
-                                  rf.isAddition ? (
-                                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                      Hoàn cọc 100%
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                                      Khấu trừ cọc
-                                    </span>
-                                  )
-                                )}
-                                {rf.refundType === 'order_cancelled' && (
-                                  rf.isAddition ? (
-                                    <span className="text-[10px] font-bold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-                                      Hoàn tiền hủy đơn
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                                      Phạt hủy đơn
-                                    </span>
-                                  )
-                                )}
-                                {rf.refundType === 'dispute_settled' && (
-                                  <span className="text-[10px] font-bold text-purple-800 bg-purple-50 px-2 py-0.5 rounded border border-purple-200">
-                                    Bồi thường tranh chấp
-                                  </span>
-                                )}
-                                {rf.refundType === 'penalty' && (
-                                  <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                                    Phạt vi phạm
-                                  </span>
-                                )}
-                                {rf.refundType === 'withdrawal' && (
-                                  <span className="text-[10px] font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
-                                    Rút tiền ví
-                                  </span>
-                                )}
-                                {rf.refundType === 'other' && (
-                                  rf.isAddition ? (
-                                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                      Cộng tiền ví
-                                    </span>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-red-800 bg-red-50 px-2 py-0.5 rounded border border-red-200">
-                                      Trừ tiền ví
-                                    </span>
-                                  )
-                                )}
-                              </td>
-
-                              <td className="py-3 px-4 font-extrabold text-sm">
-                                {rf.isAddition ? (
-                                  <span className="text-emerald-700">+{rf.refundAmount.toLocaleString('vi-VN')} đ</span>
-                                ) : (
-                                  <span className="text-red-600">-{rf.refundAmount.toLocaleString('vi-VN')} đ</span>
-                                )}
-                              </td>
-
-                              <td className="py-3 px-4 text-slate-600 text-[11px]">
-                                {rf.refundMethod || 'Ví EquipPeer Wallet'}
-                              </td>
-
-                              <td className="py-3 px-4 max-w-[220px]">
-                                <p className="text-[11px] text-slate-700 truncate" title={rf.reason}>
-                                  {rf.reason}
-                                </p>
-                              </td>
-
-                              <td className="py-3 px-4">
-                                <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full font-bold text-[10px] inline-flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                                  Thành công
-                                </span>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-            </div>
 
             {/* Profile detail card */}
             <div className="bg-surface-container-lowest border border-outline-variant rounded-2xl p-6 shadow-[0_4px_20px_rgba(0,0,0,0.02)]">
