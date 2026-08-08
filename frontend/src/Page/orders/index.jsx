@@ -353,7 +353,7 @@ const Orders = () => {
     const evidence = (noShowEvidence[orderId] || []).filter(Boolean);
     const _swalRes = await Swal.fire({
       title: 'Xác nhận hủy đơn (Không liên hệ được Lender)',
-      html: 'Bạn cần cung cấp <b>ít nhất 1 ảnh bằng chứng</b> (screenshot cuộc gọi/chat không được trả lời).<br/>Hệ thống sẽ lấy <b>vị trí GPS</b> để xác nhận bạn có mặt tại địa điểm nhận đồ. Nếu hợp lệ, bạn được <b>hoàn trả 100% tiền thuê và cọc</b>, không bị trừ phí.',
+      html: 'Bạn cần cung cấp <b>ít nhất 1 ảnh bằng chứng</b> (screenshot cuộc gọi/chat không được trả lời). Hệ thống sẽ ghi nhận bằng chứng và <b>hoàn trả 100% tiền thuê và cọc</b>, không bị trừ phí.',
       icon: 'warning',
       showCancelButton: true,
       confirmButtonText: 'Đồng ý',
@@ -377,7 +377,7 @@ const Orders = () => {
       const pos = await getPosition();
       renterLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
     } catch (err) {
-      return Swal.fire('Không lấy được vị trí GPS', 'Hãy bật quyền định vị cho trình duyệt rồi thử lại.', 'error');
+      renterLocation = null;
     }
 
     try {
