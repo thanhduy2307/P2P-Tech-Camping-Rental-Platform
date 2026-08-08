@@ -149,7 +149,7 @@ const orderSchema = new mongoose.Schema({
   }],
   disputeStatus: {
     type: String,
-    enum: ['open', 'inspector_reviewed', 'responded', 'resolved', '']
+    enum: ['open', 'negotiating', 'escalated', 'inspector_reviewed', 'responded', 'resolved', '']
   },
   deductionConfirmedByRenter: {
     type: Boolean,
