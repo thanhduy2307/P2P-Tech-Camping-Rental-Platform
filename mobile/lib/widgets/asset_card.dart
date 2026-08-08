@@ -1,4 +1,3 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:velox_mobile/models/asset.dart';
 import 'package:velox_mobile/widgets/common.dart';
@@ -25,12 +24,11 @@ class AssetCard extends StatelessWidget {
               child: AspectRatio(
                 aspectRatio: 1.3,
                 child: asset.images.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: asset.images.first,
+                    ? AssetImageWidget(
+                        image: asset.images.first,
                         fit: BoxFit.cover,
-                        placeholder: (_, __) => Container(color: Colors.grey[200]),
-                        errorWidget: (_, __, ___) => Container(
-                            color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
+                        placehold: Container(color: Colors.grey[200]),
+                        errWidget: Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
                       )
                     : Container(color: Colors.grey[200], child: const Icon(Icons.image, color: Colors.grey)),
               ),

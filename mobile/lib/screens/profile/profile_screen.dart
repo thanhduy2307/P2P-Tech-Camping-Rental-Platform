@@ -152,7 +152,7 @@ class ProfileScreen extends StatelessWidget {
                     await auth.switchRole();
                     if (!context.mounted) return;
                     EquipDialog.success(context, 'Đã chuyển sang $target.');
-                    Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role));
+                    Navigator.pushReplacementNamed(context, AppRoutes.homeForRole(auth.role, lenderStatus: auth.user?.lenderStatus));
                   } catch (e) {
                     UiHelper.showErrorToast(context, e);
                   }

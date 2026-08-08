@@ -2,7 +2,7 @@ name: Deploy Backend to VPS
 
 on:
   push:
-    branches: [hieu]
+    branches: [main, duy, hieu]
   workflow_dispatch:
 
 jobs:
@@ -19,7 +19,14 @@ jobs:
           script: |
             set -e
             cd /var/www/equippeer
-            git pull origin hieu
+            git reset --hard HEAD || true
+            git clean -fd || true
+            git fetch origin
+            TARGET_BRANCH="${{ github.ref_name }}"
+            [ -z "$TARGET_BRANCH" ] && TARGET_BRANCH="main"
+            git checkout $TARGET_BRANCH || git checkout -b $TARGET_BRANCH origin/$TARGET_BRANCH
+            git reset --hard origin/$TARGET_BRANCH
+            git pull origin $TARGET_BRANCH
             npm install --omit=dev
             if [ -n "$ENV_FILE" ]; then
               printf '%s\n' "$ENV_FILE" > .env

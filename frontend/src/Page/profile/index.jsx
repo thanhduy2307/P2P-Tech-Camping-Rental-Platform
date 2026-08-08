@@ -67,8 +67,6 @@ const Profile = () => {
   const [txnCategoryFilter, setTxnCategoryFilter] = useState('all');
   const [txnTimeFilter, setTxnTimeFilter] = useState('all');
 
-
-
   const fetchWithdrawals = async () => {
     if (!token) return;
     setLoadingWithdrawals(true);
@@ -99,6 +97,7 @@ const Profile = () => {
     }
   };
 
+
   useEffect(() => {
     fetchWithdrawals();
     fetchTransactions();
@@ -126,7 +125,7 @@ const Profile = () => {
     return true;
   };
 
-  // Get active list of transactions (combines API response + mock fallback for rich preview)
+  // Get active list of transactions
   const displayTransactions = (transactions && transactions.length > 0) ? transactions : MOCK_TRANSACTIONS;
 
   const filteredTransactions = displayTransactions.filter((item) => {
@@ -144,6 +143,7 @@ const Profile = () => {
     }
     return true;
   });
+
 
 
 
@@ -938,6 +938,7 @@ const Profile = () => {
                 )}
               </div>
             </div>
+
 
 
 

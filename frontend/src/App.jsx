@@ -24,10 +24,12 @@ import Reviews from './Page/reviews';
 import Blogs from './Page/blogs';
 import Notifications from './Page/notifications';
 import DashboardLender from './Page/dashboard-lender';
+import LenderTopAssets from './Page/lender-top-assets';
 import DashboardInspector from './Page/dashboard-inspector';
 import DashboardAdmin from './Page/dashboard-admin';
 import Login from './Page/login';
 import Register from './Page/register';
+import ForgotPassword from './Page/forgot-password';
 import Chat from './Page/chat';
 
 import PublicProfile from './Page/public-profile';
@@ -48,6 +50,7 @@ function App() {
         {/* Auth Routes */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
 
         {/* Protected General User Routes */}
         <Route element={<ProtectedRoute allowedRoles={['renter', 'lender', 'inspector', 'admin']} />}>
@@ -66,6 +69,7 @@ function App() {
         <Route element={<ProtectedRoute allowedRoles={['lender']} />}>
           <Route element={<DashboardLayout role="lender"><Outlet /></DashboardLayout>}>
             <Route path="/dashboard-lender" element={<DashboardLender />} />
+            <Route path="/lender-top-assets" element={<LenderTopAssets />} />
             <Route path="/lender-inventory" element={<LenderInventory />} />
             <Route path="/lender-orders" element={<LenderOrders />} />
             <Route path="/lender-chat" element={<Chat />} />

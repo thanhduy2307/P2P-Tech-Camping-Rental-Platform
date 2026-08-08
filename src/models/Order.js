@@ -158,8 +158,17 @@ const orderSchema = new mongoose.Schema({
   repairQuotationImages: [{
     type: String
   }],
+  cancellationProofImages: [{
+    type: String
+  }],
   disputedAt: {
     type: Date
+  },
+  renterNoShowEvidence: [{
+    type: String
+  }],
+  noShowDistanceMeters: {
+    type: Number
   }
 }, { timestamps: true });
 

@@ -10,6 +10,7 @@ import 'package:velox_mobile/screens/auth/register_screen.dart';
 import 'package:velox_mobile/screens/auth/otp_screen.dart';
 import 'package:velox_mobile/screens/auth/renter_ekyc_screen.dart';
 import 'package:velox_mobile/screens/auth/lender_onboarding_screen.dart';
+import 'package:velox_mobile/screens/auth/forgot_password_screen.dart';
 import 'package:velox_mobile/screens/home/browse_screen.dart';
 import 'package:velox_mobile/screens/home/asset_detail_screen.dart';
 import 'package:velox_mobile/screens/orders/my_orders_screen.dart';
@@ -17,13 +18,15 @@ import 'package:velox_mobile/screens/orders/order_detail_screen.dart';
 import 'package:velox_mobile/screens/chat/conversations_screen.dart';
 import 'package:velox_mobile/screens/chat/chat_thread_screen.dart';
 import 'package:velox_mobile/screens/profile/profile_screen.dart';
+import 'package:velox_mobile/screens/profile/user_profile_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_dashboard_screen.dart';
 import 'package:velox_mobile/screens/lender/post_asset_screen.dart';
 import 'package:velox_mobile/screens/lender/lender_inventory_screen.dart';
 import 'package:velox_mobile/screens/inspector/inspector_dashboard_screen.dart';
 import 'package:velox_mobile/screens/admin/admin_dashboard_screen.dart';
 import 'package:velox_mobile/screens/notifications/notifications_screen.dart';
-import 'package:velox_mobile/core/constants.dart';
+import 'package:velox_mobile/screens/posts/social_feed_screen.dart';
+import 'package:velox_mobile/screens/wallet/wallet_screen.dart';
 import 'package:velox_mobile/core/theme.dart';
 
 class AppRoutes {
@@ -46,8 +49,14 @@ class AppRoutes {
   static const inspectorDashboard = '/inspector/dashboard';
   static const adminDashboard = '/admin/dashboard';
   static const notifications = '/notifications';
+  static const socialFeed = '/social-feed';
+  static const userProfile = '/user-profile';
+  static const forgotPassword = '/forgot-password';
+  static const wallet = '/wallet';
 
-  static String homeForRole(String? role) {
+  static String homeForRole(String? role, {String? lenderStatus}) {
+    // If user is approved lender, always show lender dashboard even if current role is renter
+    if (lenderStatus == 'approved') return lenderDashboard;
     switch (role) {
       case 'lender':
         return lenderDashboard;
@@ -132,6 +141,10 @@ class MyApp extends StatelessWidget {
           AppRoutes.inspectorDashboard: (_) => const InspectorDashboardScreen(),
           AppRoutes.adminDashboard: (_) => const AdminDashboardScreen(),
           AppRoutes.notifications: (_) => const NotificationsScreen(),
+          AppRoutes.socialFeed: (_) => const SocialFeedScreen(),
+          AppRoutes.userProfile: (_) => const UserProfileScreen(),
+          AppRoutes.forgotPassword: (_) => const ForgotPasswordScreen(),
+          AppRoutes.wallet: (_) => const WalletScreen(),
         },
       ),
     );

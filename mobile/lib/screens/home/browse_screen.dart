@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
@@ -136,11 +137,16 @@ class _BrowseBody extends StatefulWidget {
 class _BrowseBodyState extends State<_BrowseBody> {
   List<Asset> _assets = [];
   bool _loading = true;
+  bool _loadingMore = false;
+  int _page = 1;
+  int _total = 0;
   String _query = '';
   String _category = 'Tất cả';
+  bool _sortByDistance = false;
+  Position? _userPos;
 
   final List<String> _categories = [
-    'Tất cả', 'Công nghệ', 'Cắm trại', 'Blogs'
+    'Tất cả', 'Công nghệ', 'Cắm trại'
   ];
 
   @override
@@ -150,23 +156,73 @@ class _BrowseBodyState extends State<_BrowseBody> {
   }
 
   Future<void> _load() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _page = 1;
+    });
     try {
-      _assets = await AssetService.getVerifiedAssets();
+      final result = await AssetService.getVerifiedAssets(page: 1);
+      final list = result['assets'] as List<Asset>;
+      _total = result['total'] as int;
+      if (!mounted) return;
+      setState(() {
+        _assets = list;
+        _loading = false;
+        _page = 1;
+      });
     } catch (e) {
-      if (mounted) UiHelper.showErrorToast(context, e);
-    } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() => _loading = false);
+        UiHelper.showErrorToast(context, e);
+      }
     }
   }
 
+  Future<void> _loadMore() async {
+    if (_loadingMore || _assets.length >= _total) return;
+    setState(() => _loadingMore = true);
+    try {
+      final nextPage = _page + 1;
+      final result = await AssetService.getVerifiedAssets(page: nextPage);
+      final list = result['assets'] as List<Asset>;
+      if (!mounted) return;
+      setState(() {
+        _assets.addAll(list);
+        _page = nextPage;
+        _loadingMore = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingMore = false);
+        UiHelper.showErrorToast(context, e);
+      }
+    }
+  }
+
+  static double _distance(Position p, double lat, double lng) {
+    const R = 6371;
+    final dLat = (lat - p.latitude) * 3.1415927 / 180;
+    final dLng = (lng - p.longitude) * 3.1415927 / 180;
+    final a = 0.5 - math.cos(dLat / 2) * math.cos(p.latitude * 3.1415927 / 180) * math.cos(p.latitude * 3.1415927 / 180) *
+        (1 - math.cos(dLng / 2));
+    return R * 2 * math.asin(a);
+  }
+
   List<Asset> get _filtered {
-    return _assets.where((a) {
+    var result = _assets.where((a) {
       final matchQ = a.name.toLowerCase().contains(_query.toLowerCase()) ||
           a.category.toLowerCase().contains(_query.toLowerCase());
       final matchC = _category == 'Tất cả' || a.category == _category;
       return matchQ && matchC;
     }).toList();
+    if (_sortByDistance && _userPos != null) {
+      result.sort((a, b) {
+        final da = a.lat != null && a.lng != null ? _distance(_userPos!, a.lat!, a.lng!) : double.infinity;
+        final db = b.lat != null && b.lng != null ? _distance(_userPos!, b.lat!, b.lng!) : double.infinity;
+        return da.compareTo(db);
+      });
+    }
+    return result;
   }
 
   @override
@@ -212,39 +268,83 @@ class _BrowseBodyState extends State<_BrowseBody> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (_, i) {
-                        final c = _categories[i];
-                        final active = c == _category;
-                        return GestureDetector(
-                          onTap: () => setState(() => _category = c),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: active ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFEDF0EE),
-                              borderRadius: BorderRadius.circular(999),
-                              border: active
-                                  ? Border.all(color: const Color(0xFF10B981))
-                                  : null,
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              c,
-                              style: TextStyle(
-                                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-                                color: active ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
-                              ),
-                            ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: _categories.length,
+                            separatorBuilder: (_, __) => const SizedBox(width: 8),
+                            itemBuilder: (_, i) {
+                              final c = _categories[i];
+                              final active = c == _category;
+                              return GestureDetector(
+                                onTap: () => setState(() => _category = c),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                                  decoration: BoxDecoration(
+                                    color: active ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFFEDF0EE),
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: active ? Border.all(color: const Color(0xFF10B981)) : null,
+                                  ),
+                                  alignment: Alignment.center,
+                                  child: Text(c, style: TextStyle(
+                                    fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                                    color: active ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
+                                  )),
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.pushNamed(context, '/social-feed'),
+                        child: Container(
+                          height: 36,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEDF0EE),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          alignment: Alignment.center,
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.groups_outlined, size: 16, color: Color(0xFF006C49)),
+                              SizedBox(width: 4),
+                              Text('Cộng đồng', style: TextStyle(
+                                fontWeight: FontWeight.w700, color: Color(0xFF006C49))),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      IconButton(
+                        icon: Icon(
+                          _sortByDistance ? Icons.sort : Icons.sort_by_alpha,
+                          color: _sortByDistance ? const Color(0xFF006C49) : const Color(0xFF3C4A42),
+                        ),
+                        tooltip: 'Sắp xếp theo khoảng cách',
+                        onPressed: () async {
+                          if (_userPos == null) {
+                            try {
+                              final perm = await Geolocator.checkPermission();
+                              if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+                                final req = await Geolocator.requestPermission();
+                                if (req == LocationPermission.denied || req == LocationPermission.deniedForever) return;
+                              }
+                              final pos = await Geolocator.getCurrentPosition();
+                              _userPos = pos;
+                            } catch (_) { return; }
+                          }
+                          setState(() => _sortByDistance = !_sortByDistance);
+                        },
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -254,7 +354,7 @@ class _BrowseBodyState extends State<_BrowseBody> {
             const SliverFillRemaining(child: Center(child: CircularProgressIndicator()))
           else if (_filtered.isEmpty)
             const SliverFillRemaining(child: Center(child: Text('Không có thiết bị nào.')))
-          else
+          else ...[
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
@@ -274,6 +374,22 @@ class _BrowseBodyState extends State<_BrowseBody> {
                 ),
               ),
             ),
+            if (_assets.length < _total)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _loadingMore ? null : _loadMore,
+                      child: _loadingMore
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Xem thêm'),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ],
       ),
     );

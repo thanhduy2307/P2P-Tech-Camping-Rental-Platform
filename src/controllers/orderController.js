@@ -3,21 +3,39 @@ const Asset = require('../models/Asset');
 const User = require('../models/User');
 const Transaction = require('../models/Transaction');
 const { createPaymentUrl, verifyReturnUrl } = require('../services/vnpayService');
+const { notifyUser } = require('../utils/notificationHelper');
 const { differenceInDays, parseISO } = require('date-fns');
 
-// Helper to auto-expire unpaid orders older than 1 minute
+// Radius (meters) a renter must be within the asset pickup location
+// for a lender_no_show claim to be considered valid.
+const PICKUP_RADIUS_METERS = 200;
+
+// Haversine distance in meters between two coordinates.
+const haversineMeters = (lat1, lng1, lat2, lng2) => {
+  const R = 6371000;
+  const toRad = (d) => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+};
+
+// Helper to auto-expire unpaid orders older than 10 minutes
 const expireOldPendingOrders = async () => {
   try {
-    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
+    const cutoff = new Date(Date.now() - 10 * 60 * 1000);
     await Order.updateMany(
       { 
         status: 'pending_payment', 
-        createdAt: { $lt: oneMinuteAgo } 
+        createdAt: { $lt: cutoff } 
       },
       { 
         $set: { 
           status: 'cancelled', 
-          disputeNotes: 'Hệ thống tự động hủy đơn do không thanh toán trong vòng 1 phút.' 
+          disputeNotes: 'Hệ thống tự động hủy đơn do không thanh toán trong vòng 10 phút.' 
         } 
       }
     );
@@ -689,26 +707,101 @@ exports.cancelOrder = async (req, res) => {
       let penalty = 0;
       let message = '';
       
-      if (reason === 'lender_no_show') {
-        // Renter reports Lender did not show up
-        refundRent = order.totalRent;
-        const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
-        
-        const lender = await User.findById(order.asset.lender);
-        lender.balance -= penaltyToLender; // Can be negative
-        lender.reputationScore = Math.max(0, lender.reputationScore - 0.5);
-        await lender.save();
-        
-        await Transaction.create({
-          user: lender._id,
-          order: order._id,
-          amount: -penaltyToLender,
-          type: 'deduction',
-          reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
-        });
+const isLenderNoShow = reason === 'lender_no_show' || 
+        (typeof reason === 'string' && (
+          reason.toLowerCase().includes('lender') || 
+          reason.toLowerCase().includes('chủ đồ') ||
+          reason.toLowerCase().includes('không liên hệ') ||
+          reason.toLowerCase().includes('no_show')
+        ));
 
-        message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
-        order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+      if (isLenderNoShow) {
+        const proofImgs = req.body.renterNoShowEvidence || req.body.cancellationProofImages || req.body.proofImages || req.body.images;
+
+        const validProofArray = Array.isArray(proofImgs) ? proofImgs.filter(Boolean) : (proofImgs ? [proofImgs] : []);
+
+        if (validProofArray.length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: 'Vui lòng tải lên ít nhất 1 hình ảnh bằng chứng (ảnh lịch sử cuộc gọi hoặc tin nhắn cho Lender) để thực hiện hủy đơn.'
+          });
+        }
+
+        // Verify the renter was actually at the pickup location before penalizing the Lender.
+        const renterLoc = req.body.renterLocation;
+        const assetLoc = order.asset && order.asset.location;
+        let distance = null;
+        if (
+          renterLoc &&
+          typeof renterLoc.lat === 'number' &&
+          typeof renterLoc.lng === 'number' &&
+          assetLoc &&
+          typeof assetLoc.lat === 'number' &&
+          typeof assetLoc.lng === 'number'
+        ) {
+          distance = haversineMeters(renterLoc.lat, renterLoc.lng, assetLoc.lat, assetLoc.lng);
+        }
+
+        order.renterNoShowEvidence = validProofArray;
+        order.noShowDistanceMeters = distance === null ? undefined : Math.round(distance);
+
+        if (distance !== null && distance <= PICKUP_RADIUS_METERS) {
+          // Renter is at/near the pickup spot -> Lender at fault
+          refundRent = order.totalRent;
+          const penaltyToLender = Math.round(order.totalRent * 0.05); // 5% penalty
+          
+          const lender = await User.findById(order.asset.lender);
+          lender.balance -= penaltyToLender; // Can be negative
+          lender.reputationScore = Math.max(0, lender.reputationScore - 0.5);
+          await lender.save();
+          
+          await Transaction.create({
+            user: lender._id,
+            order: order._id,
+            amount: -penaltyToLender,
+            type: 'deduction',
+            reason: 'Phạt 5% do không đến giao đồ cho người thuê.'
+          });
+
+          message = `Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc. Chủ đồ bị phạt ${penaltyToLender.toLocaleString('vi-VN')} đ do không xuất hiện.`;
+          order.disputeNotes = `Renter hủy: Lender không đến (lender_no_show). Renter đã có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m). Đã gửi ${validProofArray.length} ảnh bằng chứng. Hoàn Renter 100%. Phạt Lender 5% (${penaltyToLender} đ).`;
+
+          notifyUser(
+            order.asset.lender,
+            'order',
+            'Đơn hàng bị hủy do Lender không xuất hiện',
+            `Đơn hàng #${order._id.toString().slice(-6)} đã bị Renter hủy với lý do không liên hệ/gặp được Lender. Bạn bị phạt 5% tiền thuê.`,
+            '/lender-orders'
+          );
+        } else {
+          // Renter NOT at pickup location -> treat as normal renter cancel, no Lender penalty
+          if (distance !== null) {
+            order.disputeNotes = `Renter hủy (lender_no_show) nhưng KHÔNG có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m, ngưỡng ${PICKUP_RADIUS_METERS}m). Chuyển sang hủy tự nguyện, không phạt Lender. `;
+          }
+          if (hoursToStart >= 48) {
+            refundRent = order.totalRent;
+            message = 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền.';
+          } else {
+            penalty = Math.round(order.totalRent * 0.3);
+            refundRent = order.totalRent - penalty;
+            message = `Bạn không có mặt tại địa điểm nhận đồ nên không được xác nhận là Lender không đến. Hủy đơn sát ngày: bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ).`;
+          }
+
+          if (penalty > 0) {
+            const lender = await User.findById(order.asset.lender);
+            lender.balance += penalty;
+            await lender.save();
+            
+            await Transaction.create({
+              user: lender._id,
+              order: order._id,
+              amount: penalty,
+              type: 'addition',
+              reason: 'Người thuê hủy đơn sát ngày, đền bù 30%.'
+            });
+          }
+          order.disputeNotes = `${order.disputeNotes || ''}Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
+        }
       } else {
         // Normal Renter cancel
         if (hoursToStart >= 48) {
@@ -734,6 +827,14 @@ exports.cancelOrder = async (req, res) => {
           });
         }
         order.disputeNotes = `Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
+
+        notifyUser(
+          order.asset.lender,
+          'order',
+          'Người thuê đã hủy đơn hàng',
+          `Đơn hàng #${order._id.toString().slice(-6)} đã được người thuê hủy.`,
+          '/lender-orders'
+        );
       }
 
       // Process Renter refund
@@ -756,6 +857,14 @@ exports.cancelOrder = async (req, res) => {
 
       order.status = 'cancelled';
       await order.save();
+
+      notifyUser(
+        order.renter,
+        'order',
+        'Hủy đơn hàng thành công',
+        `Đơn hàng #${order._id.toString().slice(-6)} đã được hủy. Số tiền ${(refundRent + refundDeposit).toLocaleString('vi-VN')} đ đã hoàn về ví.`,
+        '/orders'
+      );
 
       return res.status(200).json({ success: true, message, data: order });
     } else {
@@ -1085,6 +1194,83 @@ exports.getIncomingOrders = async (req, res) => {
   }
 };
 
+// @desc    Get lender's top products by rental count & revenue
+// @route   GET /api/orders/top-assets
+// @access  Private (Lender)
+exports.getTopAssets = async (req, res) => {
+  try {
+    const assets = await Asset.find({ lender: req.user._id, status: { $ne: 'deleted' } });
+    if (assets.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: { mostRented: null, mostRevenue: null, topAssets: [] }
+      });
+    }
+
+    const assetIds = assets.map(a => a._id);
+    const assetMap = {};
+    const statsMap = {};
+
+    assets.forEach(a => {
+      const idStr = a._id.toString();
+      assetMap[idStr] = a;
+      statsMap[idStr] = {
+        asset: a,
+        rentalCount: 0,
+        totalRevenue: 0
+      };
+    });
+
+    const orders = await Order.find({
+      asset: { $in: assetIds },
+      status: { $nin: ['cancelled', 'pending_payment'] }
+    }).select('asset totalRent platformFee');
+
+    orders.forEach(order => {
+      const idStr = order.asset ? order.asset.toString() : null;
+      if (idStr && statsMap[idStr]) {
+        statsMap[idStr].rentalCount += 1;
+        const totalRent = Number(order.totalRent) || 0;
+        const platformFee = Number(order.platformFee) || 0;
+        const revenue = Math.max(0, totalRent - platformFee);
+        statsMap[idStr].totalRevenue += revenue;
+      }
+    });
+
+    const topAssets = Object.values(statsMap)
+      .map(item => ({
+        ...item,
+        totalRevenue: Math.round(item.totalRevenue)
+      }))
+      .sort((a, b) => b.rentalCount - a.rentalCount || b.totalRevenue - a.totalRevenue);
+
+    const rentedItems = topAssets.filter(item => item.rentalCount > 0);
+    
+    let mostRented = null;
+    let mostRevenue = null;
+
+    if (rentedItems.length > 0) {
+      mostRented = rentedItems[0];
+      mostRevenue = [...rentedItems].sort((a, b) => b.totalRevenue - a.totalRevenue || b.rentalCount - a.rentalCount)[0];
+    } else if (topAssets.length > 0) {
+      mostRented = topAssets[0];
+      mostRevenue = topAssets[0];
+    }
+
+    res.status(200).json({
+      success: true,
+      data: {
+        mostRented,
+        mostRevenue,
+        topAssets
+      }
+    });
+  } catch (error) {
+    console.error('Error in getTopAssets:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 // @desc    Get VNPay payment URL for an existing pending_payment order
 // @route   GET /api/orders/:id/pay
 // @access  Private (Renter)
@@ -1118,7 +1304,7 @@ exports.getPaymentUrl = async (req, res) => {
 exports.getDisputedOrders = async (req, res) => {
   try {
     const orders = await Order.find({ status: 'disputed' })
-      .populate('asset', 'name images')
+      .populate({ path: 'asset', select: 'name images lender', populate: { path: 'lender', select: 'name email' } })
       .populate('renter', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: orders });
@@ -1220,6 +1406,64 @@ exports.negotiateDispute = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Hành động không hợp lệ' });
     }
   } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Get user's real refund & financial transaction history for profile
+// @route   GET /api/orders/my-refunds
+// @access  Private
+exports.getMyRefunds = async (req, res) => {
+  try {
+    const userId = req.user._id;
+
+    const transactions = await Transaction.find({ user: userId })
+      .populate({
+        path: 'order',
+        populate: { path: 'asset', select: 'name' }
+      })
+      .sort({ createdAt: -1 });
+
+    const formattedList = transactions.map(t => {
+      const isAdd = t.type === 'addition';
+      const absAmount = Math.abs(t.amount);
+      const reasonLower = (t.reason || '').toLowerCase();
+      
+      let refundType = 'other';
+      if (reasonLower.includes('cọc') || reasonLower.includes('hoàn cọc') || reasonLower.includes('khấu trừ cọc')) {
+        refundType = 'deposit_return';
+      } else if (reasonLower.includes('hủy đơn') || reasonLower.includes('hủy')) {
+        refundType = 'order_cancelled';
+      } else if (reasonLower.includes('tranh chấp') || reasonLower.includes('khiếu nại') || reasonLower.includes('bồi thường') || reasonLower.includes('đền bù')) {
+        refundType = 'dispute_settled';
+      } else if (reasonLower.includes('phạt')) {
+        refundType = 'penalty';
+      } else if (reasonLower.includes('rút tiền')) {
+        refundType = 'withdrawal';
+      }
+
+      return {
+        refundId: `REF-${t._id.toString().slice(-6).toUpperCase()}`,
+        orderId: t.order ? `ORD-${t.order._id.toString().slice(-6).toUpperCase()}` : 'N/A',
+        assetTitle: t.order?.asset?.name || 'Giao dịch EquipPeer',
+        requestDate: t.createdAt,
+        type: t.type,
+        isAddition: isAdd,
+        refundType,
+        refundAmount: absAmount,
+        signedAmount: isAdd ? absAmount : -absAmount,
+        refundMethod: 'Ví EquipPeer Wallet',
+        reason: t.reason,
+        status: 'success'
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      data: formattedList
+    });
+  } catch (error) {
+    console.error('Error in getMyRefunds:', error);
     res.status(500).json({ success: false, message: error.message });
   }
 };

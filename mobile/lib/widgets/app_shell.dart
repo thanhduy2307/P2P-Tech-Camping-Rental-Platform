@@ -12,19 +12,26 @@ class _NavItem {
   const _NavItem(this.icon, this.label, this.route);
 }
 
-const List<_NavItem> _navItems = [
+const List<_NavItem> _renterNav = [
   _NavItem(Icons.explore_outlined, 'Khám phá', '/browse'),
-  _NavItem(Icons.search_outlined, 'Tìm kiếm', '/browse'),
   _NavItem(Icons.calendar_today_outlined, 'Thuê đồ', '/my-orders'),
+  _NavItem(Icons.chat_bubble_outline, 'Tin nhắn', '/conversations'),
+  _NavItem(Icons.person_outline, 'Cá nhân', '/profile'),
+];
+
+const List<_NavItem> _lenderNav = [
+  _NavItem(Icons.dashboard_outlined, 'Dashboard', '/lender/dashboard'),
+  _NavItem(Icons.inventory_2_outlined, 'Kho', '/lender/inventory'),
   _NavItem(Icons.chat_bubble_outline, 'Tin nhắn', '/conversations'),
   _NavItem(Icons.person_outline, 'Cá nhân', '/profile'),
 ];
 
 class VeloxBottomNav extends StatelessWidget {
   final int currentIndex;
+  final List<_NavItem> items;
   final void Function(int)? onTap;
 
-  const VeloxBottomNav({super.key, required this.currentIndex, this.onTap});
+  const VeloxBottomNav({super.key, required this.currentIndex, required this.items, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -39,8 +46,8 @@ class VeloxBottomNav extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: List.generate(_navItems.length, (i) {
-              final item = _navItems[i];
+            children: List.generate(items.length, (i) {
+              final item = items[i];
               final active = i == currentIndex;
               return Expanded(
                 child: InkWell(
@@ -83,7 +90,7 @@ class VeloxBottomNav extends StatelessWidget {
   }
 }
 
-class MainScaffold extends StatelessWidget {
+class MainScaffold extends StatefulWidget {
   final Widget body;
   final int currentIndex;
   final bool showTopBar;
@@ -102,22 +109,31 @@ class MainScaffold extends StatelessWidget {
     this.showDrawer = true,
   });
 
-  void _onNavTap(BuildContext context, int index) {
-    if (index == currentIndex) return;
-    final route = _navItems[index].route;
-    if (index == 1) {
-      // Tìm kiếm shares browse route
-      Navigator.pushReplacementNamed(context, route);
-      return;
-    }
-    Navigator.pushReplacementNamed(context, route);
+  @override
+  State<MainScaffold> createState() => _MainScaffoldState();
+}
+
+class _MainScaffoldState extends State<MainScaffold> {
+  final _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  List<_NavItem> _navForRole(String role) {
+    return role == 'lender' ? _lenderNav : _renterNav;
+  }
+
+  void _onNavTap(int index) {
+    final nav = _navForRole(Provider.of<AuthProvider>(context, listen: false).role ?? 'renter');
+    if (index == widget.currentIndex) return;
+    Navigator.pushReplacementNamed(context, nav[index].route);
   }
 
   @override
   Widget build(BuildContext context) {
-    final role = Provider.of<AuthProvider>(context).role ?? 'renter';
-    final showBottom = showBottomNav && role == 'renter';
-    final appBar = showTopBar
+    final auth = Provider.of<AuthProvider>(context);
+    final role = auth.role ?? 'renter';
+    final lenderStatus = auth.user?.lenderStatus ?? 'none';
+    final showBottom = widget.showBottomNav && (role == 'renter' || role == 'lender');
+    final navItems = _navForRole(role);
+    final appBar = widget.showTopBar
         ? PreferredSize(
             preferredSize: const Size.fromHeight(64),
             child: Container(
@@ -130,15 +146,28 @@ class MainScaffold extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                   child: Row(
                     children: [
-                      if (showDrawer)
+                      if (widget.showDrawer)
                         IconButton(
                           icon: const Icon(Icons.menu),
                           color: AppTheme.onSurface,
-                          onPressed: () => Scaffold.of(context).openDrawer(),
+                          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
                           tooltip: 'Menu',
                         ),
                       const BrandLogo(size: 26),
                       const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: role == 'renter' ? const Color(0xFF10B981).withValues(alpha: 0.12) : const Color(0xFF7C3AED).withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text('$role${lenderStatus == 'approved' ? '+L' : ''}', style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: role == 'renter' ? const Color(0xFF006C49) : const Color(0xFF7C3AED),
+                        )),
+                      ),
+                      const SizedBox(width: 8),
                       IconButton(
                         icon: const Icon(Icons.receipt_long_outlined),
                         color: AppTheme.onSurface,
@@ -169,13 +198,14 @@ class MainScaffold extends StatelessWidget {
         : null;
 
     return Scaffold(
+      key: _scaffoldKey,
       backgroundColor: AppTheme.background,
       appBar: appBar,
-      drawer: showDrawer ? const AppDrawer() : null,
-      body: body,
-      floatingActionButton: floatingActionButton,
+      drawer: widget.showDrawer ? const AppDrawer() : null,
+      body: widget.body,
+      floatingActionButton: widget.floatingActionButton,
       bottomNavigationBar: showBottom
-          ? VeloxBottomNav(currentIndex: currentIndex, onTap: (i) => _onNavTap(context, i))
+          ? VeloxBottomNav(currentIndex: widget.currentIndex, items: navItems, onTap: (i) => _onNavTap(i))
           : null,
     );
   }

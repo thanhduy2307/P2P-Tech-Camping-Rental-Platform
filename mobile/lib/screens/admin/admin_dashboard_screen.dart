@@ -46,10 +46,14 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   List<dynamic> _withdrawals = [];
   bool _withdrawalsLoading = false;
 
+  // Disputes
+  List<dynamic> _disputes = [];
+  bool _disputesLoading = false;
+
   @override
   void initState() {
     super.initState();
-    _tab = TabController(length: 6, vsync: this);
+    _tab = TabController(length: 7, vsync: this);
     _tab.addListener(() {
       if (_tab.indexIsChanging) return;
       _loadForTab(_tab.index);
@@ -71,6 +75,29 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
     if (i == 3) _loadOrders();
     if (i == 4) _loadEkyc();
     if (i == 5) _loadWithdrawals();
+    if (i == 6) _loadDisputes();
+  }
+
+  Future<void> _loadDisputes() async {
+    setState(() => _disputesLoading = true);
+    try {
+      _disputes = await AdminService.getDisputedOrders();
+    } catch (e) {
+      if (mounted) UiHelper.showErrorToast(context, e);
+    } finally {
+      if (mounted) setState(() => _disputesLoading = false);
+    }
+  }
+
+  Future<void> _resolveDispute(String orderId, String resolution, {String? note}) async {
+    try {
+      await AdminService.resolveDispute(orderId, resolution, note: note);
+      if (!mounted) return;
+      UiHelper.showSuccessToast(context, resolution == 'lender' ? 'Đã xử lý nghiêng về bên cho thuê' : 'Đã xử lý nghiêng về bên đi thuê');
+      _loadDisputes();
+    } catch (e) {
+      if (mounted) UiHelper.showErrorToast(context, e);
+    }
   }
 
   Future<void> _loadStats() async {
@@ -181,17 +208,60 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
   }
 
   Future<void> _verifyWithdrawal(String id, String status) async {
+    if (id.isEmpty) {
+      if (mounted) UiHelper.showErrorToast(context, 'ID giao dịch không hợp lệ');
+      return;
+    }
+    if (status == 'rejected') {
+      final reasonCtl = TextEditingController();
+      try {
+        final reason = await showDialog<String>(
+          context: context,
+          barrierDismissible: false,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Từ chối rút tiền'),
+            content: SizedBox(
+              height: 120,
+              child: TextField(
+                controller: reasonCtl,
+                decoration: const InputDecoration(
+                  labelText: 'Lý do từ chối',
+                  hintText: 'Nhập lý do...',
+                  border: OutlineInputBorder(),
+                ),
+                maxLines: 3,
+                autofocus: true,
+              ),
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Hủy')),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, reasonCtl.text.trim()),
+                child: const Text('Xác nhận'),
+              ),
+            ],
+          ),
+        );
+        if (reason == null || reason.isEmpty) return;
+        await AdminService.verifyWithdrawal(id, status, rejectReason: reason);
+        if (mounted) EquipDialog.success(context, 'Đã từ chối.');
+        _loadWithdrawals();
+      } catch (e) {
+        if (mounted) UiHelper.showErrorToast(context, e);
+      }
+      return;
+    }
     final confirmed = await EquipDialog.confirm(
       context,
       'Xác nhận',
-      status == 'approved' ? 'Duyệt yêu cầu rút tiền này?' : 'Từ chối yêu cầu rút tiền này?',
+      'Duyệt yêu cầu rút tiền này?',
       confirmText: 'Xác nhận',
       cancelText: 'Hủy',
     );
     if (confirmed != true) return;
     try {
       await AdminService.verifyWithdrawal(id, status);
-      if (mounted) EquipDialog.success(context, status == 'approved' ? 'Đã duyệt rút tiền.' : 'Đã từ chối.');
+      if (mounted) EquipDialog.success(context, 'Đã duyệt rút tiền.');
       _loadWithdrawals();
     } catch (e) {
       if (mounted) UiHelper.showErrorToast(context, e);
@@ -276,6 +346,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
               Tab(text: 'Đơn hàng'),
               Tab(text: 'Duyệt eKYC'),
               Tab(text: 'Rút tiền'),
+              Tab(text: 'Xử lý tranh chấp'),
             ],
           ),
           Expanded(
@@ -288,6 +359,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                 _ordersTab(),
                 _ekycTab(),
                 _withdrawalsTab(),
+                _disputesTab(),
               ],
             ),
           ),
@@ -424,7 +496,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                           title: Row(
                             children: [
                               Expanded(child: Text(u.name, overflow: TextOverflow.ellipsis)),
-                              if (u.isBanned)
+                              if (u.isBanned == true)
                                 const Padding(
                                   padding: EdgeInsets.only(left: 6),
                                   child: Text('Bị khóa',
@@ -438,7 +510,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               DropdownButton<String>(
-                                value: u.role,
+                                value: u.role ?? 'renter',
                                 items: const [
                                   DropdownMenuItem(value: 'renter', child: Text('Renter')),
                                   DropdownMenuItem(value: 'lender', child: Text('Lender')),
@@ -650,27 +722,120 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen>
       itemBuilder: (_, i) {
         final w = _withdrawals[i];
         final bank = w['bankAccount'] ?? {};
+        final status = w['status'] as String? ?? 'pending';
         return Card(
           child: ListTile(
             leading: const Icon(Icons.account_balance_wallet, color: Color(0xFF006C49)),
             title: Text(_fmt(w['amount'])),
-            subtitle: Text('${bank['bankName'] ?? ''} · ${bank['accountNumber'] ?? ''}'
-                '${w['status'] != null ? ' · ${w['status']}' : ''}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
+            subtitle: Text('${bank['bankName'] ?? ''} · ${bank['accountNumber'] ?? ''}'),
+            trailing: status == 'pending'
+                ? Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextButton.icon(
+                        icon: const Icon(Icons.check_circle, size: 18, color: Color(0xFF006C49)),
+                        label: const Text('Duyệt', style: TextStyle(color: Color(0xFF006C49), fontSize: 12)),
+                        onPressed: () => _verifyWithdrawal(w['_id']?.toString() ?? '', 'approved'),
+                      ),
+                      TextButton.icon(
+                        icon: const Icon(Icons.cancel, size: 18, color: Color(0xFFBA1A1A)),
+                        label: const Text('Từ chối', style: TextStyle(color: Color(0xFFBA1A1A), fontSize: 12)),
+                        onPressed: () => _verifyWithdrawal(w['_id']?.toString() ?? '', 'rejected'),
+                      ),
+                    ],
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: status == 'approved'
+                          ? const Color(0xFF006C49).withValues(alpha: 0.12)
+                          : const Color(0xFFBA1A1A).withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      status == 'approved' ? 'Đã duyệt' : 'Đã từ chối',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: status == 'approved' ? const Color(0xFF006C49) : const Color(0xFFBA1A1A),
+                      ),
+                    ),
+                  ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _disputesTab() {
+    if (_disputesLoading && _disputes.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_disputes.isEmpty) {
+      return const Center(child: Text('Không có đơn tranh chấp nào.'));
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.all(12),
+      itemCount: _disputes.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (_, i) {
+        final d = _disputes[i];
+        final asset = d['asset'] is Map ? d['asset'] : (d['assetId'] is Map ? d['assetId'] : {});
+        final renter = d['renter'] is Map ? d['renter'] : (d['renterId'] is Map ? d['renterId'] : {});
+        final assetLender = asset['lender'] is Map ? asset['lender'] : {};
+        final lender = d['lender'] is Map ? d['lender'] : (d['lenderId'] is Map ? d['lenderId'] : assetLender);
+        final dispute = d['dispute'] is Map ? d['dispute'] : {};
+        return Card(
+          child: ExpansionTile(
+            leading: const Icon(Icons.gavel, color: Color(0xFFBA1A1A)),
+            title: Text('Đơn #${((d['_id']?.toString() ?? '').length >= 8 ? d['_id'].toString().substring(0, 8) : d['_id']?.toString() ?? '?')}...',
+                style: const TextStyle(fontWeight: FontWeight.w700)),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  icon: const Icon(Icons.check_circle, color: Color(0xFF006C49)),
-                  tooltip: 'Duyệt',
-                  onPressed: () => _verifyWithdrawal(w['_id'], 'approved'),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.cancel, color: Color(0xFFBA1A1A)),
-                  tooltip: 'Từ chối',
-                  onPressed: () => _verifyWithdrawal(w['_id'], 'rejected'),
-                ),
+                Text('Thiết bị: ${asset['name'] ?? 'N/A'}'),
+                Text('Bên thuê: ${renter['name'] ?? renter['email'] ?? 'N/A'}'),
+                Text('Bên cho thuê: ${lender['name'] ?? lender['email'] ?? 'N/A'}'),
+                Text('Lý do: ${dispute['reason'] ?? ''}',
+                    style: const TextStyle(fontSize: 11)),
+                if (dispute['description'] != null)
+                  Text('Mô tả: ${dispute['description']}',
+                      style: const TextStyle(fontSize: 11)),
               ],
             ),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      icon: const Icon(Icons.person, color: Color(0xFF006C49)),
+                      label: const Text('Nghiêng về bên đi thuê',
+                          style: TextStyle(color: Color(0xFF006C49))),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (ctx) => _DisputeDialog(
+                          onResolve: (note) => _resolveDispute(d['_id'], 'renter', note: note),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    TextButton.icon(
+                      icon: const Icon(Icons.person, color: Color(0xFFBA1A1A)),
+                      label: const Text('Nghiêng về bên cho thuê',
+                          style: TextStyle(color: Color(0xFFBA1A1A))),
+                      onPressed: () => showDialog(
+                        context: context,
+                        builder: (ctx) => _DisputeDialog(
+                          onResolve: (note) => _resolveDispute(d['_id'], 'lender', note: note),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -748,6 +913,65 @@ class _Bar extends StatelessWidget {
               backgroundColor: const Color(0xFFE5E7EB)),
         ],
       ),
+    );
+  }
+}
+
+class _DisputeDialog extends StatefulWidget {
+  final Future<void> Function(String? note) onResolve;
+  const _DisputeDialog({required this.onResolve});
+
+  @override
+  State<_DisputeDialog> createState() => _DisputeDialogState();
+}
+
+class _DisputeDialogState extends State<_DisputeDialog> {
+  final _note = TextEditingController();
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Xác nhận giải quyết tranh chấp'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Xác nhận quyết định giải quyết tranh chấp này?'),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _note,
+            decoration: const InputDecoration(
+              labelText: 'Ghi chú (không bắt buộc)',
+              border: OutlineInputBorder(),
+            ),
+            maxLines: 3,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
+        ElevatedButton(
+          onPressed: _submitting ? null : () async {
+            setState(() => _submitting = true);
+            try {
+              await widget.onResolve(_note.text.trim().isEmpty ? null : _note.text.trim());
+              if (!mounted) return;
+              Navigator.pop(context);
+            } finally {
+              if (mounted) setState(() => _submitting = false);
+            }
+          },
+          child: _submitting
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Text('Xác nhận'),
+        ),
+      ],
     );
   }
 }

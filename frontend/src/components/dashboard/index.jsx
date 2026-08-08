@@ -187,6 +187,15 @@ const DashboardLayout = ({ role, children }) => {
                 Thiết bị của tôi
               </Link>
               <Link 
+                to="/lender-top-assets" 
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  isActive('/lender-top-assets') ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">leaderboard</span>
+                Sản phẩm nổi bật
+              </Link>
+              <Link 
                 to="/lender-orders" 
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive('/lender-orders') ? 'bg-teal-600 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-100'
@@ -228,9 +237,10 @@ const DashboardLayout = ({ role, children }) => {
             <h1 className="text-lg font-bold text-slate-800">
               {isActive('/dashboard-lender') && 'Tổng quan Thu nhập'}
               {isActive('/lender-inventory') && 'Kho Thiết bị của tôi'}
+              {isActive('/lender-top-assets') && 'Sản phẩm nổi bật'}
               {isActive('/lender-orders') && 'Đơn hàng cho thuê'}
               {isActive('/post-asset') && 'Đăng thiết bị mới'}
-              {!['/dashboard-lender', '/lender-inventory', '/lender-orders', '/post-asset'].includes(location.pathname) && 'Trang Quản trị Lender'}
+              {!['/dashboard-lender', '/lender-inventory', '/lender-top-assets', '/lender-orders', '/post-asset'].includes(location.pathname) && 'Trang Quản trị Lender'}
             </h1>
           </div>
           

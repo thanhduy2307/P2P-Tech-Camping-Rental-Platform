@@ -7,11 +7,61 @@ const { OAuth2Client } = require('google-auth-library');
 const { notifyUser, notifyUsersByRole } = require('../utils/notificationHelper');
 const aiService = require('../services/aiService');
 
+const crypto = require('crypto');
 const client = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_CALLBACK_URL
 );
+
+// In-memory store for mobile Google auth sessions
+const mobileAuthSessions = new Map();
+
+// URL helper for mobile Google auth
+const getGoogleAuthUrl = (sessionId) => {
+  const redirectUri = process.env.GOOGLE_CALLBACK_URL;
+  return `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=openid%20email%20profile&state=mobile:${sessionId}&access_type=offline`;
+};
+
+// @desc    Start mobile Google auth session
+// @route   POST /api/auth/google/start-mobile
+exports.googleStartMobile = async (req, res) => {
+  try {
+    const sessionId = crypto.randomUUID();
+    const authUrl = getGoogleAuthUrl(sessionId);
+    mobileAuthSessions.set(sessionId, { createdAt: Date.now(), status: 'pending' });
+    // Clean old sessions every 5 min
+    for (const [sid, data] of mobileAuthSessions) {
+      if (Date.now() - data.createdAt > 300000) mobileAuthSessions.delete(sid);
+    }
+    res.status(200).json({ success: true, data: { sessionId, authUrl } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Poll mobile Google auth session for result
+// @route   GET /api/auth/google/session/:sessionId
+exports.googlePollSession = async (req, res) => {
+  try {
+    const session = mobileAuthSessions.get(req.params.sessionId);
+    if (!session) {
+      return res.status(404).json({ success: false, message: 'Session not found or expired' });
+    }
+    if (session.status === 'completed') {
+      mobileAuthSessions.delete(req.params.sessionId);
+      const userData = session.result && session.result.data ? session.result.data : {};
+      return res.status(200).json({ success: true, data: { status: 'done', ...userData } });
+    }
+    if (session.status === 'error') {
+      mobileAuthSessions.delete(req.params.sessionId);
+      return res.status(400).json({ success: false, message: session.message || 'Google auth failed' });
+    }
+    res.status(200).json({ success: true, data: { status: 'pending' } });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
 
 const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, {
@@ -412,23 +462,21 @@ exports.login = async (req, res) => {
 };
 
 exports.googleCallback = async (req, res) => {
+  let sessionId = null;
   try {
-    const { code } = req.query;
+    const { code, state } = req.query;
     if (!code) {
       return res.status(400).json({ success: false, message: 'Google auth code missing' });
     }
 
-    let tokens;
-    try {
-      const exchangeResult = await client.getToken({
-        code,
-        redirect_uri: 'postmessage'
-      });
-      tokens = exchangeResult.tokens;
-    } catch (err) {
-      const exchangeResult = await client.getToken(code);
-      tokens = exchangeResult.tokens;
-    }
+    // Mobile OAuth flow: state=mobile:<sessionId>
+    const isMobile = typeof state === 'string' && state.startsWith('mobile:');
+    sessionId = isMobile ? state.split(':')[1] : null;
+
+    // Mobile: use GOOGLE_CALLBACK_URL; Web (GIS popup): use 'postmessage'
+    const redirectUri = isMobile ? process.env.GOOGLE_CALLBACK_URL : 'postmessage';
+    const exchangeResult = await client.getToken({ code, redirect_uri: redirectUri });
+    const tokens = exchangeResult.tokens;
     const ticket = await client.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID
@@ -445,10 +493,9 @@ exports.googleCallback = async (req, res) => {
         email,
         googleId: sub,
         authProvider: 'google',
-        role: 'renter' // Default role
+        role: 'renter'
       });
     } else if (!user.googleId) {
-      // Link account
       user.googleId = sub;
       if (user.authProvider === 'local') {
         user.authProvider = 'google';
@@ -456,9 +503,8 @@ exports.googleCallback = async (req, res) => {
       await user.save();
     }
 
-    res.status(200).json({
+    const result = {
       success: true,
-      message: 'Google Login Successful! Please copy your token to use in Swagger.',
       data: {
         _id: user._id,
         name: user.name,
@@ -472,8 +518,24 @@ exports.googleCallback = async (req, res) => {
         lenderOnboarding: user.lenderOnboarding,
         token: generateToken(user._id)
       }
-    });
+    };
+
+    if (isMobile && sessionId) {
+      // Store result in session for mobile polling
+      const session = mobileAuthSessions.get(sessionId);
+      if (session) {
+        session.status = 'completed';
+        session.result = result;
+        return res.send('<script>window.close()</script><p>Login successful! You can close this tab.</p>');
+      }
+    }
+
+    res.status(200).json(result);
   } catch (error) {
+    if (mobileAuthSessions.has(sessionId || '')) {
+      mobileAuthSessions.set(sessionId, { status: 'error', message: error.message });
+      return res.send(`<script>window.close()</script><p>Login failed: ${error.message}</p>`);
+    }
     res.status(401).json({ success: false, message: 'Google Auth Error: ' + error.message });
   }
 };
@@ -1292,12 +1354,123 @@ exports.verifyRenterApplication = async (req, res) => {
   }
 };
 
+// @desc    Forgot password - send OTP to phone
+// @route   POST /api/auth/forgot-password
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, message: 'Vui lòng nhập số điện thoại.' });
+    }
+    const cleanPhone = phoneNumber.trim().replace(/[\s-]/g, '');
+    const user = await User.findOne({ phoneNumber: cleanPhone });
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Số điện thoại chưa được đăng ký.' });
+    }
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    user.phoneVerificationOtp = otp;
+    user.phoneVerificationOtpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    await user.save();
+    const smsService = require('../services/smsService');
+    const smsResult = await smsService.sendSMS(cleanPhone, otp);
+    const isMock = !process.env.SMS_PROVIDER || process.env.SMS_PROVIDER === 'mock';
+    const isTelegram = process.env.SMS_PROVIDER === 'telegram';
+    const showOtp = isMock || !smsResult.success;
+    let message = 'Mã OTP đặt lại mật khẩu đã được gửi đến số điện thoại của bạn.';
+    if (isTelegram) message = 'Mã OTP đã được gửi về Telegram Bot.';
+    res.status(200).json({
+      success: true,
+      message: smsResult.success ? message : 'Cổng gửi bị lỗi. Đã chuyển sang chế độ OTP dự phòng.',
+      data: { userId: user._id, otp: showOtp ? otp : undefined, smsSent: smsResult.success }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Reset password with OTP
+// @route   POST /api/auth/reset-password
+exports.resetPassword = async (req, res) => {
+  try {
+    const { userId, otp, newPassword } = req.body;
+    if (!userId || !otp || !newPassword) {
+      return res.status(400).json({ success: false, message: 'Vui lòng cung cấp đầy đủ thông tin.' });
+    }
+    if (newPassword.length < 6) {
+      return res.status(400).json({ success: false, message: 'Mật khẩu phải có ít nhất 6 ký tự.' });
+    }
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy tài khoản.' });
+    }
+    if (!user.phoneVerificationOtp || user.phoneVerificationOtp !== otp.trim()) {
+      return res.status(400).json({ success: false, message: 'Mã OTP không chính xác.' });
+    }
+    if (new Date() > user.phoneVerificationOtpExpires) {
+      return res.status(400).json({ success: false, message: 'Mã OTP đã hết hạn.' });
+    }
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    user.phoneVerificationOtp = undefined;
+    user.phoneVerificationOtpExpires = undefined;
+    await user.save();
+    res.status(200).json({ success: true, message: 'Mật khẩu đã được đặt lại thành công.' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
 exports.getMyTransactions = async (req, res) => {
   try {
     const transactions = await Transaction.find({ user: req.user._id })
       .populate('order', 'startDate endDate totalRent deposit')
       .sort({ createdAt: -1 });
     res.status(200).json({ success: true, data: transactions });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// @desc    Lender earnings summary
+// @route   GET /api/auth/lender-stats
+exports.getLenderStats = async (req, res) => {
+  try {
+    const user = await User.findById(req.user._id);
+    if (!user) return res.status(404).json({ success: false, message: 'Không tìm thấy người dùng.' });
+
+    const [aggregate] = await Transaction.aggregate([
+      { $match: { user: user._id, type: 'addition' } },
+      {
+        $group: {
+          _id: null,
+          totalEarnings: { $sum: '$amount' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const [monthAgg] = await Transaction.aggregate([
+      { $match: { user: user._id, type: 'addition', createdAt: { $gte: startOfMonth } } },
+      { $group: { _id: null, monthEarnings: { $sum: '$amount' } } }
+    ]);
+
+    const [withdrawAgg] = await WithdrawalRequest.aggregate([
+      { $match: { lender: user._id, status: 'approved' } },
+      { $group: { _id: null, totalWithdrawn: { $sum: '$amount' } } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      data: {
+        balance: user.balance,
+        totalEarnings: aggregate ? aggregate.totalEarnings : 0,
+        transactionCount: aggregate ? aggregate.count : 0,
+        monthEarnings: monthAgg ? monthAgg.monthEarnings : 0,
+        totalWithdrawn: withdrawAgg ? withdrawAgg.totalWithdrawn : 0
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
   }
