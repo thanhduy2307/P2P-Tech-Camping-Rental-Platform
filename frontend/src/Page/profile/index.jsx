@@ -347,7 +347,7 @@ const Profile = () => {
         } else {
           setProfileError('Đã xảy ra lỗi khi cập nhật ảnh đại diện.');
         }
-      } font-semibold
+      }
       finally {
         setLoadingProfile(false);
       }
