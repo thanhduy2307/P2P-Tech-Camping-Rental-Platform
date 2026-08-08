@@ -146,7 +146,7 @@ const Orders = () => {
     }
   };
 
-  const handleCancelNoShow = (orderId) => {
+  const handleOpenCancelProofModal = (orderId) => {
     setSelectedCancelOrderId(orderId);
     setCancelProofImages(['', '', '']);
     setCancelProofNote('');
@@ -250,7 +250,7 @@ const Orders = () => {
       if (!_swalRes.isConfirmed) return;
       
       if (_swalRes.value === 'lender_no_show') {
-        handleCancelNoShow(orderId);
+        handleOpenCancelProofModal(orderId);
         return;
       }
 
@@ -305,6 +305,94 @@ const Orders = () => {
 } catch (err) {
       console.error(err);
       Swal.fire('Lỗi', err.response?.data?.message || 'Có lỗi xảy ra hoặc timeout. Vui lòng tải lại trang.', 'error');
+    }
+  };
+
+  // Pick one evidence image for the lender_no_show cancel claim (max 3)
+  const handlePickNoShowEvidence = (orderId, index) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.click();
+    input.onchange = async () => {
+      const file = input.files[0];
+      if (!file) return;
+      Swal.fire({
+        title: 'Đang xử lý ảnh...',
+        allowOutsideClick: false,
+        didOpen: () => { Swal.showLoading(); }
+      });
+      try {
+        const compressedBase64 = await compressImage(file);
+        setNoShowEvidence(prev => {
+          const current = prev[orderId] || [];
+          const next = [...current];
+          next[index] = compressedBase64;
+          return { ...prev, [orderId]: next };
+        });
+        Swal.close();
+      } catch (err) {
+        console.error(err);
+        Swal.close();
+        Swal.fire('Lỗi', 'Không thể xử lý hình ảnh.', 'error');
+      }
+    };
+  };
+
+  const handleRemoveNoShowEvidence = (orderId, index) => {
+    setNoShowEvidence(prev => {
+      const current = (prev[orderId] || []).filter((_, i) => i !== index);
+      return { ...prev, [orderId]: current };
+    });
+  };
+
+  const handleCancelNoShow = async (orderId) => {
+    const evidence = (noShowEvidence[orderId] || []).filter(Boolean);
+    const _swalRes = await Swal.fire({
+      title: 'Xác nhận hủy đơn (Không liên hệ được Lender)',
+      html: 'Bạn cần cung cấp <b>ít nhất 1 ảnh bằng chứng</b> (screenshot cuộc gọi/chat không được trả lời).<br/>Hệ thống sẽ lấy <b>vị trí GPS</b> để xác nhận bạn có mặt tại địa điểm nhận đồ. Nếu hợp lệ, bạn được <b>hoàn trả 100% tiền thuê và cọc</b>, không bị trừ phí.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Đồng ý',
+      cancelButtonText: 'Hủy'
+    });
+    if (!_swalRes.isConfirmed) return;
+
+    if (evidence.length === 0) {
+      return Swal.fire('Thiếu bằng chứng', 'Vui lòng tải lên ít nhất 1 ảnh bằng chứng rồi thử lại.', 'warning');
+    }
+
+    const getPosition = () => new Promise((resolve, reject) => {
+      if (!navigator.geolocation) return reject(new Error('Trình duyệt không hỗ trợ định vị.'));
+      navigator.geolocation.getCurrentPosition(resolve, reject, {
+        enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+      });
+    });
+
+    let renterLocation = null;
+    try {
+      const pos = await getPosition();
+      renterLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+    } catch (err) {
+      return Swal.fire('Không lấy được vị trí GPS', 'Hãy bật quyền định vị cho trình duyệt rồi thử lại.', 'error');
+    }
+
+    try {
+      Swal.fire({ title: 'Đang xử lý...', didOpen: () => Swal.showLoading(), allowOutsideClick: false });
+      const response = await api.put(`/orders/${orderId}/cancel`, {
+        reason: 'lender_no_show',
+        renterLocation,
+        renterNoShowEvidence: evidence
+      });
+      if (response.data?.success) {
+        setNoShowEvidence(prev => ({ ...prev, [orderId]: [] }));
+        Swal.fire(response.data.message || 'Hủy đơn hàng thành công.');
+        const res = await api.get('/orders/my-rentals');
+        if (res.data?.success) setOrders(res.data.data || []);
+      }
+    } catch (err) {
+      console.error(err);
+      Swal.fire(err.response?.data?.message || 'Không thể hủy đơn hàng.');
     }
   };
 
