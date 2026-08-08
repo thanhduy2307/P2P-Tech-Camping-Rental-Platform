@@ -774,33 +774,16 @@ const isLenderNoShow = reason === 'lender_no_show' ||
             '/lender-orders'
           );
         } else {
-          // Renter NOT at pickup location -> treat as normal renter cancel, no Lender penalty
+          // Renter NOT at pickup location (or GPS unavailable).
+          // Still refund 100% to Renter (no penalty) because the order was cancelled due to
+          // being unable to contact the Lender. No Lender penalty since presence is unverified.
+          refundRent = order.totalRent;
           if (distance !== null) {
-            order.disputeNotes = `Renter hủy (lender_no_show) nhưng KHÔNG có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m, ngưỡng ${PICKUP_RADIUS_METERS}m). Chuyển sang hủy tự nguyện, không phạt Lender. `;
-          }
-          if (hoursToStart >= 48) {
-            refundRent = order.totalRent;
-            message = 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền.';
+            order.disputeNotes = `Renter hủy (lender_no_show) nhưng KHÔNG có mặt tại địa điểm nhận đồ (cách ${Math.round(distance)}m, ngưỡng ${PICKUP_RADIUS_METERS}m). Hoàn 100% cho Renter, không phạt Lender. Đã gửi ${validProofArray.length} ảnh bằng chứng.`;
           } else {
-            penalty = Math.round(order.totalRent * 0.3);
-            refundRent = order.totalRent - penalty;
-            message = `Bạn không có mặt tại địa điểm nhận đồ nên không được xác nhận là Lender không đến. Hủy đơn sát ngày: bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ).`;
+            order.disputeNotes = `Renter hủy (lender_no_show), không xác định được vị trí GPS của Renter. Hoàn 100% cho Renter, không phạt Lender. Đã gửi ${validProofArray.length} ảnh bằng chứng.`;
           }
-
-          if (penalty > 0) {
-            const lender = await User.findById(order.asset.lender);
-            lender.balance += penalty;
-            await lender.save();
-            
-            await Transaction.create({
-              user: lender._id,
-              order: order._id,
-              amount: penalty,
-              type: 'addition',
-              reason: 'Người thuê hủy đơn sát ngày, đền bù 30%.'
-            });
-          }
-          order.disputeNotes = `${order.disputeNotes || ''}Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
+          message = 'Hủy đơn thành công. Bạn được hoàn trả 100% tiền thuê và cọc.';
         }
       } else {
         // Normal Renter cancel

@@ -141,7 +141,7 @@ class _OrderDetailScreenState extends State<OrderDetailScreen> {
 
   Future<void> _cancelNoShow() async {
     final ok = await EquipDialog.confirm(context, 'Không liên hệ được Lender',
-        'Hệ thống sẽ lấy vị trí GPS của bạn để kiểm tra bạn có đúng mặt tại địa điểm nhận đồ hay không, đồng thời yêu cầu upload ảnh bằng chứng (tối thiểu 1 ảnh, ví dụ: screenshot cuộc gọi/chat không được trả lời). Tiếp tục?');
+        'Bạn cần upload ảnh bằng chứng (tối thiểu 1 ảnh, ví dụ: screenshot cuộc gọi/chat không được trả lời) và hệ thống sẽ lấy vị trí GPS để xác nhận bạn có mặt tại địa điểm nhận đồ. Nếu hợp lệ, bạn được hoàn trả 100% tiền thuê và cọc, không bị trừ phí.');
     if (ok != true) return;
 
     if (_noShowImages.isEmpty) {
