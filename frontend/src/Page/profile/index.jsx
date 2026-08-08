@@ -4,7 +4,6 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import api from '../../configs/axios';
 import { loginSuccess, updateProfile } from '../../redux/authSlice';
-import { MOCK_TRANSACTIONS } from '../../mock/transactionData';
 
 const Profile = () => {
   const dispatch = useDispatch();
@@ -124,7 +123,7 @@ const Profile = () => {
   };
 
   // Get active list of transactions
-  const displayTransactions = (transactions && transactions.length > 0) ? transactions : MOCK_TRANSACTIONS;
+  const displayTransactions = transactions || [];
 
   const filteredTransactions = displayTransactions.filter((item) => {
     if (txnCategoryFilter !== 'all') {
