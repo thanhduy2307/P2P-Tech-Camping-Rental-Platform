@@ -28,6 +28,9 @@ const Orders = () => {
   const [handoverDrafts, setHandoverDrafts] = useState({});
   const [returnDrafts, setReturnDrafts] = useState({});
 
+  // No-show evidence images (lender_no_show claim)
+  const [noShowEvidence, setNoShowEvidence] = useState({});
+
   // Dispute states
   const [disputeModalOpen, setDisputeModalOpen] = useState(false);
   const [selectedOrderForDispute, setSelectedOrderForDispute] = useState(null);
@@ -627,6 +630,27 @@ const Orders = () => {
     if (activeTab === 'cancelled') return orders.filter(o => o.status === 'cancelled');
     if (activeTab === 'disputed') return orders.filter(o => o.status === 'disputed');
     return orders;
+  };
+
+  // Safe date rendering (never throws)
+  const formatSafeDate = (value) => {
+    if (!value) return 'N/A';
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return 'N/A';
+      return d.toLocaleDateString('vi-VN');
+    } catch (err) {
+      return 'N/A';
+    }
+  };
+
+  const isLateReturn = (order) => {
+    try {
+      const end = new Date(order.endDate);
+      return order.status === 'active' && !isNaN(end.getTime()) && new Date() > end;
+    } catch (err) {
+      return false;
+    }
   };
 
   // Helper for rendering status badge
