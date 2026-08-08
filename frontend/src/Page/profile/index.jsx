@@ -130,30 +130,6 @@ const Profile = () => {
   const displayTransactions = (transactions && transactions.length > 0) ? transactions : MOCK_TRANSACTIONS;
 
   const filteredTransactions = displayTransactions.filter((item) => {
-    const orderStatus = typeof item.order === 'object' ? item.order?.status : null;
-    const reasonLower = (item.reason || item.description || '').toLowerCase();
-    
-    // 1. Ẩn chi tiết giao dịch liên quan tới đơn hàng bị hủy hoặc đang khiếu nại/tranh chấp
-    const isCancelledOrDisputed = 
-      orderStatus === 'cancelled' || 
-      orderStatus === 'disputed' || 
-      item.category === 'cancellation_refund' || 
-      item.category === 'dispute_refund' ||
-      reasonLower.includes('hủy đơn') ||
-      reasonLower.includes('khiếu nại') ||
-      reasonLower.includes('tranh chấp');
-
-    if (isCancelledOrDisputed) {
-      return false;
-    }
-
-    // 2. Cộng tiền chỉ hiển thị khi đơn hàng đó đã hoàn thành ('completed')
-    if (item.type === 'addition' && item.order) {
-      if (orderStatus && orderStatus !== 'completed') {
-        return false;
-      }
-    }
-
     if (txnCategoryFilter !== 'all') {
       if (txnCategoryFilter === 'rental_payment' && item.category !== 'rental_payment' && item.type !== 'deduction') return false;
       if (txnCategoryFilter === 'deposit_refund' && item.category !== 'deposit_refund' && item.type !== 'addition') return false;
@@ -162,7 +138,7 @@ const Profile = () => {
     if (!isWithinTimeRange(item.createdAt, txnTimeFilter)) return false;
     if (txnSearchQuery.trim()) {
       const q = txnSearchQuery.toLowerCase();
-      const matchName = (item.serviceName || item.reason || '').toLowerCase().includes(q);
+      const matchName = (item.serviceName || item.reason || item.description || '').toLowerCase().includes(q);
       const matchCode = (item.id || item.orderId || '').toLowerCase().includes(q);
       if (!matchName && !matchCode) return false;
     }

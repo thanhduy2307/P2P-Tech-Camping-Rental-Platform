@@ -713,11 +713,11 @@ exports.cancelOrder = async (req, res) => {
         // Normal Renter cancel
         if (hoursToStart >= 48) {
           refundRent = order.totalRent;
-          message = 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền.';
+          message = 'Hủy đơn hàng trước 2 ngày thành công. Bạn được hoàn trả 100% tiền cọc & tiền thuê.';
         } else {
-          penalty = Math.round(order.totalRent * 0.3);
+          penalty = Math.round(order.totalRent * 0.15);
           refundRent = order.totalRent - penalty;
-          message = `Hủy đơn hàng sát ngày. Bị phạt 30% tiền thuê (${penalty.toLocaleString('vi-VN')} đ).`;
+          message = `Hủy đơn hàng sát ngày. Bị phạt 15% tiền thuê (${penalty.toLocaleString('vi-VN')} đ).`;
         }
 
         if (penalty > 0) {
@@ -730,7 +730,7 @@ exports.cancelOrder = async (req, res) => {
             order: order._id,
             amount: penalty,
             type: 'addition',
-            reason: 'Người thuê hủy đơn sát ngày, đền bù 30%.'
+            reason: 'Người thuê hủy đơn sát ngày, đền bù 15% tiền thuê.'
           });
         }
         order.disputeNotes = `Renter hủy đơn tự nguyện. Phạt: ${penalty} đ. Hoàn trả: ${refundRent + refundDeposit} đ. Lý do: ${reason || 'Không có'}`;
@@ -738,8 +738,21 @@ exports.cancelOrder = async (req, res) => {
 
       // Process Renter refund
       const renter = await User.findById(order.renter);
-      renter.balance += (refundRent + refundDeposit);
-      await renter.save();
+      const renterRefundAmount = refundRent + refundDeposit;
+      if (renterRefundAmount > 0) {
+        renter.balance += renterRefundAmount;
+        await renter.save();
+
+        await Transaction.create({
+          user: renter._id,
+          order: order._id,
+          amount: renterRefundAmount,
+          type: 'addition',
+          reason: penalty > 0 
+            ? `Hoàn tiền cọc & thuê (Đã trừ 15% phí hủy đơn: ${penalty.toLocaleString('vi-VN')} đ)`
+            : 'Hoàn 100% tiền cọc & thuê do hủy đơn hàng'
+        });
+      }
 
       order.status = 'cancelled';
       await order.save();
